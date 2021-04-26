@@ -1,0 +1,19 @@
+target_sources(NoodlesViewer
+PRIVATE
+    argumenttablemodel.cpp
+    argumenttablemodel.h
+    main.cpp
+    structtablemodel.cpp
+    structtablemodel.h
+    componentlistmodel.cpp
+    componentlistmodel.h
+    qml.qrc
+    state.cpp
+    state.h
+    delegates.h
+    delegates.cpp
+    instance_material/qinstancedmetalroughmaterial.cpp
+    instance_material/qinstancedmetalroughmaterial.h
+    attachedmethodlistmodel.cpp
+    attachedmethodlistmodel.h
+)

@@ -1,0 +1,18 @@
+<RCC>
+    <qresource prefix="/">
+        <file>instance_material/shaders/es3/coordinatesystems.inc</file>
+        <file>instance_material/shaders/es3/default.vert</file>
+        <file>instance_material/shaders/es3/light.inc.frag</file>
+        <file>instance_material/shaders/es3/metalrough.inc.frag</file>
+        <file>instance_material/shaders/gl3/coordinatesystems.inc</file>
+        <file>instance_material/shaders/gl3/default.vert</file>
+        <file>instance_material/shaders/gl3/light.inc.frag</file>
+        <file>instance_material/shaders/gl3/metalrough.inc.frag</file>
+        <file>instance_material/shaders/graphs/metalrough.frag.json</file>
+        <file>instance_material/shaders/rhi/coordinatesystems.inc</file>
+        <file>instance_material/shaders/rhi/default.vert</file>
+        <file>instance_material/shaders/rhi/defaultuniforms.inc</file>
+        <file>instance_material/shaders/rhi/light.inc.frag</file>
+        <file>instance_material/shaders/rhi/metalrough.inc.frag</file>
+    </qresource>
+</RCC>
