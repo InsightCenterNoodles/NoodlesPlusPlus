@@ -1,0 +1,16 @@
+target_sources(noodles
+PRIVATE
+    interface_types.cpp
+    noo_any.cpp
+    noo_anyref.cpp
+    client_interface.cpp
+    common.cpp
+PUBLIC
+    id.h
+    include_glm.h
+    interface_types.h
+    noo_any.h
+    noo_anyref.h
+    common.h
+    client_interface.h
+)

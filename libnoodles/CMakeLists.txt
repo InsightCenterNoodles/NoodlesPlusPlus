@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.12...3.16)
 
-project(Noodles VERSION 0.1 LANGUAGES CXX)
+project(libnoodles VERSION 0.1 LANGUAGES CXX)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -45,8 +47,6 @@ CPMAddPackage(
     VERSION 0.9.9.8
 )
 
-#find_package(glm REQUIRED)
-
 find_package(Qt5 COMPONENTS Gui Widgets WebSockets Core 3DCore 3DExtras 3DRender Quick)
 
 # Options ======================================================================
@@ -81,75 +81,16 @@ endmacro()
 
 # Set Up =======================================================================
 
-# Common Lib
-add_library(noodlesCommon STATIC "")
-setup_library_target(noodlesCommon)
-add_subdirectory(shared)
-target_link_libraries(noodlesCommon PUBLIC Qt::Core)
-
 # Server Lib
-add_library(noodlesServer SHARED "")
-setup_library_target(noodlesServer)
-add_subdirectory(server_lib)
+add_library(noodles SHARED "")
+setup_library_target(noodles)
+target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets)
 
-
-target_link_libraries(noodlesServer PRIVATE noodlesCommon)
-target_link_libraries(noodlesServer PUBLIC Qt::WebSockets Qt::Core)
-
-# Client Lib
-add_library(noodlesClient SHARED "")
-setup_library_target(noodlesClient)
-add_subdirectory(client_lib)
-
-target_link_libraries(noodlesClient PRIVATE noodlesCommon)
-target_link_libraries(noodlesClient PUBLIC Qt::Widgets Qt::WebSockets Qt::Core)
-
-if(BUILD_EX_SERVER)
-    # Server Example
-    add_executable(exampleServer "")
-    setup_exe_target(exampleServer)
-    add_subdirectory(example_server)
-    target_include_directories(exampleServer PRIVATE ${CMAKE_SOURCE_DIR}/server_lib)
-    target_link_libraries(exampleServer PRIVATE noodlesServer)
-    target_link_libraries(exampleServer PUBLIC Qt::Gui Qt::Core)
-endif()
-
-
-if (BUILD_EX_CLIENT)
-    add_executable(exampleClient "")
-    setup_exe_target(exampleClient)
-    add_subdirectory(example_client)
-    target_include_directories(exampleClient PRIVATE ${CMAKE_SOURCE_DIR}/client_lib)
-    target_link_libraries(exampleClient PRIVATE noodlesClient)
-    target_link_libraries(exampleClient PUBLIC
-        Qt::Gui Qt::Widgets Qt::Core
-        Qt::3DCore Qt::3DExtras Qt::3DRender
-    )
-
-    # QML Client
-    add_executable(NoodlesViewer "")
-    setup_exe_target(NoodlesViewer)
-    add_subdirectory(qml_client)
-    target_include_directories(NoodlesViewer PRIVATE ${CMAKE_SOURCE_DIR}/client_lib)
-    target_link_libraries(NoodlesViewer PRIVATE noodlesClient)
-    target_link_libraries(NoodlesViewer PUBLIC
-        Qt::Gui Qt::Widgets Qt::Core
-        Qt::3DCore Qt::3DExtras Qt::3DRender
-        Qt::Quick
-    )
-endif()
-
+add_subdirectory(common)
+add_subdirectory(generated)
+add_subdirectory(include)
+add_subdirectory(client)
 
 # Files ========================================================================
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-
-GroupSourcesByFolder(noodlesCommon)
-
-GroupSourcesByFolder(noodlesServer)
-GroupSourcesByFolder(noodlesClient)
-
-GroupSourcesByFolder(exampleServer)
-GroupSourcesByFolder(exampleClient)
-GroupSourcesByFolder(NoodlesViewer)
-
+GroupSourcesByFolder(noodles)
