@@ -120,7 +120,7 @@ write_basic_package_version_file(
 
 install(EXPORT LibNoodlesConfig
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibNoodles"
-    NAMESPACE LibNoodles
+    NAMESPACE LibNoodles::
 )
 
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LibNoodlesConfigVersion.cmake"
