@@ -1,7 +1,7 @@
 #pragma once
 
-#include "id.h"
-#include "include_glm.h"
+#include "noo_id.h"
+#include "noo_include_glm.h"
 
 #include <optional>
 #include <span>

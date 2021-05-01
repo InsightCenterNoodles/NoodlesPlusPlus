@@ -1,7 +1,7 @@
 #ifndef CLIENTSTATE_H
 #define CLIENTSTATE_H
 
-#include "include/client_interface.h"
+#include "include/noo_client_interface.h"
 
 #include <deque>
 

@@ -1,16 +1,16 @@
 target_sources(noodles
 PRIVATE
-    interface_types.cpp
+    noo_interface_types.cpp
     noo_any.cpp
     noo_anyref.cpp
-    client_interface.cpp
-    common.cpp
-PUBLIC
-    id.h
-    include_glm.h
-    interface_types.h
+    noo_client_interface.cpp
+    noo_common.cpp
+#PUBLIC
+    noo_id.h
+    noo_include_glm.h
+    noo_interface_types.h
     noo_any.h
     noo_anyref.h
-    common.h
-    client_interface.h
+    noo_common.h
+    noo_client_interface.h
 )

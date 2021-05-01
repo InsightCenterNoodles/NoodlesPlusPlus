@@ -2,7 +2,7 @@
 
 #include "common/variant_tools.h"
 #include "generated/noodles_generated.h"
-#include "include/interface_types.h"
+#include "include/noo_interface_types.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>

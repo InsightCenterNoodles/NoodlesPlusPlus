@@ -2,8 +2,8 @@
 #define NOO_INTERFACE_TOOLS_H
 
 #include "flatbuffers/flatbuffers.h"
-#include "include/id.h"
-#include "include/include_glm.h"
+#include "include/noo_id.h"
+#include "include/noo_include_glm.h"
 
 #include <functional>
 #include <string>
