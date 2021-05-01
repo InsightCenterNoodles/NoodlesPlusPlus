@@ -78,9 +78,7 @@ target_link_libraries(noodles PRIVATE glm)
 target_include_directories(noodles PRIVATE ${flatbuffers_SOURCE_DIR}/include)
 target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets)
 
-add_subdirectory(common)
-add_subdirectory(generated)
-add_subdirectory(client)
+add_subdirectory(src)
 
 # We have to do this for the group-by-folders module
 # We cant have a cmakelists in the include dir as that appears to be installed
