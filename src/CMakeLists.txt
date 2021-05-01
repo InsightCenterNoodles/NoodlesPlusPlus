@@ -8,9 +8,6 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-option(BUILD_EX_CLIENT "Build example client executable" ON)
-option(BUILD_EX_SERVER "Build example server executable" ON)
-
 # CMake Modules ================================================================
 
 include(cmake/CPM.cmake)
