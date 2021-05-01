@@ -1,8 +1,8 @@
 #include "clientstate.h"
 
 #include "clientmessagehandler.h"
-#include "common/variant_tools.h"
-#include "generated/interface_tools.h"
+#include "src/common/variant_tools.h"
+#include "src/generated/interface_tools.h"
 
 #include <QUuid>
 

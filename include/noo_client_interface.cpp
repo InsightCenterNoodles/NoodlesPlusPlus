@@ -1,8 +1,8 @@
 #include "noo_client_interface.h"
 
-#include "client/clientstate.h"
-#include "common/variant_tools.h"
 #include "noo_common.h"
+#include "src/client/clientstate.h"
+#include "src/common/variant_tools.h"
 
 #include <QWebSocket>
 

@@ -1,7 +1,7 @@
 #include "clientmessagehandler.h"
 
 #include "clientstate.h"
-#include "generated/interface_tools.h"
+#include "src/generated/interface_tools.h"
 
 namespace nooc {
 

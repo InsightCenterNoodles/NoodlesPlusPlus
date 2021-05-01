@@ -1,8 +1,8 @@
 #include "interface_tools.h"
 
-#include "common/variant_tools.h"
-#include "generated/noodles_generated.h"
 #include "include/noo_interface_types.h"
+#include "src/common/variant_tools.h"
+#include "src/generated/noodles_generated.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>

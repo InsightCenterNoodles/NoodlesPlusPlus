@@ -1,7 +1,7 @@
 #include "noo_anyref.h"
 
-#include "generated/interface_tools.h"
-#include "generated/noodles_generated.h"
+#include "src/generated/interface_tools.h"
+#include "src/generated/noodles_generated.h"
 
 namespace noo {
 
