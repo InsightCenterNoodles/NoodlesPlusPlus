@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 3.12...3.16)
+cmake_minimum_required(VERSION 3.13...3.16)
 
-project(LibNoodles VERSION 0.1 LANGUAGES CXX)
+project(noodles VERSION 0.1 LANGUAGES CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-#set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -19,6 +19,8 @@ CPMAddPackage(
   GITHUB_REPOSITORY TheLartians/GroupSourcesByFolder.cmake
   VERSION 1.0
 )
+
+CPMAddPackage("gh:TheLartians/PackageProject.cmake@1.6.0")
 
 CPMAddPackage(
   NAME flatbuffers
@@ -65,12 +67,9 @@ target_compile_features(noodles PUBLIC cxx_std_20)
 target_compile_options(noodles PUBLIC ${sanitizer_compile_flag})
 target_link_options(noodles PUBLIC ${sanitizer_compile_flag})
 
-target_include_directories(noodles
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<INSTALL_INTERFACE:include/libnoodles>
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
+target_include_directories(noodles PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
 )
 
 
@@ -81,8 +80,29 @@ target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets)
 
 add_subdirectory(common)
 add_subdirectory(generated)
-add_subdirectory(include)
 add_subdirectory(client)
+
+# We have to do this for the group-by-folders module
+# We cant have a cmakelists in the include dir as that appears to be installed
+target_sources(noodles
+PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_interface_types.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_interface_types.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_any.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_any.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_anyref.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_anyref.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_client_interface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_client_interface.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_common.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_common.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_id.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_include_glm.h
+)
+
+#get_target_property(NDBG noodles SOURCES)
+
+#message(${NDBG})
 
 # Files ========================================================================
 
@@ -90,39 +110,20 @@ GroupSourcesByFolder(noodles)
 
 # Install ======================================================================
 
-file(GLOB_RECURSE PUBLIC_INCLUDE_FILES "include/*.h*")
+string(TOLOWER ${PROJECT_NAME}/version.h VERSION_HEADER_LOCATION)
 
-set_target_properties(noodles
-    PROPERTIES
-    PUBLIC_HEADER "${PUBLIC_INCLUDE_FILES}"
-)
+packageProject(
+  NAME ${PROJECT_NAME}
+  VERSION ${PROJECT_VERSION}
+  NAMESPACE ${PROJECT_NAME}
 
-install(TARGETS noodles
-    EXPORT LibNoodlesConfig
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libnoodles
-)
 
-export(TARGETS noodles
-    NAMESPACE LibNoodles::
-    FILE "${CMAKE_CURRENT_BINARY_DIR}/LibNoodlesConfig.cmake"
-)
+  BINARY_DIR ${PROJECT_BINARY_DIR}
+  INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include
+  INCLUDE_DESTINATION include/${PROJECT_NAME}-${PROJECT_VERSION}
+  VERSION_HEADER "${VERSION_HEADER_LOCATION}"
 
-include(CMakePackageConfigHelpers)
+  EXPORT_HEADER "${PROJECT_NAME}/export.h"
 
-write_basic_package_version_file(
-    LibNoodlesConfigVersion.cmake
-    VERSION ${PACKAGE_VERSION}
-    COMPATIBILITY AnyNewerVersion
-    )
-
-install(EXPORT LibNoodlesConfig
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibNoodles"
-    NAMESPACE LibNoodles::
-)
-
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/LibNoodlesConfigVersion.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/LibNoodles"
+  DEPENDENCIES "glm 0.9.9.8"
 )
