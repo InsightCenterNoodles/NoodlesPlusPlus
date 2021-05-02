@@ -34,20 +34,31 @@ struct PossiblyOwnedView {
     PossiblyOwnedView(PossiblyOwnedView&&) = default;
     PossiblyOwnedView& operator=(PossiblyOwnedView&&) = default;
 
+
+    PossiblyOwnedView& operator=(std::span<T> s) {
+        storage = s;
+        return *this;
+    }
+
+    PossiblyOwnedView& operator=(std::vector<StrippedT>&& s) {
+        storage = std::move(s);
+        return *this;
+    }
+
     auto begin() const {
-        return std::visit([](auto const& a) { return a.begin(); });
+        return std::visit([](auto const& a) { return a.begin(); }, storage);
     }
 
     auto end() const {
-        return std::visit([](auto const& a) { return a.end(); });
+        return std::visit([](auto const& a) { return a.end(); }, storage);
     }
 
     T const* data() const {
-        return std::visit([](auto const& a) { return a.data(); });
+        return std::visit([](auto const& a) { return a.data(); }, storage);
     }
 
     auto size() const {
-        return std::visit([](auto const& a) { return a.size(); });
+        return std::visit([](auto const& a) { return a.size(); }, storage);
     }
 
     std::span<T> span() const {

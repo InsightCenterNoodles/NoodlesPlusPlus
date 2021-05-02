@@ -96,6 +96,8 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_common.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_id.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_include_glm.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_server_interface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_server_interface.h
 )
 
 #get_target_property(NDBG noodles SOURCES)
