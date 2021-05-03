@@ -1,6 +1,7 @@
 #include "noo_server_interface.h"
 
 #include "include/noo_include_glm.h"
+#include "src/common/variant_tools.h"
 #include "src/server/noodlesserver.h"
 #include "src/server/noodlesstate.h"
 
@@ -346,123 +347,528 @@ void update_mesh(MeshT* item, MeshData const& data) {
 
 // Table =======================================================================
 
-TableQuery::~TableQuery() = default;
+// TableQuery::~TableQuery() = default;
 
-size_t TableQuery::next() const {
-    return 0;
+// size_t TableQuery::next() const {
+//    return 0;
+//}
+
+// void TableQuery::write_next_to(std::span<double>) {
+//    // do nothing
+//}
+
+bool TableQuery::is_column_string(size_t) const {
+    return false;
 }
 
-void TableQuery::write_next_to(std::span<double>) {
-    // do nothing
+bool TableQuery::get_reals_to(size_t, std::span<double>) const {
+    return false;
+}
+
+bool TableQuery::get_cell_to(size_t, size_t, std::string_view&) const {
+    return false;
+}
+
+bool TableQuery::get_keys_to(std::span<int64_t>) const {
+    return false;
+}
+
+// =============
+
+size_t TableColumn::size() const {
+    return std::visit([&](auto const& a) { return a.size(); }, *this);
+}
+
+bool TableColumn::is_string() const {
+    return std::holds_alternative<std::vector<std::string>>(*this);
+}
+
+std::span<double const> TableColumn::as_doubles() const {
+    auto* p = std::get_if<std::vector<double>>(this);
+
+    return p ? std::span<double const>(*p) : std::span<double const> {};
+}
+std::span<std::string const> TableColumn::as_string() const {
+    auto* p = std::get_if<std::vector<std::string>>(this);
+
+    return p ? std::span<std::string const>(*p)
+             : std::span<std::string const> {};
+}
+
+void TableColumn::append(std::span<double> d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) {
+            a.insert(a.end(), d.begin(), d.end());
+        },
+        VCASE(std::vector<std::string> & a) {
+            for (auto value : d) {
+                a.push_back(std::to_string(value));
+            }
+        });
+}
+
+void TableColumn::append(AnyVarListRef const& d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) {
+            d.for_each(
+                [&](auto, auto const& ref) { a.push_back(ref.to_real()); });
+        },
+        VCASE(std::vector<std::string> & a) {
+            d.for_each([&](auto, auto const& ref) {
+                a.push_back(std::string(ref.to_string()));
+            });
+        });
+}
+
+void TableColumn::set(size_t row, double d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) { a[row] = d; },
+        VCASE(std::vector<std::string> & a) { a[row] = std::to_string(d); });
+}
+void TableColumn::set(size_t row, AnyVarRef d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) { a[row] = d.to_real(); },
+        VCASE(std::vector<std::string> & a) {
+            a[row] = std::string(d.to_string());
+        });
+}
+
+void TableColumn::erase(size_t row) {
+    std::visit([row](auto& a) { a.erase(a.begin() + row); }, *this);
+}
+
+void TableColumn::clear() {
+    std::visit([](auto& a) { a.clear(); }, *this);
+}
+
+// =============
+
+namespace {
+
+
+struct WholeTableQuery : TableQuery {
+    TableSource* source;
+
+    WholeTableQuery(TableSource* s) : source(s) {
+        num_cols = s->get_columns().size();
+        num_rows = num_cols ? s->get_columns().at(0).size() : 0;
+    }
+
+    bool is_column_string(size_t col) const override {
+        return source->get_columns().at(col).is_string();
+    }
+
+    bool get_reals_to(size_t col, std::span<double> dest) const override {
+        auto& column = source->get_columns().at(col);
+
+        if (column.is_string()) return false;
+
+        auto sp = column.as_doubles();
+
+        copy(sp.begin(), sp.end(), dest.begin(), dest.end());
+
+        return true;
+    }
+
+    bool
+    get_cell_to(size_t col, size_t row, std::string_view& s) const override {
+        try {
+            auto& column = source->get_columns().at(col);
+
+            auto sp = column.as_string();
+
+            if (row >= sp.size()) return false;
+
+            s = std::string_view(sp[row]);
+
+            return true;
+
+        } catch (...) { return false; }
+    }
+
+    bool get_keys_to(std::span<int64_t> dest) const override {
+        auto const& r = source->get_row_to_key_map();
+        copy(r.begin(), r.end(), dest.begin(), dest.end());
+        return true;
+    }
+};
+
+struct InsertQuery : TableQuery {
+    TableSource* source;
+
+    size_t start_at = 0;
+
+    InsertQuery(TableSource* s, size_t row_start, size_t count) : source(s) {
+        num_cols = s->get_columns().size();
+        num_rows = count;
+        start_at = row_start;
+    }
+
+    bool is_column_string(size_t col) const override {
+        return source->get_columns().at(col).is_string();
+    }
+
+    bool get_reals_to(size_t col, std::span<double> dest) const override {
+        auto& column = source->get_columns().at(col);
+
+        if (column.is_string()) return false;
+
+        auto sp = column.as_doubles();
+
+        copy(sp.begin() + start_at,
+             sp.begin() + start_at + num_rows,
+             dest.begin(),
+             dest.end());
+
+        return true;
+    }
+
+    bool
+    get_cell_to(size_t col, size_t row, std::string_view& s) const override {
+        try {
+            auto& column = source->get_columns().at(col);
+
+            auto sp = column.as_string();
+
+            if (row >= sp.size()) return false;
+
+            s = std::string_view(sp[row + start_at]);
+
+            return true;
+
+        } catch (...) { return false; }
+    }
+
+    bool get_keys_to(std::span<int64_t> dest) const override {
+        auto const& r = source->get_row_to_key_map();
+        copy(r.begin() + start_at,
+             r.begin() + start_at + num_rows,
+             dest.begin(),
+             dest.end());
+        return true;
+    }
+};
+
+struct UpdateQuery : TableQuery {
+    TableSource*         source;
+    std::vector<int64_t> keys;
+
+
+    UpdateQuery(TableSource* s, std::vector<int64_t> _keys)
+        : source(s), keys(std::move(_keys)) {
+        num_cols = s->get_columns().size();
+        num_rows = keys.size();
+    }
+
+    bool is_column_string(size_t col) const override {
+        return source->get_columns().at(col).is_string();
+    }
+
+    bool get_reals_to(size_t col, std::span<double> dest) const override {
+        auto& column = source->get_columns().at(col);
+
+        if (column.is_string()) return false;
+
+        auto sp = column.as_doubles();
+
+        auto& map = source->get_key_to_row_map();
+
+        for (size_t i = 0; i < num_rows; i++) {
+            auto key = keys[i];
+            auto row = map.at(key);
+
+            dest[i] = sp[row];
+        }
+
+        return true;
+    }
+
+    bool
+    get_cell_to(size_t col, size_t row, std::string_view& s) const override {
+        try {
+            auto& column = source->get_columns().at(col);
+
+            auto sp = column.as_string();
+
+            if (row >= sp.size()) return false;
+
+            auto& map = source->get_key_to_row_map();
+
+            auto key        = keys[row];
+            auto source_row = map.at(key);
+
+            s = sp[source_row];
+
+            return true;
+
+        } catch (...) {
+            qCritical() << Q_FUNC_INFO << "Internal error!";
+            return false;
+        }
+    }
+
+    bool get_keys_to(std::span<int64_t> dest) const override {
+        copy(keys.begin(), keys.end(), dest.begin(), dest.end());
+        return true;
+    }
+};
+
+struct DeleteQuery : TableQuery {
+    TableSource*         source;
+    std::vector<int64_t> keys;
+
+
+    DeleteQuery(TableSource* s, std::vector<int64_t> _keys)
+        : source(s), keys(std::move(_keys)) {
+        num_cols = s->get_columns().size();
+        num_rows = keys.size();
+    }
+
+    bool is_column_string(size_t col) const override {
+        return source->get_columns().at(col).is_string();
+    }
+
+    bool get_reals_to(size_t /*col*/, std::span<double>) const override {
+        return false;
+    }
+
+    bool get_cell_to(size_t /*col*/,
+                     size_t /*row*/,
+                     std::string_view&) const override {
+        return false;
+    }
+
+    bool get_keys_to(std::span<int64_t> dest) const override {
+        copy(keys.begin(), keys.end(), dest.begin(), dest.end());
+        return true;
+    }
+};
+
+} // namespace
+
+TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
+    // get dimensions of insert
+
+    size_t num_cols = cols.size();
+
+    if (num_cols == 0) return nullptr;
+    if (num_cols != m_columns.size()) return nullptr;
+
+    size_t num_rows = 0;
+    bool   ok       = true;
+
+    for (size_t ci = 0; ci < num_cols; ci++) {
+        auto r = cols[ci];
+        switch (r.type()) {
+        case AnyVarRef::AnyType::RealList:
+            if (m_columns.at(ci).is_string()) ok = false;
+            num_rows = std::max(num_rows, r.to_real_list().size());
+            break;
+        case AnyVarRef::AnyType::AnyList:
+            num_rows = std::max(num_rows, r.to_vector().size());
+            break;
+        default: ok = false; break;
+        }
+    }
+
+    if (!ok or num_rows == 0) return nullptr;
+
+    // lets get some keys
+
+    std::vector<int64_t> new_row_keys;
+    new_row_keys.resize(num_rows);
+
+    auto const current_row_count = m_columns.at(0).size();
+
+    for (size_t i = 0; i < num_rows; i++) {
+        new_row_keys[i]             = m_counter;
+        m_key_to_row_map[m_counter] = current_row_count + i;
+        m_counter++;
+    }
+
+    m_row_to_key_map.insert(
+        m_row_to_key_map.end(), new_row_keys.begin(), new_row_keys.end());
+
+
+    // now lets insert
+
+    for (size_t ci = 0; ci < num_cols; ci++) {
+        auto source_col = cols[ci];
+        auto dest_col   = m_columns.at(ci);
+        VMATCH_W(
+            visit,
+            source_col,
+            VCASE(std::span<double> data) { dest_col.append(data); },
+            VCASE(AnyVarListRef const& ref) { dest_col.append(ref); },
+            VCASE(auto const&) {
+                // do nothing, should not get here
+                qFatal("Unable to insert this data type");
+            })
+    }
+
+    // now return a query to the data
+
+    return std::make_shared<InsertQuery>(this, current_row_count, num_rows);
+}
+
+TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
+                                         AnyVarListRef const& cols) {
+    // get dimensions of update
+
+    size_t num_cols = cols.size();
+
+    if (num_cols == 0) return nullptr;
+    if (num_cols != m_columns.size()) return nullptr;
+
+    size_t num_rows = 0;
+    bool   ok       = true;
+
+    for (size_t ci = 0; ci < num_cols; ci++) {
+        auto r = cols[ci];
+        switch (r.type()) {
+        case AnyVarRef::AnyType::RealList:
+            if (m_columns.at(ci).is_string()) ok = false;
+            num_rows = std::max(num_rows, r.to_real_list().size());
+            break;
+        case AnyVarRef::AnyType::AnyList:
+            num_rows = std::max(num_rows, r.to_vector().size());
+            break;
+        default: ok = false; break;
+        }
+    }
+
+    if (!ok or num_rows == 0) return nullptr;
+
+    // lets get some keys
+
+    auto key_list = keys.coerce_int_list();
+
+
+    // now lets update
+
+    for (auto key : key_list) {
+
+        auto update_at = m_key_to_row_map[key];
+
+        for (size_t ci = 0; ci < num_cols; ci++) {
+            auto source_col = cols[ci];
+            auto dest_col   = m_columns.at(ci);
+            VMATCH_W(
+                visit,
+                source_col,
+                VCASE(std::span<double> data) {
+                    dest_col.set(update_at, data[ci]);
+                },
+                VCASE(AnyVarListRef const& ref) {
+                    dest_col.set(update_at, ref[ci]);
+                },
+                VCASE(auto const&) {
+                    // do nothing, should not get here
+                    qFatal("Unable to insert this data type");
+                })
+        }
+    }
+
+    // now return a query to the data
+
+    // UpdateQuery(this, span_to_vector(key_list.span()));
+
+    return std::make_shared<UpdateQuery>(this, span_to_vector(key_list.span()));
+}
+
+TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
+    auto key_list = keys.coerce_int_list();
+
+    // make sure we have those keys
+    for (auto key : key_list) {
+        if (m_key_to_row_map.count(key) == 0) return nullptr;
+    }
+
+    // let us now delete
+    for (auto key : key_list) {
+        auto row = m_key_to_row_map.at(key);
+
+        m_row_to_key_map.erase(m_row_to_key_map.begin() + row);
+        m_key_to_row_map.erase(key);
+
+        for (auto& col : m_columns) {
+            col.erase(row);
+        }
+    }
+
+
+    return std::make_shared<DeleteQuery>(this, span_to_vector(key_list.span()));
+}
+
+bool TableSource::handle_reset() {
+    for (auto& col : m_columns) {
+        col.clear();
+    }
+    return true;
+}
+
+bool TableSource::handle_set_selection(std::string_view    s,
+                                       SelectionRef const& ref) {
+
+    m_selections[std::string(s)] = ref.to_selection();
+
+    return true;
 }
 
 
 TableSource::~TableSource() = default;
 
-std::vector<std::string> TableSource::get_columns() {
-    return {};
-}
-
-size_t TableSource::get_num_rows() {
-    return 0;
-}
-
-QueryPtr TableSource::get_row(int64_t /*row*/, std::span<int64_t> /*columns*/) {
-    return nullptr;
-}
-
-QueryPtr TableSource::get_block(std::pair<int64_t, int64_t> /*rows*/,
-                                std::span<int64_t> /*columns*/) {
-    return nullptr;
-}
-
-QueryPtr TableSource::get_selection_data(std::string_view) {
-    return nullptr;
-}
-
-bool TableSource::request_row_insert(int64_t /*row*/,
-                                     std::span<double> /*data*/) {
-    return false;
-}
-bool TableSource::request_row_update(int64_t /*row*/,
-                                     std::span<double> /*data*/) {
-    return false;
-}
-bool TableSource::request_row_append(std::span<std::span<double>>) {
-    return false;
-}
-bool TableSource::request_deletion(Selection const&) {
-    return false;
-}
-
-bool TableSource::request_reset() {
-    return false;
-}
-
-SelectionRef TableSource::get_selection(std::string_view) {
-    return SelectionRef();
-}
-bool TableSource::request_set_selection(std::string_view, SelectionRef const&) {
-    return false;
-}
-
-std::vector<std::string> TableSource::get_all_selections() {
-    return {};
-}
-
-bool TableSource::trigger_set_selection(std::string_view    selection_id,
-                                        SelectionRef const& r) {
-    auto b = request_set_selection(selection_id, r);
-
-    if (b) { emit table_selection_updated(std::string(selection_id)); }
-
-    return b;
-}
-
-bool TableSource::trigger_row_insert(int64_t row, std::span<double> data) {
-    auto b = request_row_insert(row, data);
-
-    if (b) { emit table_row_added(row, 1); }
-
-    return b;
-}
-
-bool TableSource::trigger_row_update(int64_t row, std::span<double> data) {
-    auto b = request_row_update(row, data);
-
-    if (b) {
-        Selection s;
-
-        s.rows = { row };
-
-        emit table_row_updated(s);
+std::vector<std::string> TableSource::get_headers() {
+    std::vector<std::string> ret;
+    for (auto const& c : m_columns) {
+        ret.push_back(c.name);
     }
-
-    return b;
+    return ret;
 }
 
-bool TableSource::trigger_row_append(std::span<std::span<double>> rows) {
-    auto b = request_row_append(rows);
 
-    if (b) { emit table_row_added(-1, rows.size()); }
-
-    return b;
+TableQueryPtr TableSource::get_all_data() {
+    return std::make_shared<WholeTableQuery>(this);
 }
 
-bool TableSource::trigger_deletion(Selection const& s) {
-    auto b = request_deletion(s);
 
-    if (b) { emit table_row_deleted(s); }
+bool TableSource::ask_insert(AnyVarListRef const& cols) {
+    auto b = handle_insert(cols);
 
-    return b;
+    if (b) { emit table_row_updated(b); }
+
+    return !!b;
 }
 
-bool TableSource::trigger_reset() {
-    auto b = request_reset();
 
-    if (b) { emit sig_reset(); }
+bool TableSource::ask_update(AnyVarRef const&     keys,
+                             AnyVarListRef const& columns) {
+    auto b = handle_update(keys, columns);
 
-    return b;
+    if (b) { emit table_row_updated(b); }
+
+    return !!b;
+}
+
+bool TableSource::ask_delete(AnyVarRef const& keys) {
+    auto b = handle_deletion(keys);
+
+    if (b) { emit table_row_deleted(b); }
+
+    return !!b;
+}
+
+bool TableSource::ask_clear() {
+    return handle_reset();
+}
+
+bool TableSource::ask_update_selection(std::string_view    k,
+                                       SelectionRef const& s) {
+    return handle_set_selection(k, s);
 }
 
 

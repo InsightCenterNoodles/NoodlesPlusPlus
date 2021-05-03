@@ -100,21 +100,21 @@ SignalTPtr DocumentT::get_builtin(BuiltinSignals e) {
 
 // Table Builtins ==============================================================
 
-#define GET_TABLE(CTX)                                                         \
-    ({                                                                         \
-        auto ctlb = CTX.get_table();                                           \
-        if (!ctlb)                                                             \
-            throw MethodException(MethodException::CLIENT,                     \
-                                  "Can only be called on a table.");           \
-        ctlb;                                                                  \
-    })
+static TableTPtr get_table(MethodContext const& context) {
+    auto ctlb = context.get_table();
+    if (!ctlb)
+        throw MethodException(MethodException::CLIENT,
+                              "Can only be called on a table.");
+    return ctlb;
+}
+
 
 static AnyVar table_subscribe(MethodContext const& context,
-                              AnyVarList& /*args*/) {
+                              AnyVarListRef const& /*args*/) {
 
     qDebug() << Q_FUNC_INFO;
 
-    auto tbl = GET_TABLE(context);
+    auto tbl = get_table(context);
 
     QObject::connect(tbl.get(),
                      &TableT::send_data,
@@ -122,84 +122,68 @@ static AnyVar table_subscribe(MethodContext const& context,
                      &ClientT::send,
                      Qt::UniqueConnection);
 
-    return AnyVar();
-}
+    auto& source = *tbl->get_source();
 
 
-static AnyVar table_get_columns(MethodContext const& context) {
-    qDebug() << Q_FUNC_INFO;
+    AnyVarMap return_obj;
 
-    auto tbl = GET_TABLE(context);
-    // return a list of strings
+    return_obj["columns"] = source.get_headers();
 
-    auto header = tbl->get_source()->get_columns();
-
-    return AnyVar(header);
-}
-
-static int64_t table_get_num_rows(MethodContext const& context) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    return static_cast<int64_t>(tbl->get_source()->get_num_rows());
-}
-
-static std::vector<double> clear_query(QueryPtr& q) {
-    std::vector<double> ret;
-    if (!q) return ret;
-
-    ret.reserve(128);
-
-    while (true) {
-        size_t n = q->next();
-
-        if (n == 0) break;
-
-        // allocate an extra chunk
-
-        double* last = ret.data() + ret.size();
-
-        ret.resize(ret.size() + n);
-
-        q->write_next_to(std::span<double>(last, n));
-    }
-
-    return ret;
-}
-
-static std::vector<double> table_get_row(MethodContext const& context,
-                                         int64_t              row,
-                                         std::vector<int64_t> columns) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
+    auto q = source.get_all_data();
 
     {
-        size_t max_row = src->get_num_rows() - 1;
+        std::vector<int64_t> keys(q->num_rows);
 
-        if (row < 0 or row > max_row) {
-            throw MethodException(MethodException::CLIENT, "Row out of range");
-        }
+        q->get_keys_to(keys);
+
+        return_obj["keys"] = std::move(keys);
     }
 
-
     {
-        size_t max_column = src->get_columns().size() - 1;
+        AnyVarList lv(q->num_cols);
 
-        for (auto c : columns) {
-            if (c > max_column or c < 0) {
-                throw MethodException(MethodException::CLIENT,
-                                      "Row out of range");
+        for (size_t ci = 0; ci < lv.size(); ci++) {
+            if (q->is_column_string(ci)) {
+                AnyVarList data(q->num_rows);
+
+                for (size_t ri = 0; ri < data.size(); ri++) {
+                    std::string_view view;
+                    q->get_cell_to(ci, ri, view);
+                    data[ri] = std::string(view);
+                }
+
+                lv[ci] = std::move(data);
+
+            } else {
+                std::vector<double> data;
+
+                q->get_reals_to(ci, data);
+
+                lv[ci] = std::move(data);
             }
         }
+
+        return_obj["data"] = std::move(lv);
     }
 
-    auto query = tbl->get_source()->get_row(row, columns);
+    {
+        auto const& selections = source.get_all_selections();
 
-    return clear_query(query);
+        AnyVarList lv;
+
+        for (auto const& [k, v] : selections) {
+            AnyVarList entry;
+            entry.push_back(k);
+            entry.emplace_back(v.to_any());
+
+            lv.push_back(std::move(entry));
+        }
+
+        return_obj["selections"] = std::move(lv);
+    }
+
+
+    return return_obj;
 }
 
 static auto get_builtin(TableT* tbl, BuiltinSignals b) {
@@ -207,245 +191,76 @@ static auto get_builtin(TableT* tbl, BuiltinSignals b) {
     return server->state()->document()->get_builtin(b);
 }
 
-static int64_t table_request_row_insert(MethodContext const& context,
-                                        int64_t              row,
-                                        RealListArg          data) {
-    // qDebug() << Q_FUNC_INFO << QString::fromStdString(args.dump_string());
 
-    auto tbl = GET_TABLE(context);
+static AnyVar table_data_insert(MethodContext const& context, AnyListArg ref) {
+    auto tbl = get_table(context);
 
-    auto* src = tbl->get_source();
+    bool ok = tbl->get_source()->ask_insert(ref.list);
 
-    {
-        size_t max_row = src->get_num_rows() - 1;
-
-        if (row > max_row or row < 0)
-            throw MethodException(MethodException::CLIENT, "Row out of range");
+    if (!ok) {
+        throw MethodException(MethodException::CLIENT, "Unable to insert data");
     }
 
-    int64_t ok = tbl->get_source()->trigger_row_insert(row, data.list);
-
-    if (ok) {
-        auto sig = get_builtin(tbl.get(), BuiltinSignals::TABLE_SIG_ROWS_ADDED);
-
-        issue_signal(
-            tbl.get(), sig.get(), marshall_to_any(int64_t(row), int64_t(1)));
-    }
-
-    return ok;
+    return {};
 }
 
-static AnyVar table_request_row_update(MethodContext const& context,
-                                       int64_t              row,
-                                       RealListArg          data) {
+
+static AnyVar table_data_update(MethodContext const& context,
+                                AnyVarRef            keys,
+                                AnyListArg           cols) {
+    auto tbl = get_table(context);
+
+    bool ok = tbl->get_source()->ask_update(keys, cols.list);
+
+    if (!ok) {
+        throw MethodException(MethodException::CLIENT, "Unable to update data");
+    }
+
+    return {};
+}
+
+static AnyVar table_data_remove(MethodContext const& context, AnyVarRef keys) {
+    auto tbl = get_table(context);
+
+    bool ok = tbl->get_source()->ask_delete(keys);
+
+    if (!ok) {
+        throw MethodException(MethodException::CLIENT, "Unable to remove data");
+    }
+
+    return {};
+}
+
+static AnyVar table_data_clear(MethodContext const& context) {
+    auto tbl = get_table(context);
+
+    bool ok = tbl->get_source()->ask_clear();
+
+    if (!ok) {
+        throw MethodException(MethodException::CLIENT, "Unable to clear table");
+    }
+
+    return {};
+}
+
+static AnyVar table_update_selection(MethodContext const& context,
+                                     std::string_view     selection_id,
+                                     SelectionRef         selection_ref) {
     qDebug() << Q_FUNC_INFO;
 
-    auto tbl = GET_TABLE(context);
+    auto tbl = get_table(context);
 
     auto* src = tbl->get_source();
 
-    {
-        size_t max_row = src->get_num_rows() - 1;
+    bool ok = src->ask_update_selection(selection_id, selection_ref);
 
-        if (row > max_row or row < 0)
-            throw MethodException(MethodException::CLIENT, "Row out of range");
-    }
-
-    int64_t ok = tbl->get_source()->trigger_row_update(row, data.list);
-
-    if (ok) {
-        Selection selection;
-
-        selection.row_ranges.emplace_back(row, row + 1);
-
-        auto sig =
-            get_builtin(tbl.get(), BuiltinSignals::TABLE_SIG_DATA_UPDATED);
-
-        issue_signal(tbl.get(), sig.get(), selection.to_any());
-    }
-
-    return ok;
-}
-
-struct ListOfListOfReals {
-    std::vector<std::vector<double>> lol; // yeah... :(
-
-    ListOfListOfReals() = default;
-
-    ListOfListOfReals(AnyVar&& a) {
-        auto l = a.steal_vector();
-
-        for (auto& li : l) {
-            lol.emplace_back(li.coerce_real_list());
-        }
-    }
-};
-
-static AnyVar table_request_row_append(MethodContext const& context,
-                                       ListOfListOfReals    list) {
-    // qDebug() << Q_FUNC_INFO << QString::fromStdString(args.dump_string());
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
-
-    size_t insert_row = src->get_num_rows();
-
-
-    std::vector<std::span<double>> ref_list;
-
-    for (auto& v : list.lol) {
-        ref_list.emplace_back(v);
-    }
-
-    int64_t ok = src->trigger_row_append(ref_list);
-
-    if (ok) {
-        auto sig = get_builtin(tbl.get(), BuiltinSignals::TABLE_SIG_ROWS_ADDED);
-
-        issue_signal(tbl.get(), sig.get(), insert_row, ref_list.size());
-    }
-
-    return ok;
-}
-
-
-static int64_t table_request_row_remove(MethodContext const& context,
-                                        Selection            selection) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
-
-    int64_t ok = src->trigger_deletion(selection);
-
-    if (ok) {
-        auto sig =
-            get_builtin(tbl.get(), BuiltinSignals::TABLE_SIG_ROWS_DELETED);
-
-        for (auto r : selection.rows) {
-            issue_signal(tbl.get(), sig.get(), r, 1);
-        }
-
-        for (auto ra : selection.row_ranges) {
-            issue_signal(tbl.get(), sig.get(), ra.first, ra.second - ra.second);
-        }
-    }
-
-    return ok;
-}
-
-static AnyVar table_get_selection(MethodContext const& context,
-                                  std::string          selection_id) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
-
-    auto sel_ref = src->get_selection(selection_id);
-
-    return sel_ref.to_any();
-}
-
-static AnyVar table_get_selection_data(MethodContext const& context,
-                                       std::string          selection_id) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
-
-    auto q = src->get_selection_data(selection_id);
-
-    return clear_query(q);
-}
-
-static AnyVar table_set_selection(MethodContext const& context,
-                                  Selection            selection,
-                                  std::string          selection_id) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
-
-    SelectionRef ref;
-    ref.rows       = selection.rows;
-    ref.row_ranges = selection.row_ranges;
-
-    int64_t ok = src->trigger_set_selection(selection_id, ref);
-
-    if (ok) {
-        auto sig =
-            get_builtin(tbl.get(), BuiltinSignals::TABLE_SIG_SELECTION_CHANGED);
-
-        issue_signal(tbl.get(), sig.get(), selection_id, ref.to_any());
+    if (!ok) {
+        throw MethodException(MethodException::CLIENT,
+                              "Unable to update selection");
     }
 
 
-    return ok;
-}
-
-static AnyVar table_all_selections(MethodContext const& context) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
-
-    return src->get_all_selections();
-}
-
-static AnyVar table_get_block(MethodContext const& context,
-                              int64_t              row_start,
-                              int64_t              row_end,
-                              IntListArg           list) {
-    qDebug() << Q_FUNC_INFO;
-
-    auto tbl = GET_TABLE(context);
-
-    auto* src = tbl->get_source();
-
-    int64_t max_row = src->get_num_rows();
-
-    if (row_end < 0) row_end = max_row;
-
-    if (row_start < 0 or row_start >= max_row) {
-        throw MethodException(MethodException::CLIENT, "Row out of range!");
-    }
-
-    if (row_end < 0 or row_end >= max_row) {
-        throw MethodException(MethodException::CLIENT, "Row out of range!");
-    }
-
-    qDebug() << "Rows" << row_start << row_end;
-
-    for (auto const& cid : list.list) {
-        size_t max_column = src->get_columns().size() - 1;
-
-        if (cid >= max_column or cid < 0) {
-            throw MethodException(MethodException::CLIENT,
-                                  "Column id out of range");
-        }
-    }
-
-    if (list.list.empty()) {
-        list.list.resize(src->get_columns().size());
-        std::iota(list.list.begin(), list.list.end(), 0);
-    }
-
-    qDebug() << "Cols" << QVector<size_t>(list.list.begin(), list.list.end());
-
-    auto query =
-        tbl->get_source()->get_block({ row_start, row_end }, list.list);
-
-    std::vector<double> ret = clear_query(query);
-
-    qDebug() << "Returning" << ret.size();
-
-    return ret;
+    return {};
 }
 
 // Object Builtins =============================================================
@@ -474,11 +289,11 @@ struct StringOrIntArgument
 
     StringOrIntArgument() = default;
 
-    StringOrIntArgument(AnyVar&& a) {
+    StringOrIntArgument(AnyVarRef const& a) {
         if (a.has_int()) {
             emplace<int64_t>(a.to_int());
-        } else if (std::holds_alternative<std::string>(a)) {
-            emplace<std::string>(a.steal_string());
+        } else if (a.has_string()) {
+            emplace<std::string>(a.to_string());
         }
     }
 };
@@ -532,13 +347,13 @@ static AnyVar object_get_current_option(MethodContext const& context) {
 }
 
 static AnyVar object_set_current_option(MethodContext const& context,
-                                        std::string          arg) {
+                                        std::string_view     arg) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    cb->set_current_option(arg);
+    cb->set_current_option(std::string(arg));
 
     return {};
 }
@@ -665,9 +480,9 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = "subscribe"sv;
+        d.method_name          = "tbl_subscribe"sv;
         d.documentation        = "Subscribe to this table's signals"sv;
-        d.return_documentation = "None"sv;
+        d.return_documentation = "A table initialization object."sv;
         d.code                 = table_subscribe;
 
         m_builtin_methods[BuiltinMethods::TABLE_SUBSCRIBE] =
@@ -676,184 +491,75 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = "get_columns"sv;
-        d.documentation        = "Get the header of this table."sv;
-        d.return_documentation = "List of strings"sv;
-        d.set_code(table_get_columns);
-
-        m_builtin_methods[BuiltinMethods::TABLE_GET_COLUMNS] =
-            create_method(this, d);
-    }
-
-    {
-        MethodData d;
-        d.method_name          = "get_num_rows"sv;
-        d.documentation        = "Get the number of rows in this table."sv;
-        d.return_documentation = "Integer"sv;
-        d.set_code(table_get_num_rows);
-
-        m_builtin_methods[BuiltinMethods::TABLE_GET_NUM_ROWS] =
-            create_method(this, d);
-    }
-
-    {
-        MethodData d;
-        d.method_name = "get_row"sv;
-        d.documentation =
-            "Get the data in a given row, and given columns. Data is returned in the order of columns given."sv;
-        d.argument_documentation = {
-            { "row", "Integer row to query" },
-            { "cols",
-              "List of column indicies to query. An empty list implies all "
-              "columns." },
-        };
-        d.return_documentation = "List of reals"sv;
-        d.set_code(table_get_row);
-
-        m_builtin_methods[BuiltinMethods::TABLE_GET_ROW] =
-            create_method(this, d);
-    }
-
-    {
-        MethodData d;
-        d.method_name = "get_block"sv;
-        d.documentation =
-            "Get the data in a given row range, and given columns. Data is returned as concatenated columns."sv;
-        d.argument_documentation = {
-            { "row_from", "Starting integer row to query" },
-            { "row_to",
-              "Ending integer row to query (exclusive). Can be set to a "
-              "negative value to indicate all rows." },
-            { "col_list",
-              "List of columns indicies to query. An empty list implies all "
-              "columns." }
-        };
-        d.return_documentation = "List of reals"sv;
-        d.set_code(table_get_block);
-
-        m_builtin_methods[BuiltinMethods::TABLE_GET_BLOCK] =
-            create_method(this, d);
-    }
-
-
-    {
-        MethodData d;
-        d.method_name = "insert_row"sv;
+        d.method_name = "tbl_insert"sv;
         d.documentation =
             "Request that given data be inserted into the table."sv;
         d.argument_documentation = {
-            { "row",
-              "Integer row slot to insert data. Following data is shifted "
-              "down." },
-            { "[real]", "List of reals to insert" },
+            { "[ col ]",
+              "A list of columns to insert. Columns must be the same length." },
         };
-        d.return_documentation = "Integer, >0 if successful"sv;
-        d.set_code(table_request_row_insert);
+        d.return_documentation = "None"sv;
+        d.set_code(table_data_insert);
 
-        m_builtin_methods[BuiltinMethods::TABLE_REQUEST_ROW_INSERT] =
+        m_builtin_methods[BuiltinMethods::TABLE_INSERT] =
             create_method(this, d);
     }
 
 
     {
         MethodData d;
-        d.method_name   = "update_row"sv;
-        d.documentation = "Request that a row be updated with given data."sv;
+        d.method_name   = "tbl_update"sv;
+        d.documentation = "Request that rows be updated with given data."sv;
         d.argument_documentation = {
-            { "row", "Integer row slot to update data." },
-            { "[real]", "List of reals to insert" },
+            { "[keys]", "Integer list of keys to update" },
+            { "[cols]", "Data to use to update the table" },
         };
-        d.return_documentation = "Integer, >0 if successful"sv;
-        d.set_code(table_request_row_update);
+        d.return_documentation = "None"sv;
+        d.set_code(table_data_update);
 
-        m_builtin_methods[BuiltinMethods::TABLE_REQUEST_ROW_UPDATE] =
+        m_builtin_methods[BuiltinMethods::TABLE_UPDATE] =
             create_method(this, d);
     }
 
 
     {
         MethodData d;
-        d.method_name   = "append_rows"sv;
-        d.documentation = "Request that the be appended with given data."sv;
+        d.method_name            = "tbl_remove"sv;
+        d.documentation          = "Request that data be deleted"sv;
+        d.argument_documentation = { { "[keys]", "A list of keys to delete" } };
+        d.return_documentation   = "None"sv;
+        d.set_code(table_data_remove);
+
+        m_builtin_methods[BuiltinMethods::TABLE_REMOVE] =
+            create_method(this, d);
+    }
+
+    {
+        MethodData d;
+        d.method_name            = "tbl_update_selection"sv;
+        d.documentation          = "Set the table selection."sv;
         d.argument_documentation = {
-            { "[ [real] ]",
-              "List of rows (list of a list of reals) to insert" },
+            {
+                "string",
+                "Name of the selection to update",
+            },
+            { "selection_data", "A SelectionObject" },
         };
-        d.return_documentation = "Integer, >0 if successful"sv;
-        d.set_code(table_request_row_append);
+        d.return_documentation = "None"sv;
+        d.set_code(table_update_selection);
 
-        m_builtin_methods[BuiltinMethods::TABLE_REQUEST_ROW_APPEND] =
-            create_method(this, d);
-    }
-
-
-    {
-        MethodData d;
-        d.method_name            = "remove_rows"sv;
-        d.documentation          = "Request that a selection be deleted"sv;
-        d.argument_documentation = {
-            { "selection", "A Selection to delete. This is a Selection Object" }
-        };
-        d.return_documentation = "Integer, >0 if successful"sv;
-        d.set_code(table_request_row_remove);
-
-        m_builtin_methods[BuiltinMethods::TABLE_REQUEST_DELETION] =
-            create_method(this, d);
-    }
-
-
-    {
-        MethodData d;
-        d.method_name   = "get_selection"sv;
-        d.documentation = "Get the table selection at a given index."sv;
-        d.argument_documentation = { { "selection_id",
-                                       "String selection ID" } };
-        d.return_documentation   = "Selection object"sv;
-        d.set_code(table_get_selection);
-
-        m_builtin_methods[BuiltinMethods::TABLE_GET_SELECTION] =
+        m_builtin_methods[BuiltinMethods::TABLE_UPDATE_SELECTION] =
             create_method(this, d);
     }
 
     {
         MethodData d;
-        d.method_name   = "get_selection_data"sv;
-        d.documentation = "Get the table data from a given selection ID."sv;
-        d.argument_documentation = { { "selection_id",
-                                       "String selection ID" } };
-        d.return_documentation   = "Returns a row-concatenated list of reals"sv;
-        d.set_code(table_get_selection_data);
+        d.method_name          = "tbl_clear"sv;
+        d.documentation        = "Request to clear all data and selections"sv;
+        d.return_documentation = "None"sv;
+        d.set_code(table_data_clear);
 
-        m_builtin_methods[BuiltinMethods::TABLE_GET_SELECTION_DATA] =
-            create_method(this, d);
-    }
-
-
-    {
-        MethodData d;
-        d.method_name   = "set_selection"sv;
-        d.documentation = "Set the table selection at a given index."sv;
-        d.argument_documentation = { {
-            "Selection object",
-            "String selection ID",
-        } };
-        d.return_documentation   = "Integer >0 if successful"sv;
-        d.set_code(table_set_selection);
-
-        m_builtin_methods[BuiltinMethods::TABLE_REQUEST_SET_SELECTION] =
-            create_method(this, d);
-    }
-
-    {
-        MethodData d;
-        d.method_name   = "get_all_selections"sv;
-        d.documentation = "Get all selections on a table"sv;
-        // d.argument_documentation ;
-        d.return_documentation = "List of strings."sv;
-        d.set_code(table_all_selections);
-
-        m_builtin_methods[BuiltinMethods::TABLE_GET_ALL_SELECTIONS] =
-            create_method(this, d);
+        m_builtin_methods[BuiltinMethods::TABLE_CLEAR] = create_method(this, d);
     }
 
 
@@ -1039,7 +745,7 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name   = "table_reset"sv;
+        d.signal_name   = "tbl_reset"sv;
         d.documentation = "The table has been reset, and cleared."sv;
 
         m_builtin_signals[BuiltinSignals::TABLE_SIG_RESET] =
@@ -1048,37 +754,11 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name      = "table_row_added"sv;
-        d.documentation    = "Rows have been inserted in the table"sv;
+        d.signal_name   = "tbl_updated"sv;
+        d.documentation = "Rows have been inserted or updated in the table"sv;
         std::string args[] = {
-            "Starting row",
-            "Count of rows added at that point",
-        };
-
-        m_builtin_signals[BuiltinSignals::TABLE_SIG_ROWS_ADDED] =
-            create_signal(this, d);
-    }
-
-    {
-        SignalData d;
-        d.signal_name      = "table_row_deleted"sv;
-        d.documentation    = "Rows have been deleted from the table"sv;
-        std::string args[] = {
-            "Starting row",
-            "Count of rows removed from that point on. Rows are shifted up.",
-        };
-
-        m_builtin_signals[BuiltinSignals::TABLE_SIG_ROWS_DELETED] =
-            create_signal(this, d);
-    }
-
-    {
-        SignalData d;
-        d.signal_name      = "table_row_updated"sv;
-        d.documentation    = "Certain rows have changed in the table"sv;
-        std::string args[] = {
-            "Starting row",
-            "Count of rows updated from at that point",
+            "[key]",
+            "[col]",
         };
 
         m_builtin_signals[BuiltinSignals::TABLE_SIG_DATA_UPDATED] =
@@ -1087,7 +767,17 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name      = "table_selection_updated"sv;
+        d.signal_name      = "tbl_rows_removed"sv;
+        d.documentation    = "Rows have been deleted from the table"sv;
+        std::string args[] = { "[key]" };
+
+        m_builtin_signals[BuiltinSignals::TABLE_SIG_ROWS_DELETED] =
+            create_signal(this, d);
+    }
+
+    {
+        SignalData d;
+        d.signal_name      = "tbl_selection_updated"sv;
         d.documentation    = "A selection of the table has changed"sv;
         std::string args[] = {
             "Selection ID",

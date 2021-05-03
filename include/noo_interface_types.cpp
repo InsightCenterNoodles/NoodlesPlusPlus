@@ -63,33 +63,41 @@ AnyVar SelectionRef::to_any() const {
     return ret;
 }
 
-//==============================================================================
+Selection SelectionRef::to_selection() const {
+    Selection s;
+    s.rows       = span_to_vector(rows.span());
+    s.row_ranges = span_to_vector(row_ranges);
 
-StringListArg::StringListArg(AnyVar&& a) {
-    auto l = a.steal_vector();
-
-    for (auto& s : l) {
-        list.emplace_back(s.steal_string());
-    }
+    return s;
 }
 
-Vec3Arg::Vec3Arg(AnyVar&& a) {
-    auto l = a.steal_real_list();
+//==============================================================================
+
+StringListArg::StringListArg(AnyVarRef const& a) {
+    auto l = a.to_vector();
+
+    l.for_each([&](auto, AnyVarRef const& ref) {
+        list.emplace_back(std::string(ref.to_string()));
+    });
+}
+
+Vec3Arg::Vec3Arg(AnyVarRef const& a) {
+    auto l = a.to_real_list();
 
     if (l.size() < 3) { return; }
 
     this->emplace(l[0], l[1], l[2]);
 }
 
-Vec4Arg::Vec4Arg(AnyVar&& a) {
-    auto l = a.steal_real_list();
+Vec4Arg::Vec4Arg(AnyVarRef const& a) {
+    auto l = a.to_real_list();
 
     if (l.size() < 4) { return; }
 
     this->emplace(l[0], l[1], l[2], l[3]);
 }
 
-BoolArg::BoolArg(AnyVar&& a) {
+BoolArg::BoolArg(AnyVarRef const& a) {
     if (!a.has_int()) return;
 
     auto l = a.to_int();

@@ -101,7 +101,7 @@ void GetStringListReply::interpret() {
         VCASE(noo::AnyVarListRef const& l) {
             QStringList to_ret;
 
-            l.for_each([&](noo::AnyVarRef r) {
+            l.for_each([&](auto, noo::AnyVarRef r) {
                 to_ret << noo::to_qstring(r.to_string());
             });
 

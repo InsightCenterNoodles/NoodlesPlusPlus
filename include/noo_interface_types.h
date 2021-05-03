@@ -49,6 +49,8 @@ struct SelectionRef {
     SelectionRef(AnyVarRef const&);
 
     AnyVar to_any() const;
+
+    Selection to_selection() const;
 };
 
 // =============================================================================
@@ -72,6 +74,27 @@ template <class T>
 struct is_vector<std::vector<T>> : std::bool_constant<true> { };
 //@}
 
+//@{
+/// Ask if a type is a std::span of some kind
+template <class T>
+struct is_span : std::bool_constant<false> { };
+
+template <class T>
+struct is_span<std::span<T>> : std::bool_constant<true> { };
+//@}
+
+
+///
+/// \brief The RealListArg struct is used in methods to coerce the Any type
+/// to turn a real-list, a list of any-reals or list of any-ints into a list of
+/// reals.
+///
+struct AnyListArg {
+    AnyVarListRef list;
+
+    AnyListArg() = default;
+    AnyListArg(AnyVarRef const& a) : list(a.to_vector()) { }
+};
 
 ///
 /// \brief The RealListArg struct is used in methods to coerce the Any type
@@ -79,10 +102,10 @@ struct is_vector<std::vector<T>> : std::bool_constant<true> { };
 /// reals.
 ///
 struct RealListArg {
-    std::vector<double> list;
+    PossiblyOwnedView<double const> list;
 
     RealListArg() = default;
-    RealListArg(AnyVar&& a) : list(a.coerce_real_list()) { }
+    RealListArg(AnyVarRef const& a) : list(a.coerce_real_list()) { }
 };
 
 ///
@@ -90,10 +113,10 @@ struct RealListArg {
 /// list of integers.
 ///
 struct IntListArg {
-    std::vector<int64_t> list;
+    PossiblyOwnedView<int64_t const> list;
 
     IntListArg() = default;
-    IntListArg(AnyVar&& a) : list(a.coerce_int_list()) { }
+    IntListArg(AnyVarRef const& a) : list(a.coerce_int_list()) { }
 };
 
 ///
@@ -104,25 +127,25 @@ struct StringListArg {
     std::vector<std::string> list;
 
     StringListArg() = default;
-    StringListArg(AnyVar&& a);
+    StringListArg(AnyVarRef const& a);
 };
 
 
 struct Vec3Arg : std::optional<glm::vec3> {
     Vec3Arg() = default;
-    Vec3Arg(AnyVar&&);
+    Vec3Arg(AnyVarRef const&);
 };
 
 struct Vec4Arg : std::optional<glm::vec4> {
     Vec4Arg() = default;
-    Vec4Arg(AnyVar&&);
+    Vec4Arg(AnyVarRef const&);
 };
 
 struct BoolArg {
     char state = -1;
 
     BoolArg() = default;
-    BoolArg(AnyVar&&);
+    BoolArg(AnyVarRef const&);
 
     operator bool() const { return state >= 0; }
 

@@ -42,11 +42,10 @@ signals:
     void send_data(QByteArray);
 
 private slots:
-    void on_table_selection_updated(std::string);
-    void on_table_row_added(int64_t at, int64_t count);
-    void on_table_row_deleted(Selection);
-    void on_table_row_updated(Selection);
-    void on_sig_reset();
+    void on_table_reset();
+    void on_table_selection_updated(std::string, SelectionRef const&);
+    void on_table_row_updated(TableQueryPtr);
+    void on_table_row_deleted(TableQueryPtr);
 };
 
 } // namespace noo

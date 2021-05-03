@@ -367,10 +367,10 @@ class MessageHandler {
             return;
         }
 
-        std::vector<AnyVar> vars;
+        AnyVarListRef vars;
 
         if (message->method_args()) {
-            read_to_array(message->method_args(), vars);
+            vars = AnyVarListRef(message->method_args());
         }
 
         AnyVar      ret_data;

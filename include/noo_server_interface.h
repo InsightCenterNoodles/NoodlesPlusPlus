@@ -51,38 +51,38 @@ using ObjectTPtr = std::shared_ptr<ObjectT>;
 struct MethodContext;
 
 template <class T>
-T _any_call_getter(AnyVarList& source, size_t& loc) {
-    auto at_i = steal_or_default(source, loc);
+T _any_call_getter(AnyVarListRef const& source, size_t& loc) {
+    auto at_i = source[loc];
     loc++;
 
-    if constexpr (!is_in_variant<T, AnyVarBase>::value) {
-
-        if constexpr (is_vector<T>::value) {
-            // extract a vector
-            auto nv = at_i.steal_vector();
-
-            T ret;
-
-            for (auto& local_a : nv) {
-                ret.emplace_back(std::move(local_a));
-            }
-
-            return ret;
-
-        } else {
-            return T(std::move(at_i));
-        }
-
+    if constexpr (std::is_same_v<T, int64_t>) {
+        return at_i.to_int();
+    } else if constexpr (std::is_same_v<T, double>) {
+        return at_i.to_real();
+    } else if constexpr (std::is_same_v<T, std::string_view>) {
+        return at_i.to_string();
+    } else if constexpr (std::is_same_v<T, AnyVarListRef>) {
+        return at_i.to_vector();
+    } else if constexpr (std::is_same_v<T, std::span<std::byte const>>) {
+        return at_i.to_data();
+    } else if constexpr (std::is_same_v<T, AnyVarMapRef>) {
+        return at_i.to_map();
+    } else if constexpr (std::is_same_v<T, std::span<double const>>) {
+        return at_i.to_real_list();
+    } else if constexpr (std::is_same_v<T, std::span<int64_t const>>) {
+        return at_i.to_int_list();
+    } else if constexpr (std::is_same_v<T, AnyID>) {
+        return at_i.to_id();
+    } else if constexpr (std::is_same_v<T, AnyVarRef>) {
+        return at_i;
     } else {
-        T* c = std::get_if<T>(&at_i);
-        if (c) return std::move(*c);
-        return T();
+        return T(at_i);
     }
 }
 
 
 template <class Func, class... Args>
-auto _call(Func&& f, MethodContext const& c, AnyVarList& source) {
+auto _call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
     size_t i = 0;
     return f(c, std::move(_any_call_getter<Args>(source, i))...);
 }
@@ -93,7 +93,8 @@ struct AnyCallHelper : AnyCallHelper<decltype(&Lambda::operator())> { };
 template <class R, class... Args>
 struct AnyCallHelper<R(MethodContext const&, Args...)> {
     template <class Func>
-    static auto call(Func&& f, MethodContext const& c, AnyVarList& source) {
+    static auto
+    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -101,7 +102,8 @@ struct AnyCallHelper<R(MethodContext const&, Args...)> {
 template <class R, class... Args>
 struct AnyCallHelper<R (*)(MethodContext const&, Args...)> {
     template <class Func>
-    static auto call(Func&& f, MethodContext const& c, AnyVarList& source) {
+    static auto
+    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -109,7 +111,8 @@ struct AnyCallHelper<R (*)(MethodContext const&, Args...)> {
 template <class R, class C, class... Args>
 struct AnyCallHelper<R (C::*)(MethodContext const&, Args...)> {
     template <class Func>
-    static auto call(Func&& f, MethodContext const& c, AnyVarList& source) {
+    static auto
+    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -117,7 +120,8 @@ struct AnyCallHelper<R (C::*)(MethodContext const&, Args...)> {
 template <class R, class C, class... Args>
 struct AnyCallHelper<R (C::*)(MethodContext const&, Args...) const> {
     template <class Func>
-    static auto call(Func&& f, MethodContext const& c, AnyVarList& source) {
+    static auto
+    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -127,7 +131,9 @@ struct AnyCallHelper<R (C::*)(MethodContext const&, Args...) const> {
 /// function, and then call that function.
 ///
 template <class Func>
-auto any_call_helper(Func&& f, MethodContext const& c, AnyVarList& source) {
+auto any_call_helper(Func&&               f,
+                     MethodContext const& c,
+                     AnyVarListRef const& source) {
     using FType = std::remove_cvref_t<Func>;
     return AnyCallHelper<FType>::call(f, c, source);
 }
@@ -188,7 +194,7 @@ struct MethodData {
     std::string      return_documentation;
     std::vector<Arg> argument_documentation;
 
-    std::function<AnyVar(MethodContext const&, AnyVarList&)> code;
+    std::function<AnyVar(MethodContext const&, AnyVarListRef const&)> code;
 
     /// Set the code to be called when the method is invoked. The function f can
     /// be any function and the parameters will be decoded. See noo::RealListArg
@@ -196,7 +202,8 @@ struct MethodData {
     /// decoded to.
     template <class Function>
     void set_code(Function&& f) {
-        code = [lf = std::move(f)](MethodContext const& c, AnyVarList& v) {
+        code = [lf = std::move(f)](MethodContext const& c,
+                                   AnyVarListRef const& v) {
             return any_call_helper(lf, c, v);
         };
     }
@@ -455,12 +462,12 @@ struct TableQuery {
     size_t num_cols = 0;
     size_t num_rows = 0;
 
-    virtual bool is_column_string(size_t col); // either real or string
+    virtual bool is_column_string(size_t col) const; // either real or string
 
-    virtual bool get_reals_to(size_t col, std::span<double>);
-    virtual bool get_cell_to(size_t col, size_t row, std::string_view&);
+    virtual bool get_reals_to(size_t col, std::span<double>) const;
+    virtual bool get_cell_to(size_t col, size_t row, std::string_view&) const;
 
-    virtual bool get_keys_to(std::span<int64_t>);
+    virtual bool get_keys_to(std::span<int64_t>) const;
 };
 
 using TableQueryPtr = std::shared_ptr<TableQuery const>;
@@ -472,6 +479,22 @@ public:
     std::string name;
 
     using variant::variant;
+
+    size_t size() const;
+    bool   is_string() const;
+
+    std::span<double const>      as_doubles() const;
+    std::span<std::string const> as_string() const;
+
+    void append(std::span<double>);
+    void append(AnyVarListRef const&);
+
+    void set(size_t row, double);
+    void set(size_t row, AnyVarRef);
+
+    void erase(size_t row);
+
+    void clear();
 };
 
 ///
@@ -481,66 +504,48 @@ public:
 class TableSource : public QObject {
     Q_OBJECT
 
-    std::vector<TableColumn>               m_columns;
-    std::unordered_map<uint64_t, uint64_t> m_key_to_row_map;
-    uint64_t                               m_counter = 0;
+    std::vector<TableColumn> m_columns;
+    uint64_t                 m_counter = 0;
+
+    std::unordered_map<int64_t, uint64_t> m_key_to_row_map;
+    std::vector<int64_t>                  m_row_to_key_map;
 
     // how should selections handle key deletion?
     std::unordered_map<std::string, Selection> m_selections;
 
 protected:
-    /// Request a selection be updated. If you return true, a signal will be
-    /// emitted
-    virtual bool request_set_selection(std::string_view selection_id,
-                                       SelectionRef const&);
-
-    virtual bool request_row_insert(int64_t row, std::span<double> data);
-    virtual bool request_row_update(int64_t row, std::span<double> data);
-    virtual bool request_row_append(std::span<std::span<double>>);
-    virtual bool request_deletion(Selection const&);
-
-    virtual bool request_reset();
+    virtual TableQueryPtr handle_insert(AnyVarListRef const& cols);
+    virtual TableQueryPtr handle_update(AnyVarRef const&     keys,
+                                        AnyVarListRef const& cols);
+    virtual TableQueryPtr handle_deletion(AnyVarRef const& keys);
+    virtual bool          handle_reset();
+    virtual bool handle_set_selection(std::string_view, SelectionRef const&);
 
 public:
+    TableSource(QObject* p) : QObject(p) { }
     virtual ~TableSource();
 
     std::vector<std::string> get_headers();
-    TableQueryPtr            get_all_columns();
-    auto const&              get_all_selections() { return m_selections; }
+    TableQueryPtr            get_all_data();
 
-    /// Get a row
-    virtual QueryPtr get_row(int64_t row, std::span<int64_t> columns);
+    auto const& get_columns() const { return m_columns; }
+    auto const& get_all_selections() const { return m_selections; }
+    auto const& get_key_to_row_map() const { return m_key_to_row_map; }
+    auto const& get_row_to_key_map() const { return m_row_to_key_map; }
 
-    /// Get a block
-    virtual QueryPtr get_block(std::pair<int64_t, int64_t> rows,
-                               std::span<int64_t>          columns);
 
-    /// Get the data from a selection
-    virtual QueryPtr get_selection_data(std::string_view selection_id);
-
-    /// Get selection information
-    virtual SelectionRef get_selection(std::string_view selection_id);
-
-    /// Get all available selections
-    virtual std::vector<std::string> get_all_selections();
-
-    // These will automatically call the virtual versions of the function; if
-    // successfull they will also emit signals
-    bool trigger_set_selection(std::string_view selection_id,
-                               SelectionRef const&);
-    bool trigger_row_insert(int64_t row, std::span<double> data);
-    bool trigger_row_update(int64_t row, std::span<double> data);
-    bool trigger_row_append(std::span<std::span<double>>);
-    bool trigger_deletion(Selection const&);
-
-    bool trigger_reset();
+    bool ask_insert(AnyVarListRef const&); // list of lists
+    bool ask_update(AnyVarRef const& keys,
+                    AnyVarListRef const&); // list of lists
+    bool ask_delete(AnyVarRef const& keys);
+    bool ask_clear();
+    bool ask_update_selection(std::string_view, SelectionRef const&);
 
 signals:
+    void table_reset();
     void table_selection_updated(std::string, SelectionRef const&);
-    void table_row_added(TableQueryPtr);
     void table_row_updated(TableQueryPtr);
-    void table_row_deleted(QVector<int64_t> keys);
-    void sig_reset();
+    void table_row_deleted(TableQueryPtr);
 };
 
 ///

@@ -94,10 +94,15 @@ public:
 
     bool has_int() const;
     bool has_real() const;
+    bool has_string() const;
     bool has_list() const;
     bool has_int_list() const;
     bool has_real_list() const;
     bool has_byte_list() const;
+
+    bool is_some_list() const {
+        return has_list() or has_real_list() or has_int_list();
+    }
 
     AnyType type() const;
 
@@ -118,6 +123,30 @@ public:
     std::string dump_string() const;
 };
 
+template <class T>
+constexpr inline bool is_in_anyref_typelist = false;
+
+template <>
+constexpr inline bool is_in_anyref_typelist<int64_t> = true;
+
+template <>
+constexpr inline bool is_in_anyref_typelist<double> = true;
+
+template <>
+constexpr inline bool is_in_anyref_typelist<std::string_view> = true;
+
+template <>
+constexpr inline bool is_in_anyref_typelist<AnyVarListRef> = true;
+
+template <>
+constexpr inline bool is_in_anyref_typelist<std::span<double const>> = true;
+
+template <>
+constexpr inline bool is_in_anyref_typelist<std::span<int64_t const>> = true;
+
+template <>
+constexpr inline bool is_in_anyref_typelist<AnyID> = true;
+
 // =============================================================================
 
 class AnyVarListRef {
@@ -137,7 +166,7 @@ public:
     void for_each(Function&& f) const {
         auto s = size();
         for (size_t i = 0; i < s; i++) {
-            f(this->operator[](i));
+            f(i, this->operator[](i));
         }
     }
 

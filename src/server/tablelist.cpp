@@ -21,21 +21,15 @@ TableT::TableT(IDType id, TableList* host, TableData const& d)
     auto doc = host->server()->state()->document();
 
     for (auto e : { BuiltinMethods::TABLE_SUBSCRIBE,
-                    BuiltinMethods::TABLE_GET_COLUMNS,
-                    BuiltinMethods::TABLE_GET_NUM_ROWS,
-                    BuiltinMethods::TABLE_GET_ROW,
-                    BuiltinMethods::TABLE_GET_BLOCK,
-                    BuiltinMethods::TABLE_REQUEST_ROW_INSERT,
-                    BuiltinMethods::TABLE_REQUEST_ROW_UPDATE,
-                    BuiltinMethods::TABLE_REQUEST_ROW_APPEND,
-                    BuiltinMethods::TABLE_REQUEST_DELETION,
-                    BuiltinMethods::TABLE_GET_SELECTION,
-                    BuiltinMethods::TABLE_REQUEST_SET_SELECTION }) {
+                    BuiltinMethods::TABLE_INSERT,
+                    BuiltinMethods::TABLE_UPDATE,
+                    BuiltinMethods::TABLE_REMOVE,
+                    BuiltinMethods::TABLE_CLEAR,
+                    BuiltinMethods::TABLE_UPDATE_SELECTION }) {
         m_method_list.insert(doc->get_builtin(e));
     }
 
     for (auto e : { BuiltinSignals::TABLE_SIG_RESET,
-                    BuiltinSignals::TABLE_SIG_ROWS_ADDED,
                     BuiltinSignals::TABLE_SIG_ROWS_DELETED,
                     BuiltinSignals::TABLE_SIG_DATA_UPDATED,
                     BuiltinSignals::TABLE_SIG_SELECTION_CHANGED }) {
@@ -48,11 +42,6 @@ TableT::TableT(IDType id, TableList* host, TableData const& d)
             &TableT::on_table_selection_updated);
 
     connect(m_data.source.get(),
-            &TableSource::table_row_added,
-            this,
-            &TableT::on_table_row_added);
-
-    connect(m_data.source.get(),
             &TableSource::table_row_deleted,
             this,
             &TableT::on_table_row_deleted);
@@ -63,9 +52,9 @@ TableT::TableT(IDType id, TableList* host, TableData const& d)
             &TableT::on_table_row_updated);
 
     connect(m_data.source.get(),
-            &TableSource::sig_reset,
+            &TableSource::table_reset,
             this,
-            &TableT::on_sig_reset);
+            &TableT::on_table_reset);
 }
 
 AttachedMethodList& TableT::att_method_list() {
@@ -123,25 +112,75 @@ static void send_table_signal(TableT& n, BuiltinSignals bs, Args&&... args) {
 }
 
 
-void TableT::on_table_selection_updated(std::string id) {
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, id);
-}
-
-void TableT::on_table_row_added(int64_t at, int64_t count) {
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_ROWS_ADDED, at, count);
-}
-
-void TableT::on_table_row_deleted(Selection s) {
+void TableT::on_table_selection_updated(std::string         name,
+                                        SelectionRef const& ref) {
     send_table_signal(
-        *this, BuiltinSignals::TABLE_SIG_ROWS_DELETED, s.to_any());
+        *this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, name, ref.to_any());
 }
 
-void TableT::on_table_row_updated(Selection s) {
-    send_table_signal(
-        *this, BuiltinSignals::TABLE_SIG_DATA_UPDATED, s.to_any());
+void TableT::on_table_row_deleted(TableQueryPtr q) {
+    // TODO clean up
+    std::vector<int64_t> keys;
+    keys.resize(q->num_rows);
+
+    q->get_keys_to(keys);
+
+    AnyVar v = std::move(keys);
+
+    send_table_signal(*this, BuiltinSignals::TABLE_SIG_ROWS_DELETED, v);
 }
 
-void TableT::on_sig_reset() {
+void TableT::on_table_row_updated(TableQueryPtr q) {
+    AnyVar kv;
+    AnyVar cols;
+
+    {
+        std::vector<int64_t> keys;
+        keys.resize(q->num_rows);
+
+        q->get_keys_to(keys);
+
+        kv = std::move(keys);
+    }
+
+    {
+        AnyVarList l;
+        l.reserve(q->num_cols);
+
+        for (size_t i = 0; i < q->num_cols; i++) {
+            AnyVar this_c;
+
+            if (q->is_column_string(i)) {
+                AnyVarList avl(q->num_rows);
+
+                for (size_t row_i = 0; row_i < avl.size(); row_i++) {
+                    std::string_view value_view;
+
+                    q->get_cell_to(i, row_i, value_view);
+
+                    avl[i] = std::string(value_view);
+                }
+
+                this_c = std::move(avl);
+
+            } else {
+                std::vector<double> d(q->num_rows);
+
+                q->get_reals_to(i, d);
+
+                this_c = std::move(d);
+            }
+
+            l.emplace_back(std::move(this_c));
+        }
+
+        cols = std::move(l);
+    }
+
+    send_table_signal(*this, BuiltinSignals::TABLE_SIG_DATA_UPDATED, kv, cols);
+}
+
+void TableT::on_table_reset() {
     send_table_signal(*this, BuiltinSignals::TABLE_SIG_RESET);
 }
 

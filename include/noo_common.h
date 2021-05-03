@@ -70,6 +70,21 @@ std::span<U> cast_span_to(std::span<T> s) {
                         s.size_bytes() / sizeof(U));
 }
 
+
+template <class Iter1, class Iter2>
+void copy(Iter1 src_begin, Iter1 src_end, Iter2 dest_begin, Iter2 dest_end) {
+    auto size1 = std::distance(src_begin, src_end);
+    auto size2 = std::distance(dest_begin, dest_end);
+
+    std::copy_n(src_begin, std::min(size1, size2), dest_begin);
+}
+
+template <class T>
+auto span_to_vector(std::span<T> sp) {
+    using R = std::remove_cvref_t<T>;
+    return std::vector<R>(sp.begin(), sp.end());
+}
+
 } // namespace noo
 
 #endif // COMMON_H

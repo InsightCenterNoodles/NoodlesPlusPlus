@@ -36,6 +36,11 @@ bool AnyVarRef::has_real() const {
     return m_source->any_type() == noodles::AnyType::Real;
 }
 
+bool AnyVarRef::has_string() const {
+    if (!m_source) return false;
+    return m_source->any_type() == noodles::AnyType::Text;
+}
+
 bool AnyVarRef::has_list() const {
     if (!m_source) return false;
     return m_source->any_type() == noodles::AnyType::AnyList;
@@ -271,7 +276,7 @@ std::string to_string_part(AnyVarMapRef const& map) {
 std::string to_string_part(AnyVarListRef const& list) {
     std::string ret = "[";
 
-    list.for_each([&ret](auto r) { ret += to_string(r) + ","; });
+    list.for_each([&ret](auto, auto r) { ret += to_string(r) + ","; });
 
 
     ret += "]";
