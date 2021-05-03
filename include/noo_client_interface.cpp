@@ -1,6 +1,7 @@
 #include "noo_client_interface.h"
 
 #include "noo_common.h"
+#include "src/client/client_common.h"
 #include "src/client/clientstate.h"
 #include "src/common/variant_tools.h"
 
@@ -252,120 +253,100 @@ noo::TableID TableDelegate::id() const {
 
 void TableDelegate::prepare_delete() { }
 
-void TableDelegate::subscribe() const {
-    auto* p = attached_methods().new_call_by_name("subscribe");
+void TableDelegate::on_table_initialize(noo::AnyVarListRef const&,
+                                        noo::AnyVarRef,
+                                        noo::AnyVarListRef const&,
+                                        noo::AnyVarListRef const&) { }
 
-    Q_UNUSED(p);
+void TableDelegate::on_table_reset() { }
+void TableDelegate::on_table_updated(noo::AnyVarRef, noo::AnyVarRef) { }
+void TableDelegate::on_table_rows_removed(noo::AnyVarRef) { }
+void TableDelegate::on_table_selection_updated(std::string_view,
+                                               noo::SelectionRef const&) { }
 
-    // dont care about return
-}
+PendingMethodReply* TableDelegate::subscribe() const {
+    auto* p = attached_methods().new_call_by_name<SubscribeInitReply>(
+        "tbl_subscribe");
 
+    connect(p,
+            &SubscribeInitReply::recv,
+            this,
+            &TableDelegate::on_table_initialize);
 
-void TableDelegate::get_columns() const {
-    using namespace translators;
-    auto* p =
-        attached_methods().new_call_by_name<GetStringListReply>("get_columns");
-
-    if (!p) return;
-
-    connect(p, &GetStringListReply::recv, this, &TableDelegate::on_get_columns);
-}
-
-void TableDelegate::get_num_rows() const {
-    using namespace translators;
-    auto* p =
-        attached_methods().new_call_by_name<GetIntegerReply>("get_num_rows");
-
-    if (!p) return;
-
-    connect(p, &GetIntegerReply::recv, this, &TableDelegate::on_get_num_rows);
-}
-
-translators::GetTableRowReply*
-TableDelegate::get_row(int64_t row, std::span<int64_t> columns) const {
-    using namespace translators;
-    auto* p = attached_methods().new_call_by_name<GetTableRowReply>(
-        "get_row", row, columns);
+    p->call();
 
     return p;
 }
 
-translators::GetTableBlockReply*
-TableDelegate::get_block(int64_t            row_from,
-                         int64_t            row_to,
-                         std::span<int64_t> columns) const {
-    using namespace translators;
-    return attached_methods().new_call_by_name<GetTableBlockReply>(
-        "get_block", row_from, row_to, columns);
+
+PendingMethodReply*
+TableDelegate::request_row_insert(noo::AnyVarList&& row) const {
+    auto new_list = noo::AnyVarList(row.size());
+
+    for (size_t i = 0; i < row.size(); i++) {
+        new_list[i] = noo::AnyVarList({ row[i] });
+    }
+
+    return request_rows_insert(std::move(new_list));
 }
 
-translators::GetTableSelectionReply*
-TableDelegate::get_selection_data(QString selection_id) const {
-    using namespace translators;
-    return attached_methods().new_call_by_name<GetTableSelectionReply>(
-        "get_selection_data", selection_id);
+PendingMethodReply*
+TableDelegate::request_rows_insert(noo::AnyVarList&& columns) const {
+    auto* p = attached_methods().new_call_by_name("tbl_insert");
+
+    p->call(columns);
+
+    return p;
 }
 
+PendingMethodReply*
+TableDelegate::request_row_update(int64_t key, noo::AnyVarList&& row) const {
+    auto new_list = noo::AnyVarList(row.size());
 
-void TableDelegate::request_row_insert(int64_t           row,
-                                       std::span<double> data) const {
-    auto* p = attached_methods().new_call_by_name("row_insert");
+    for (size_t i = 0; i < row.size(); i++) {
+        new_list[i] = noo::AnyVarList({ row[i] });
+    }
 
-    if (p) p->call(row, data);
+    return request_rows_update({ key }, std::move(new_list));
 }
 
-void TableDelegate::request_row_update(int64_t           row,
-                                       std::span<double> data) const {
-    auto* p = attached_methods().new_call_by_name("row_update");
+PendingMethodReply*
+TableDelegate::request_rows_update(std::vector<int64_t>&& keys,
+                                   noo::AnyVarList&&      columns) const {
+    auto* p = attached_methods().new_call_by_name("tbl_update");
 
-    if (p) p->call(row, data);
+    p->call(keys, columns);
+
+    return p;
 }
 
-void TableDelegate::request_row_append(std::span<double> data) const {
-    auto* p = attached_methods().new_call_by_name("row_append");
+PendingMethodReply*
+TableDelegate::request_deletion(std::span<int64_t> keys) const {
+    auto* p = attached_methods().new_call_by_name("tbl_remove");
 
-    if (p) p->call(data);
-}
-void TableDelegate::request_deletion(noo::SelectionRef const& selection) const {
-    auto* p = attached_methods().new_call_by_name("remove_rows");
+    p->call(keys);
 
-    if (p) p->call(selection.to_any());
+    return p;
 }
 
-void TableDelegate::request_selection(QString selection) const {
-    using namespace translators;
-    auto* p = attached_methods().new_call_by_name<GetSelectionReply>(
-        "get_selection", selection);
+PendingMethodReply* TableDelegate::request_clear() const {
+    auto* p = attached_methods().new_call_by_name("tbl_clear");
 
-    if (!p) return;
+    p->call();
 
-    connect(p,
-            &GetSelectionReply::recv,
-            this,
-            &TableDelegate::on_request_selection);
-
-    p->call(selection.toStdString());
+    return p;
 }
 
-void TableDelegate::request_set_selection(QString                  selection,
-                                          noo::SelectionRef const& sel) const {
-    auto* p = attached_methods().new_call_by_name("set_selection");
+PendingMethodReply*
+TableDelegate::request_selection_update(std::string_view name,
+                                        noo::Selection   selection) const {
+    auto* p = attached_methods().new_call_by_name("tbl_update_selection");
 
-    if (p) p->call(selection.toStdString(), sel.to_any());
+    p->call(name, selection.to_any());
+
+    return p;
 }
 
-void TableDelegate::request_all_selections() const {
-    using namespace translators;
-    auto* p = attached_methods().new_call_by_name<GetStringListReply>(
-        "get_all_selections");
-
-    if (!p) return;
-
-    connect(p,
-            &GetStringListReply::recv,
-            this,
-            &TableDelegate::on_request_all_selections);
-}
 
 // =============================================================================
 

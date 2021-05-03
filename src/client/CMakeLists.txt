@@ -4,4 +4,6 @@ PRIVATE
     clientstate.cpp
     clientmessagehandler.cpp
     clientmessagehandler.h
+    client_common.cpp
+    client_common.h
 )

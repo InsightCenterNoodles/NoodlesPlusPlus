@@ -648,41 +648,36 @@ public:
     AttachedMethodList const& attached_methods() const;
     AttachedSignalList const& attached_signals() const;
 
+public slots:
+    virtual void on_table_initialize(noo::AnyVarListRef const& names,
+                                     noo::AnyVarRef            keys,
+                                     noo::AnyVarListRef const& data_cols,
+                                     noo::AnyVarListRef const& selections);
+
+    virtual void on_table_reset();
+    virtual void on_table_updated(noo::AnyVarRef keys, noo::AnyVarRef columns);
+    virtual void on_table_rows_removed(noo::AnyVarRef keys);
+    virtual void on_table_selection_updated(std::string_view,
+                                            noo::SelectionRef const&);
+
 public:
-    void subscribe() const;
-    void get_columns() const;
-    void get_num_rows() const;
+    PendingMethodReply* subscribe() const;
+    PendingMethodReply* request_row_insert(noo::AnyVarList&& row) const;
+    PendingMethodReply* request_rows_insert(noo::AnyVarList&& columns) const;
 
+    PendingMethodReply* request_row_update(int64_t           key,
+                                           noo::AnyVarList&& row) const;
+    PendingMethodReply* request_rows_update(std::vector<int64_t>&& keys,
+                                            noo::AnyVarList&& columns) const;
 
-    translators::GetTableRowReply* get_row(int64_t            row,
-                                           std::span<int64_t> columns) const;
+    PendingMethodReply* request_deletion(std::span<int64_t> keys) const;
 
-    translators::GetTableBlockReply*
-    get_block(int64_t            row_from,
-              int64_t            row_to,
-              std::span<int64_t> columns) const;
-
-    translators::GetTableSelectionReply*
-    get_selection_data(QString selection_id) const;
-
-
-    void request_row_insert(int64_t row, std::span<double>) const;
-    void request_row_update(int64_t row, std::span<double>) const;
-    void request_row_append(std::span<double>) const;
-    void request_deletion(noo::SelectionRef const&) const;
-
-    void request_selection(QString) const;
-    void request_set_selection(QString, noo::SelectionRef const&) const;
-    void request_all_selections() const;
+    PendingMethodReply* request_clear() const;
+    PendingMethodReply* request_selection_update(std::string_view,
+                                                 noo::Selection) const;
 
 signals:
     void updated();
-
-    void on_get_columns(QStringList);
-    void on_get_num_rows(int);
-
-    void on_request_selection(QString, noo::SelectionRef const&) const;
-    void on_request_all_selections() const;
 };
 
 
