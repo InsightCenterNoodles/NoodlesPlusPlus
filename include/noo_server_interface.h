@@ -448,17 +448,37 @@ void update_mesh(MeshT*, MeshData const&);
 
 // Table =======================================================================
 
-struct TableQuery {
-    virtual ~TableQuery();
+// class TableColumnWriterImpl;
 
-    /// Ask how many reals are waiting to be written.
-    virtual size_t next() const;
+// class TableColumnWriter {
+//    TableColumnWriterImpl& m_state;
 
-    /// Write available reals to the given span.
-    virtual void write_next_to(std::span<double>);
+//    void start_string_write(size_t);
+//    void add_string(std::string_view);
+//    void end_string_write();
+
+// public:
+//    TableColumnWriter(TableColumnWriterImpl&);
+
+//    void write_real_column(std::span<double>);
+
+//    template <class Function>
+//    void write_string_column(size_t count, Function&& f) {
+//        start_string_write(count);
+//        for (int i = 0; i < count; i++) {
+//            add_string(f(i));
+//        }
+//        end_string_write();
+//    }
+//};
+
+
+class TableColumn
+    : public std::variant<std::vector<double>, std::vector<std::string>> {
+
+public:
+    using variant::variant;
 };
-
-using QueryPtr = std::unique_ptr<TableQuery>;
 
 ///
 /// \brief The TableSource class is the base type for tables. Users should
@@ -486,8 +506,7 @@ public:
 
     /// Provide the names of your table columns
     virtual std::vector<std::string> get_headers();
-    virtual QueryPtr                 get_all_rows();
-    // virtual std::vector<std::pair<std::string, >>
+    virtual void                     get_all_columns_to(TableColumnWriter&);
 
     /// Get a row
     virtual QueryPtr get_row(int64_t row, std::span<int64_t> columns);
