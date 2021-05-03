@@ -448,35 +448,29 @@ void update_mesh(MeshT*, MeshData const&);
 
 // Table =======================================================================
 
-// class TableColumnWriterImpl;
+// The table system here is just preliminary
 
-// class TableColumnWriter {
-//    TableColumnWriterImpl& m_state;
+// sketch for better query...
+struct TableQuery {
+    size_t num_cols = 0;
+    size_t num_rows = 0;
 
-//    void start_string_write(size_t);
-//    void add_string(std::string_view);
-//    void end_string_write();
+    virtual bool is_column_string(size_t col); // either real or string
 
-// public:
-//    TableColumnWriter(TableColumnWriterImpl&);
+    virtual bool get_reals_to(size_t col, std::span<double>);
+    virtual bool get_cell_to(size_t col, size_t row, std::string_view&);
 
-//    void write_real_column(std::span<double>);
+    virtual bool get_keys_to(std::span<int64_t>);
+};
 
-//    template <class Function>
-//    void write_string_column(size_t count, Function&& f) {
-//        start_string_write(count);
-//        for (int i = 0; i < count; i++) {
-//            add_string(f(i));
-//        }
-//        end_string_write();
-//    }
-//};
+using TableQueryPtr = std::shared_ptr<TableQuery const>;
 
 
 class TableColumn
     : public std::variant<std::vector<double>, std::vector<std::string>> {
-
 public:
+    std::string name;
+
     using variant::variant;
 };
 
@@ -487,6 +481,12 @@ public:
 class TableSource : public QObject {
     Q_OBJECT
 
+    std::vector<TableColumn>               m_columns;
+    std::unordered_map<uint64_t, uint64_t> m_key_to_row_map;
+    uint64_t                               m_counter = 0;
+
+    // how should selections handle key deletion?
+    std::unordered_map<std::string, Selection> m_selections;
 
 protected:
     /// Request a selection be updated. If you return true, a signal will be
@@ -504,9 +504,9 @@ protected:
 public:
     virtual ~TableSource();
 
-    /// Provide the names of your table columns
-    virtual std::vector<std::string> get_headers();
-    virtual void                     get_all_columns_to(TableColumnWriter&);
+    std::vector<std::string> get_headers();
+    TableQueryPtr            get_all_columns();
+    auto const&              get_all_selections() { return m_selections; }
 
     /// Get a row
     virtual QueryPtr get_row(int64_t row, std::span<int64_t> columns);
@@ -536,10 +536,10 @@ public:
     bool trigger_reset();
 
 signals:
-    void table_selection_updated(std::string);
-    void table_row_added(int64_t at, int64_t count);
-    void table_row_deleted(Selection);
-    void table_row_updated(Selection);
+    void table_selection_updated(std::string, SelectionRef const&);
+    void table_row_added(TableQueryPtr);
+    void table_row_updated(TableQueryPtr);
+    void table_row_deleted(QVector<int64_t> keys);
     void sig_reset();
 };
 
