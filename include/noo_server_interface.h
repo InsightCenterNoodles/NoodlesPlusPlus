@@ -504,6 +504,7 @@ public:
 class TableSource : public QObject {
     Q_OBJECT
 
+protected:
     std::vector<TableColumn> m_columns;
     uint64_t                 m_counter = 0;
 
