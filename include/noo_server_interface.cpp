@@ -395,7 +395,7 @@ std::span<std::string const> TableColumn::as_string() const {
              : std::span<std::string const> {};
 }
 
-void TableColumn::append(std::span<double> d) {
+void TableColumn::append(std::span<double const> d) {
     VMATCH(
         *this,
         VCASE(std::vector<double> & a) {
@@ -783,21 +783,32 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
 TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
     auto key_list = keys.coerce_int_list();
 
-    // make sure we have those keys
-    for (auto key : key_list) {
-        if (m_key_to_row_map.count(key) == 0) return nullptr;
+    // to delete we are finding the rows to remove, and then deleting the rows
+    // from highest to lowest. this means we dont break index validity
+
+    std::vector<size_t> rows_to_delete;
+
+    for (auto k : key_list) {
+        if (m_key_to_row_map.count(k) != 1) continue;
+
+        rows_to_delete.push_back(m_key_to_row_map.at(k));
+
+        m_key_to_row_map.erase(k);
     }
 
-    // let us now delete
-    for (auto key : key_list) {
-        auto row = m_key_to_row_map.at(key);
+    std::sort(
+        rows_to_delete.begin(), rows_to_delete.end(), std::greater<size_t>());
 
+    for (auto row : rows_to_delete) {
         m_row_to_key_map.erase(m_row_to_key_map.begin() + row);
-        m_key_to_row_map.erase(key);
-
-        for (auto& col : m_columns) {
-            col.erase(row);
+        for (auto& c : m_columns) {
+            c.erase(row);
         }
+    }
+
+    for (size_t row = 0; row < m_row_to_key_map.size();) {
+        auto k              = m_row_to_key_map[row];
+        m_key_to_row_map[k] = row;
     }
 
 

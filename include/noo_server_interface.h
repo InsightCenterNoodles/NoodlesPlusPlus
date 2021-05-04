@@ -486,7 +486,7 @@ public:
     std::span<double const>      as_doubles() const;
     std::span<std::string const> as_string() const;
 
-    void append(std::span<double>);
+    void append(std::span<double const>);
     void append(AnyVarListRef const&);
 
     void set(size_t row, double);
