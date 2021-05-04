@@ -1,9 +1,9 @@
 #ifndef NOO_SERVER_INTERFACE_H
 #define NOO_SERVER_INTERFACE_H
 
-#include "include/noo_common.h"
-#include "include/noo_include_glm.h"
-#include "include/noo_interface_types.h"
+#include "noo_common.h"
+#include "noo_include_glm.h"
+#include "noo_interface_types.h"
 
 #include <QObject>
 #include <QUrl>
