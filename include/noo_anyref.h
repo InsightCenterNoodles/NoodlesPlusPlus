@@ -185,7 +185,7 @@ public:
     AnyVarMapRef() = default;
     AnyVarMapRef(noodles::AnyMap const*);
 
-    AnyVarRef operator[](std::string_view) const;
+    using unordered_map::operator[];
 
     /// Dump the Any to a human-friendly string representation.
     std::string dump_string() const;
