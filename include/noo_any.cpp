@@ -126,15 +126,15 @@ std::string to_string_part(std::monostate) {
 }
 
 std::string to_string_part(int64_t i) {
-    return std::to_string(i);
+    return "(int " + std::to_string(i) + ")";
 }
 
 std::string to_string_part(double i) {
-    return std::to_string(i);
+    return "(flt " + std::to_string(i) + ")";
 }
 
 std::string to_string_part(std::string const& i) {
-    return i;
+    return "(str " + i + ")";
 }
 
 template <class Tag>
@@ -143,7 +143,9 @@ std::string to_string_part(ID<Tag> id) {
 }
 
 std::string to_string_part(AnyID const& i) {
-    return std::visit([](auto const& ptr) { return to_string_part(ptr); }, i);
+    return "(ID " +
+           std::visit([](auto const& ptr) { return to_string_part(ptr); }, i) +
+           ")";
 }
 
 std::string to_string_part(std::vector<std::byte> const&) {
@@ -151,21 +153,25 @@ std::string to_string_part(std::vector<std::byte> const&) {
 }
 
 std::string to_string_part(std::vector<double> const& v) {
-    std::string ret;
+    std::string ret = "[";
 
     for (double d : v) {
         ret += std::to_string(d) + ", ";
     }
 
+    ret += "]";
+
     return ret;
 }
 
 std::string to_string_part(std::vector<int64_t> const& v) {
-    std::string ret;
+    std::string ret = "[";
 
     for (auto d : v) {
         ret += std::to_string(d) + ", ";
     }
+
+    ret += "]";
 
     return ret;
 }

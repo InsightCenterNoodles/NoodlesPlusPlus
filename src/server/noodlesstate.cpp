@@ -155,7 +155,7 @@ static AnyVar table_subscribe(MethodContext const& context,
                 lv[ci] = std::move(data);
 
             } else {
-                std::vector<double> data;
+                std::vector<double> data(q->num_rows);
 
                 q->get_reals_to(ci, data);
 
