@@ -817,7 +817,7 @@ TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
 
     qDebug() << "Rebuilding maps";
 
-    for (size_t row = 0; row < m_row_to_key_map.size();) {
+    for (size_t row = 0; row < m_row_to_key_map.size(); row++) {
         auto k              = m_row_to_key_map[row];
         m_key_to_row_map[k] = row;
     }
