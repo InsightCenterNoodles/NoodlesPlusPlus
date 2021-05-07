@@ -28,6 +28,8 @@ void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
 
     if (!m_method) return complete({}, "Tried to call a missing method");
 
+    qDebug() << "Invoking" << noo::to_qstring(m_method->name());
+
     VMATCH(
         m_context,
         VCASE(std::monostate) {

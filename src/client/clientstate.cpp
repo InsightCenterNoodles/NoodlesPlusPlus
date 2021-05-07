@@ -71,6 +71,7 @@ void ClientState::on_method_ask_invoke(noo::MethodID          method_id,
                                        MethodContext          context,
                                        noo::AnyVarList const& args,
                                        PendingMethodReply*    reply) {
+    qDebug() << "Invoking" << method_id.to_qstring();
     Q_ASSERT(method_id.valid());
     Q_ASSERT(reply->parent() != this);
     reply->setParent(this);
