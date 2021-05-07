@@ -781,7 +781,10 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
 }
 
 TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
+    qDebug() << Q_FUNC_INFO;
     auto key_list = keys.coerce_int_list();
+
+    qDebug() << QVector<int64_t>(key_list.begin(), key_list.end());
 
     // to delete we are finding the rows to remove, and then deleting the rows
     // from highest to lowest. this means we dont break index validity
@@ -796,8 +799,14 @@ TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
         m_key_to_row_map.erase(k);
     }
 
+    qDebug() << "Rows to delete"
+             << QVector<size_t>(rows_to_delete.begin(), rows_to_delete.end());
+
     std::sort(
         rows_to_delete.begin(), rows_to_delete.end(), std::greater<size_t>());
+
+    qDebug() << "Rows to delete sorted"
+             << QVector<size_t>(rows_to_delete.begin(), rows_to_delete.end());
 
     for (auto row : rows_to_delete) {
         m_row_to_key_map.erase(m_row_to_key_map.begin() + row);
@@ -805,6 +814,8 @@ TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
             c.erase(row);
         }
     }
+
+    qDebug() << "Rebuilding maps";
 
     for (size_t row = 0; row < m_row_to_key_map.size();) {
         auto k              = m_row_to_key_map[row];
