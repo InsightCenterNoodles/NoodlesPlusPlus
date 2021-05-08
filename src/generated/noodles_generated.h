@@ -1736,7 +1736,7 @@ struct Any FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_ANY_TYPE) &&
-           VerifyOffsetRequired(verifier, VT_ANY) &&
+           VerifyOffset(verifier, VT_ANY) &&
            VerifyAnyType(verifier, any(), any_type()) &&
            verifier.EndTable();
   }
@@ -1796,7 +1796,6 @@ struct AnyBuilder {
   flatbuffers::Offset<Any> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Any>(end);
-    fbb_.Required(o, Any::VT_ANY);
     return o;
   }
 };
