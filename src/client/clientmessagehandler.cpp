@@ -340,6 +340,7 @@ void MessageHandler::process_message(noodles::DocumentReset const&) {
     m_state.object_list().clear();
 }
 void MessageHandler::process_message(noodles::SignalInvoke const& m) {
+    qDebug() << Q_FUNC_INFO;
     auto sig = lookup(m_state, *m.id());
 
     if (!sig) {
@@ -354,6 +355,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
     AttachedSignal* attached = nullptr;
 
     if (m.on_object()) {
+        qDebug() << "Invoke on object";
         auto obj = lookup(m_state, *m.on_object());
         if (!obj) {
             qWarning() << "Unknown object for signal!";
@@ -364,6 +366,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
         attached = obj->attached_signals().find_by_delegate(sig);
 
     } else if (m.on_table()) {
+        qDebug() << "Invoke on table";
         auto tbl = lookup(m_state, *m.on_table());
         if (!tbl) {
             qWarning() << "Unknown table for signal!";
@@ -372,6 +375,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
         ctx      = tbl.get();
         attached = tbl->attached_signals().find_by_delegate(sig);
     } else {
+        qDebug() << "Invoke on document";
         ctx      = std::monostate();
         attached = m_state.document().attached_signals().find_by_delegate(sig);
     }
