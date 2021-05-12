@@ -348,8 +348,8 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
         return;
     }
 
-    noo::AnyVarList av;
-    if (m.signal_data()) { noo::read_to_array(m.signal_data(), av); }
+    noo::AnyVarListRef av;
+    if (m.signal_data()) { av = noo::AnyVarListRef(m.signal_data()); }
 
     MethodContext   ctx;
     AttachedSignal* attached = nullptr;
