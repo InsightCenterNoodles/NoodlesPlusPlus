@@ -643,6 +643,7 @@ struct DeleteQuery : TableQuery {
     }
 
     bool get_keys_to(std::span<int64_t> dest) const override {
+        qDebug() << Q_FUNC_INFO << dest.size() << keys.size();
         copy(keys.begin(), keys.end(), dest.begin(), dest.end());
         return true;
     }

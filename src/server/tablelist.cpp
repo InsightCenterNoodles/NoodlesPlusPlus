@@ -114,10 +114,11 @@ static void send_table_signal(TableT& n, BuiltinSignals bs, Args&&... args) {
 
 void TableT::on_table_selection_updated(std::string         name,
                                         SelectionRef const& ref) {
-    send_table_signal(
-        *this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, name, ref.to_any());
     qDebug() << "Table emit" << Q_FUNC_INFO
              << QString::fromStdString(ref.to_any().dump_string());
+
+    send_table_signal(
+        *this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, name, ref.to_any());
 }
 
 void TableT::on_table_row_deleted(TableQueryPtr q) {
@@ -129,10 +130,10 @@ void TableT::on_table_row_deleted(TableQueryPtr q) {
 
     AnyVar v = std::move(keys);
 
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_ROWS_DELETED, v);
-
     qDebug() << "Table emit" << Q_FUNC_INFO
              << QString::fromStdString(v.dump_string());
+
+    send_table_signal(*this, BuiltinSignals::TABLE_SIG_ROWS_DELETED, v);
 }
 
 void TableT::on_table_row_updated(TableQueryPtr q) {
@@ -182,16 +183,16 @@ void TableT::on_table_row_updated(TableQueryPtr q) {
         cols = std::move(l);
     }
 
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_DATA_UPDATED, kv, cols);
-
     qDebug() << "Table emit" << Q_FUNC_INFO
              << QString::fromStdString(kv.dump_string())
              << QString::fromStdString(cols.dump_string());
+
+    send_table_signal(*this, BuiltinSignals::TABLE_SIG_DATA_UPDATED, kv, cols);
 }
 
 void TableT::on_table_reset() {
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_RESET);
     qDebug() << "Table emit" << Q_FUNC_INFO;
+    send_table_signal(*this, BuiltinSignals::TABLE_SIG_RESET);
 }
 
 } // namespace noo
