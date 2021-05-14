@@ -710,8 +710,8 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
     // now lets insert
 
     for (size_t ci = 0; ci < num_cols; ci++) {
-        auto source_col = cols[ci];
-        auto dest_col   = m_columns.at(ci);
+        auto  source_col = cols[ci];
+        auto& dest_col   = m_columns.at(ci);
         VMATCH_W(
             visit,
             source_col,
@@ -785,8 +785,8 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
         auto update_at = m_key_to_row_map[key];
 
         for (size_t ci = 0; ci < num_cols; ci++) {
-            auto source_col = cols[ci];
-            auto dest_col   = m_columns.at(ci);
+            auto  source_col = cols[ci];
+            auto& dest_col   = m_columns.at(ci);
             VMATCH_W(
                 visit,
                 source_col,
@@ -804,8 +804,6 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
     }
 
     // now return a query to the data
-
-    // UpdateQuery(this, span_to_vector(key_list.span()));
 
     return std::make_shared<UpdateQuery>(this, span_to_vector(key_list.span()));
 }
