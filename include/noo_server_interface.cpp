@@ -749,7 +749,7 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
                                          AnyVarListRef const& cols) {
     // get dimensions of update
 
-    size_t num_cols = cols.size();
+    size_t const num_cols = cols.size();
 
     if (num_cols == 0) return nullptr;
     if (num_cols != m_columns.size()) return nullptr;
@@ -773,16 +773,23 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
 
     if (!ok or num_rows == 0) return nullptr;
 
+    qDebug() << Q_FUNC_INFO << num_rows;
+
     // lets get some keys
 
-    auto key_list = keys.coerce_int_list();
-
+    auto key_list      = keys.coerce_int_list();
+    auto key_list_span = key_list.span();
 
     // now lets update
 
-    for (auto key : key_list) {
+    for (size_t key_i = 0; key_i < key_list.size(); key_i++) {
+        auto key = key_list_span[key_i];
 
-        auto update_at = m_key_to_row_map[key];
+        auto iter = m_key_to_row_map.find(key);
+
+        if (iter == m_key_to_row_map.end()) continue;
+
+        auto const update_at = iter->second;
 
         for (size_t ci = 0; ci < num_cols; ci++) {
             auto  source_col = cols[ci];
@@ -791,10 +798,10 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
                 visit,
                 source_col,
                 VCASE(std::span<double> data) {
-                    dest_col.set(update_at, data[ci]);
+                    dest_col.set(update_at, data[key_i]);
                 },
                 VCASE(AnyVarListRef const& ref) {
-                    dest_col.set(update_at, ref[ci]);
+                    dest_col.set(update_at, ref[key_i]);
                 },
                 VCASE(auto const&) {
                     // do nothing, should not get here

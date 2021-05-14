@@ -302,6 +302,8 @@ AnyVarListRef::AnyVarListRef(noodles::AnyList const* s) : m_list_source(s) { }
 AnyVarRef AnyVarListRef::operator[](size_t i) const {
     if (!m_list_source) return {};
 
+    if (m_list_source->list()->size() <= i) return AnyVarRef();
+
     return AnyVarRef(m_list_source->list()->Get(i));
 }
 
