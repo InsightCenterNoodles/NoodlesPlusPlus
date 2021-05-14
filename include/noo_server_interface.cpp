@@ -469,7 +469,7 @@ struct WholeTableQuery : TableQuery {
 
         auto sp = column.as_doubles();
 
-        copy(sp.begin(), sp.end(), dest.begin(), dest.end());
+        copy_range(sp, dest);
 
         return true;
     }
@@ -492,7 +492,7 @@ struct WholeTableQuery : TableQuery {
 
     bool get_keys_to(std::span<int64_t> dest) const override {
         auto const& r = source->get_row_to_key_map();
-        copy(r.begin(), r.end(), dest.begin(), dest.end());
+        copy_range(r, dest);
         return true;
     }
 };
@@ -522,10 +522,11 @@ struct InsertQuery : TableQuery {
         qDebug() << Q_FUNC_INFO << col << dest.size() << start_at << num_rows
                  << sp.size();
 
-        copy(sp.begin() + start_at,
-             sp.begin() + start_at + num_rows,
-             dest.begin(),
-             dest.end());
+        sp = noo::safe_subspan(sp, start_at, num_rows);
+
+        Q_ASSERT(sp.size() == num_rows);
+
+        copy_range(sp, dest);
 
         return true;
     }
@@ -548,10 +549,12 @@ struct InsertQuery : TableQuery {
 
     bool get_keys_to(std::span<int64_t> dest) const override {
         auto const& r = source->get_row_to_key_map();
-        copy(r.begin() + start_at,
-             r.begin() + start_at + num_rows,
-             dest.begin(),
-             dest.end());
+
+        auto key_sp = noo::safe_subspan(std::span(r), start_at, num_rows);
+
+        Q_ASSERT(key_sp.size() == num_rows);
+
+        copy_range(key_sp, dest);
         return true;
     }
 };
