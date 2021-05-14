@@ -515,9 +515,12 @@ struct InsertQuery : TableQuery {
     bool get_reals_to(size_t col, std::span<double> dest) const override {
         auto& column = source->get_columns().at(col);
 
-        if (column.is_string()) return false;
+        Q_ASSERT(!column.is_string()); // should already have been checked
 
         auto sp = column.as_doubles();
+
+        qDebug() << Q_FUNC_INFO << col << dest.size() << start_at << num_rows
+                 << sp.size();
 
         copy(sp.begin() + start_at,
              sp.begin() + start_at + num_rows,
