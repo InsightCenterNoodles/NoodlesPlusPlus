@@ -678,12 +678,16 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
 
     if (!ok or num_rows == 0) return nullptr;
 
+    qDebug() << Q_FUNC_INFO << "num rows" << num_rows;
+
     // lets get some keys
 
     std::vector<int64_t> new_row_keys;
     new_row_keys.resize(num_rows);
 
     auto const current_row_count = m_columns.at(0).size();
+
+    qDebug() << "current row count" << current_row_count;
 
     for (size_t i = 0; i < num_rows; i++) {
         new_row_keys[i]             = m_counter;
@@ -694,6 +698,8 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
     m_row_to_key_map.insert(
         m_row_to_key_map.end(), new_row_keys.begin(), new_row_keys.end());
 
+    qDebug() << "assigned keys"
+             << QVector<int64_t>::fromStdVector(new_row_keys);
 
     // now lets insert
 
@@ -709,6 +715,23 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
                 // do nothing, should not get here
                 qFatal("Unable to insert this data type");
             })
+
+        if (dest_col.is_string()) {
+            QVector<QString> sl;
+
+            for (auto const& s : dest_col.as_string()) {
+                sl.push_back(noo::to_qstring(s));
+            }
+            qDebug() << "Col " << ci << "is now" << sl;
+
+        } else {
+            QVector<double> sl;
+
+            for (auto const& s : dest_col.as_doubles()) {
+                sl.push_back(s);
+            }
+            qDebug() << "Col " << ci << "is now" << sl;
+        }
     }
 
     // now return a query to the data
