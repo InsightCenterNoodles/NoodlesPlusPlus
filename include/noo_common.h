@@ -56,6 +56,16 @@ T get_or_default(std::vector<T> const& t, size_t i, T const& def = T()) {
     return def;
 }
 
+
+/// Attempt to get a value from a span at a certain index. If the index does
+/// not exist, returns the default value.
+template <class T>
+T get_or_default(std::span<T> const& t, size_t i, T const& def = T()) {
+    if (i < t.size()) { return t[i]; }
+    return def;
+}
+
+
 QString to_qstring(std::string_view);
 
 template <class U, class T>
