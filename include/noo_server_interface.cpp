@@ -422,6 +422,23 @@ void TableColumn::append(AnyVarListRef const& d) {
         });
 }
 
+void TableColumn::append(double d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) { a.push_back(d); },
+        VCASE(std::vector<std::string> & a) {
+            a.push_back(std::to_string(d));
+        });
+}
+void TableColumn::append(std::string_view d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) {
+            a.push_back(std::stod(std::string(d))); // UGH
+        },
+        VCASE(std::vector<std::string> & a) { a.push_back(std::string(d)); });
+}
+
 void TableColumn::set(size_t row, double d) {
     VMATCH(
         *this,
@@ -435,6 +452,12 @@ void TableColumn::set(size_t row, AnyVarRef d) {
         VCASE(std::vector<std::string> & a) {
             a[row] = std::string(d.to_string());
         });
+}
+void TableColumn::set(size_t row, std::string_view d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) { a[row] = std::stod(std::string(d)); },
+        VCASE(std::vector<std::string> & a) { a[row] = std::string(d); });
 }
 
 void TableColumn::erase(size_t row) {
