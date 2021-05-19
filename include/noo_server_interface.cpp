@@ -291,6 +291,16 @@ void update_material(MaterialTPtr item, MaterialData const& data) {
     item->update(data);
 }
 
+// Light =======================================================================
+
+LightTPtr create_light(DocumentTPtrRef doc, LightData const& data) {
+    return doc->light_list().provision_next(data);
+}
+
+void update_light(LightTPtr const& item, LightData const& data) {
+    item->update(data);
+}
+
 // Mesh ========================================================================
 
 MeshData::MeshData(PackedMeshDataResult const& res, BufferTPtr ptr) {
