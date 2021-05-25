@@ -159,7 +159,7 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
 
             std::byte* write_at = comp_start;
 
-            for (auto& component : refs.positions) {
+            for (auto const& component : vector) {
                 assert((write_at - vertex_portion.data()) <
                        vertex_portion.size());
                 memcpy(write_at, &component, sizeof(component));
