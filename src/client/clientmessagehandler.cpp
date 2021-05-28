@@ -262,6 +262,7 @@ void MessageHandler::process_message(noodles::LightCreateUpdate const& m) {
     LightData ld;
 
     EXIST_EXE(m.color(), { ld.color = noo::convert(VALUE); });
+    ld.intensity = m.intensity();
 
     m_state.light_list().handle_new(at, std::move(ld));
 }
