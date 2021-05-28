@@ -327,7 +327,7 @@ public:
     SignalDelegatePtr const& delegate() const;
 
 signals:
-    void fired(noo::AnyVar const&);
+    void fired(noo::AnyVarListRef const&);
 };
 
 class AttachedSignalList {
@@ -413,7 +413,7 @@ public:
     virtual void prepare_delete();
 
 signals:
-    void fired(MethodContext, noo::AnyVarList);
+    void fired(MethodContext, noo::AnyVarListRef const&);
 };
 
 // =============================================================================
@@ -631,6 +631,8 @@ class TableDelegate : public QObject {
     AttachedMethodList m_attached_methods;
     AttachedSignalList m_attached_signals;
 
+    std::vector<QMetaObject::Connection> m_spec_signals;
+
 public:
     TableDelegate(noo::TableID, TableData const&);
     virtual ~TableDelegate();
@@ -675,6 +677,12 @@ public:
     PendingMethodReply* request_clear() const;
     PendingMethodReply* request_selection_update(std::string_view,
                                                  noo::Selection) const;
+
+private slots:
+    void interp_table_reset(noo::AnyVarListRef const&);
+    void interp_table_update(noo::AnyVarListRef const&);
+    void interp_table_remove(noo::AnyVarListRef const&);
+    void interp_table_sel_update(noo::AnyVarListRef const&);
 
 signals:
     void updated();

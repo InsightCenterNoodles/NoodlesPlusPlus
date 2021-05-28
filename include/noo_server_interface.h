@@ -488,9 +488,12 @@ public:
 
     void append(std::span<double const>);
     void append(AnyVarListRef const&);
+    void append(double);
+    void append(std::string_view);
 
     void set(size_t row, double);
     void set(size_t row, AnyVarRef);
+    void set(size_t row, std::string_view);
 
     void erase(size_t row);
 

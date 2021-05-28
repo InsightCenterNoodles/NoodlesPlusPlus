@@ -229,14 +229,37 @@ void BufferDelegate::prepare_delete() { }
 TableDelegate::TableDelegate(noo::TableID i, TableData const& data)
     : m_id(i), m_attached_methods(this), m_attached_signals(this) {
 
-    if (data.method_list) m_attached_methods = *data.method_list;
-    if (data.signal_list) m_attached_signals = *data.signal_list;
+    update(data);
 }
 TableDelegate::~TableDelegate() = default;
 
 void TableDelegate::update(TableData const& data) {
     if (data.method_list) m_attached_methods = *data.method_list;
-    if (data.signal_list) m_attached_signals = *data.signal_list;
+    if (data.signal_list) {
+
+        for (auto c : m_spec_signals) {
+            disconnect(c);
+        }
+
+        m_attached_signals = *data.signal_list;
+
+        // find specific signals
+
+        auto find_sig = [&](std::string_view n, auto targ) {
+            auto* p = m_attached_signals.find_by_name(n);
+
+            if (p) {
+                auto c = connect(p, &AttachedSignal::fired, this, targ);
+                m_spec_signals.push_back(c);
+            }
+        };
+
+        find_sig("tbl_reset", &TableDelegate::interp_table_reset);
+        find_sig("tbl_updated", &TableDelegate::interp_table_update);
+        find_sig("tbl_rows_removed", &TableDelegate::interp_table_remove);
+        find_sig("tbl_selection_updated",
+                 &TableDelegate::interp_table_sel_update);
+    }
 
     this->on_update(data);
 }
@@ -347,6 +370,44 @@ TableDelegate::request_selection_update(std::string_view name,
     p->call(name, selection.to_any());
 
     return p;
+}
+
+void TableDelegate::interp_table_reset(noo::AnyVarListRef const&) {
+    this->on_table_reset();
+}
+
+void TableDelegate::interp_table_update(noo::AnyVarListRef const& ref) {
+    // row of keys, then row of columns
+    if (ref.size() < 2) {
+        qWarning() << Q_FUNC_INFO << "Malformed signal from server";
+        return;
+    }
+
+    auto keylist = ref[0];
+    auto cols    = ref[1];
+
+    this->on_table_updated(keylist, cols);
+}
+
+void TableDelegate::interp_table_remove(noo::AnyVarListRef const& ref) {
+    if (ref.size() < 1) {
+        qWarning() << Q_FUNC_INFO << "Malformed signal from server";
+        return;
+    }
+
+    this->on_table_rows_removed(ref[0]);
+}
+
+void TableDelegate::interp_table_sel_update(noo::AnyVarListRef const& ref) {
+    if (ref.size() < 2) {
+        qWarning() << Q_FUNC_INFO << "Malformed signal from server";
+        return;
+    }
+
+    auto str     = ref[0].to_string();
+    auto sel_ref = noo::SelectionRef(ref[1]);
+
+    this->on_table_selection_updated(str, sel_ref);
 }
 
 

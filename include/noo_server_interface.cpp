@@ -159,7 +159,7 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
 
             std::byte* write_at = comp_start;
 
-            for (auto& component : refs.positions) {
+            for (auto const& component : vector) {
                 assert((write_at - vertex_portion.data()) <
                        vertex_portion.size());
                 memcpy(write_at, &component, sizeof(component));
@@ -288,6 +288,16 @@ MaterialTPtr create_material(DocumentTPtrRef doc, MaterialData const& data) {
 }
 
 void update_material(MaterialTPtr item, MaterialData const& data) {
+    item->update(data);
+}
+
+// Light =======================================================================
+
+LightTPtr create_light(DocumentTPtrRef doc, LightData const& data) {
+    return doc->light_list().provision_next(data);
+}
+
+void update_light(LightTPtr const& item, LightData const& data) {
     item->update(data);
 }
 
@@ -422,6 +432,23 @@ void TableColumn::append(AnyVarListRef const& d) {
         });
 }
 
+void TableColumn::append(double d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) { a.push_back(d); },
+        VCASE(std::vector<std::string> & a) {
+            a.push_back(std::to_string(d));
+        });
+}
+void TableColumn::append(std::string_view d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) {
+            a.push_back(std::stod(std::string(d))); // UGH
+        },
+        VCASE(std::vector<std::string> & a) { a.push_back(std::string(d)); });
+}
+
 void TableColumn::set(size_t row, double d) {
     VMATCH(
         *this,
@@ -435,6 +462,12 @@ void TableColumn::set(size_t row, AnyVarRef d) {
         VCASE(std::vector<std::string> & a) {
             a[row] = std::string(d.to_string());
         });
+}
+void TableColumn::set(size_t row, std::string_view d) {
+    VMATCH(
+        *this,
+        VCASE(std::vector<double> & a) { a[row] = std::stod(std::string(d)); },
+        VCASE(std::vector<std::string> & a) { a[row] = std::string(d); });
 }
 
 void TableColumn::erase(size_t row) {
@@ -469,7 +502,7 @@ struct WholeTableQuery : TableQuery {
 
         auto sp = column.as_doubles();
 
-        copy(sp.begin(), sp.end(), dest.begin(), dest.end());
+        copy_range(sp, dest);
 
         return true;
     }
@@ -492,7 +525,7 @@ struct WholeTableQuery : TableQuery {
 
     bool get_keys_to(std::span<int64_t> dest) const override {
         auto const& r = source->get_row_to_key_map();
-        copy(r.begin(), r.end(), dest.begin(), dest.end());
+        copy_range(r, dest);
         return true;
     }
 };
@@ -515,14 +548,18 @@ struct InsertQuery : TableQuery {
     bool get_reals_to(size_t col, std::span<double> dest) const override {
         auto& column = source->get_columns().at(col);
 
-        if (column.is_string()) return false;
+        Q_ASSERT(!column.is_string()); // should already have been checked
 
         auto sp = column.as_doubles();
 
-        copy(sp.begin() + start_at,
-             sp.begin() + start_at + num_rows,
-             dest.begin(),
-             dest.end());
+        qDebug() << Q_FUNC_INFO << col << dest.size() << start_at << num_rows
+                 << sp.size();
+
+        sp = noo::safe_subspan(sp, start_at, num_rows);
+
+        Q_ASSERT(sp.size() == num_rows);
+
+        copy_range(sp, dest);
 
         return true;
     }
@@ -545,10 +582,12 @@ struct InsertQuery : TableQuery {
 
     bool get_keys_to(std::span<int64_t> dest) const override {
         auto const& r = source->get_row_to_key_map();
-        copy(r.begin() + start_at,
-             r.begin() + start_at + num_rows,
-             dest.begin(),
-             dest.end());
+
+        auto key_sp = noo::safe_subspan(std::span(r), start_at, num_rows);
+
+        Q_ASSERT(key_sp.size() == num_rows);
+
+        copy_range(key_sp, dest);
         return true;
     }
 };
@@ -678,12 +717,16 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
 
     if (!ok or num_rows == 0) return nullptr;
 
+    qDebug() << Q_FUNC_INFO << "num rows" << num_rows;
+
     // lets get some keys
 
     std::vector<int64_t> new_row_keys;
     new_row_keys.resize(num_rows);
 
     auto const current_row_count = m_columns.at(0).size();
+
+    qDebug() << "current row count" << current_row_count;
 
     for (size_t i = 0; i < num_rows; i++) {
         new_row_keys[i]             = m_counter;
@@ -694,12 +737,14 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
     m_row_to_key_map.insert(
         m_row_to_key_map.end(), new_row_keys.begin(), new_row_keys.end());
 
+    qDebug() << "assigned keys"
+             << QVector<int64_t>::fromStdVector(new_row_keys);
 
     // now lets insert
 
     for (size_t ci = 0; ci < num_cols; ci++) {
-        auto source_col = cols[ci];
-        auto dest_col   = m_columns.at(ci);
+        auto  source_col = cols[ci];
+        auto& dest_col   = m_columns.at(ci);
         VMATCH_W(
             visit,
             source_col,
@@ -709,6 +754,23 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
                 // do nothing, should not get here
                 qFatal("Unable to insert this data type");
             })
+
+        if (dest_col.is_string()) {
+            QVector<QString> sl;
+
+            for (auto const& s : dest_col.as_string()) {
+                sl.push_back(noo::to_qstring(s));
+            }
+            qDebug() << "Col " << ci << "is now" << sl;
+
+        } else {
+            QVector<double> sl;
+
+            for (auto const& s : dest_col.as_doubles()) {
+                sl.push_back(s);
+            }
+            qDebug() << "Col " << ci << "is now" << sl;
+        }
     }
 
     // now return a query to the data
@@ -720,7 +782,7 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
                                          AnyVarListRef const& cols) {
     // get dimensions of update
 
-    size_t num_cols = cols.size();
+    size_t const num_cols = cols.size();
 
     if (num_cols == 0) return nullptr;
     if (num_cols != m_columns.size()) return nullptr;
@@ -744,28 +806,35 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
 
     if (!ok or num_rows == 0) return nullptr;
 
+    qDebug() << Q_FUNC_INFO << num_rows;
+
     // lets get some keys
 
-    auto key_list = keys.coerce_int_list();
-
+    auto key_list      = keys.coerce_int_list();
+    auto key_list_span = key_list.span();
 
     // now lets update
 
-    for (auto key : key_list) {
+    for (size_t key_i = 0; key_i < key_list.size(); key_i++) {
+        auto key = key_list_span[key_i];
 
-        auto update_at = m_key_to_row_map[key];
+        auto iter = m_key_to_row_map.find(key);
+
+        if (iter == m_key_to_row_map.end()) continue;
+
+        auto const update_at = iter->second;
 
         for (size_t ci = 0; ci < num_cols; ci++) {
-            auto source_col = cols[ci];
-            auto dest_col   = m_columns.at(ci);
+            auto  source_col = cols[ci];
+            auto& dest_col   = m_columns.at(ci);
             VMATCH_W(
                 visit,
                 source_col,
                 VCASE(std::span<double> data) {
-                    dest_col.set(update_at, data[ci]);
+                    dest_col.set(update_at, data[key_i]);
                 },
                 VCASE(AnyVarListRef const& ref) {
-                    dest_col.set(update_at, ref[ci]);
+                    dest_col.set(update_at, ref[key_i]);
                 },
                 VCASE(auto const&) {
                     // do nothing, should not get here
@@ -775,8 +844,6 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
     }
 
     // now return a query to the data
-
-    // UpdateQuery(this, span_to_vector(key_list.span()));
 
     return std::make_shared<UpdateQuery>(this, span_to_vector(key_list.span()));
 }

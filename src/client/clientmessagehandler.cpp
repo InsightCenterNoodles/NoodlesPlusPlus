@@ -262,6 +262,7 @@ void MessageHandler::process_message(noodles::LightCreateUpdate const& m) {
     LightData ld;
 
     EXIST_EXE(m.color(), { ld.color = noo::convert(VALUE); });
+    ld.intensity = m.intensity();
 
     m_state.light_list().handle_new(at, std::move(ld));
 }
@@ -340,6 +341,7 @@ void MessageHandler::process_message(noodles::DocumentReset const&) {
     m_state.object_list().clear();
 }
 void MessageHandler::process_message(noodles::SignalInvoke const& m) {
+    qDebug() << Q_FUNC_INFO;
     auto sig = lookup(m_state, *m.id());
 
     if (!sig) {
@@ -347,13 +349,14 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
         return;
     }
 
-    noo::AnyVarList av;
-    if (m.signal_data()) { noo::read_to_array(m.signal_data(), av); }
+    noo::AnyVarListRef av;
+    if (m.signal_data()) { av = noo::AnyVarListRef(m.signal_data()); }
 
     MethodContext   ctx;
     AttachedSignal* attached = nullptr;
 
     if (m.on_object()) {
+        qDebug() << "Invoke on object";
         auto obj = lookup(m_state, *m.on_object());
         if (!obj) {
             qWarning() << "Unknown object for signal!";
@@ -364,6 +367,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
         attached = obj->attached_signals().find_by_delegate(sig);
 
     } else if (m.on_table()) {
+        qDebug() << "Invoke on table";
         auto tbl = lookup(m_state, *m.on_table());
         if (!tbl) {
             qWarning() << "Unknown table for signal!";
@@ -372,6 +376,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
         ctx      = tbl.get();
         attached = tbl->attached_signals().find_by_delegate(sig);
     } else {
+        qDebug() << "Invoke on document";
         ctx      = std::monostate();
         attached = m_state.document().attached_signals().find_by_delegate(sig);
     }

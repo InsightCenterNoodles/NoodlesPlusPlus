@@ -56,6 +56,16 @@ T get_or_default(std::vector<T> const& t, size_t i, T const& def = T()) {
     return def;
 }
 
+
+/// Attempt to get a value from a span at a certain index. If the index does
+/// not exist, returns the default value.
+template <class T>
+T get_or_default(std::span<T> const& t, size_t i, T const& def = T()) {
+    if (i < t.size()) { return t[i]; }
+    return def;
+}
+
+
 QString to_qstring(std::string_view);
 
 template <class U, class T>
@@ -72,17 +82,51 @@ std::span<U> cast_span_to(std::span<T> s) {
 
 
 template <class Iter1, class Iter2>
-void copy(Iter1 src_begin, Iter1 src_end, Iter2 dest_begin, Iter2 dest_end) {
+size_t copy(Iter1 src_begin, Iter1 src_end, Iter2 dest_begin, Iter2 dest_end) {
     auto size1 = std::distance(src_begin, src_end);
     auto size2 = std::distance(dest_begin, dest_end);
 
-    std::copy_n(src_begin, std::min(size1, size2), dest_begin);
+    auto to_copy = std::min(size1, size2);
+
+    std::copy_n(src_begin, to_copy, dest_begin);
+
+    return to_copy;
+}
+
+template <class C1, class C2>
+size_t copy_range(C1 const& src, C2& dest) {
+    auto size1 = std::size(src);
+    auto size2 = std::size(dest);
+
+    auto to_copy = std::min(size1, size2);
+
+    std::copy_n(std::begin(src), to_copy, std::begin(dest));
+
+    return to_copy;
 }
 
 template <class T>
 auto span_to_vector(std::span<T> sp) {
     using R = std::remove_cvref_t<T>;
     return std::vector<R>(sp.begin(), sp.end());
+}
+
+///
+/// \brief By the standard, no checks are made for a subspan offset or count (if
+/// not max). The span returned here will always be defined, and may have less
+/// items than requested.
+///
+template <class T>
+auto safe_subspan(std::span<T> sp,
+                  size_t       offset,
+                  size_t       count = std::dynamic_extent) {
+    if (offset >= sp.size()) return std::span<T>();
+
+    size_t available = sp.size() - offset;
+
+    count = (count <= available ? count : available);
+
+    return sp.subspan(offset, count);
 }
 
 } // namespace noo
