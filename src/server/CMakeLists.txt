@@ -1,0 +1,26 @@
+target_sources(noodles
+PRIVATE
+    bufferlist.cpp
+    bufferlist.h
+    componentlistbase.cpp
+    componentlistbase.h
+    materiallist.cpp
+    materiallist.h
+    meshlist.cpp
+    meshlist.h
+    methodlist.cpp
+    methodlist.h
+    noodlesserver.cpp
+    noodlesserver.h
+    noodlesstate.cpp
+    noodlesstate.h
+    objectlist.cpp
+    objectlist.h
+    search_helpers.h
+    serialize.cpp
+    serialize.h
+    tablelist.cpp
+    tablelist.h
+    texturelist.cpp
+    texturelist.h
+)

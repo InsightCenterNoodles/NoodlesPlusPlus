@@ -88,7 +88,7 @@ void TableT::write_new_to(Writer& w) {
     auto x = noodles::CreateTableCreateUpdateDirect(w,
                                                     lid,
                                                     m_data.name.c_str(),
-                                                    m_data.url.c_str(),
+                                                    m_data.meta.c_str(),
                                                     &update_methods_list,
                                                     &update_signals_list);
 

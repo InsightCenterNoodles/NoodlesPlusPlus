@@ -532,7 +532,7 @@ signals:
 ///
 struct TableData {
     std::string name;
-    std::string url;
+    std::string meta;
 
     std::shared_ptr<TableSource> source;
 };
