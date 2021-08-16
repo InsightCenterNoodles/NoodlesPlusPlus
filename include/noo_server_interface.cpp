@@ -737,8 +737,8 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
     m_row_to_key_map.insert(
         m_row_to_key_map.end(), new_row_keys.begin(), new_row_keys.end());
 
-    qDebug() << "assigned keys"
-             << QVector<int64_t>::fromStdVector(new_row_keys);
+    // qDebug() << "assigned keys"
+    //         << QVector<int64_t>::fromStdVector(new_row_keys);
 
     // now lets insert
 
@@ -953,12 +953,20 @@ bool TableSource::ask_delete(AnyVarRef const& keys) {
 }
 
 bool TableSource::ask_clear() {
-    return handle_reset();
+    auto b = handle_reset();
+
+    if (b) emit table_reset();
+
+    return b;
 }
 
 bool TableSource::ask_update_selection(std::string_view    k,
                                        SelectionRef const& s) {
-    return handle_set_selection(k, s);
+    auto b = handle_set_selection(k, s);
+
+    if (b) emit table_selection_updated(std::string(k), s);
+
+    return b;
 }
 
 
