@@ -99,9 +99,10 @@ void ClientT::send(QByteArray data) {
 // =============================================================================
 
 
-ServerT::ServerT(quint16 port, QObject* parent) : QObject(parent) {
+ServerT::ServerT(quint16 port, bool debug, QObject* parent)
+    : QObject(parent), m_debug(debug) {
 
-    m_state = new NoodlesState(this);
+    m_state = new NoodlesState(this, debug);
 
     m_socket_server = new QWebSocketServer(QStringLiteral("Noodles Server"),
                                            QWebSocketServer::NonSecureMode,
@@ -119,6 +120,10 @@ ServerT::ServerT(quint16 port, QObject* parent) : QObject(parent) {
 
 NoodlesState* ServerT::state() {
     return m_state;
+}
+
+bool ServerT::debug_mode() const {
+    return m_debug;
 }
 
 std::unique_ptr<Writer> ServerT::get_broadcast_writer() {
@@ -196,7 +201,7 @@ class MessageHandler {
 
     void handle_introduction(noodles::IntroductionMessage const* m) {
         if (!m) return;
-        qDebug() << Q_FUNC_INFO;
+        if (on_debug()) qDebug() << Q_FUNC_INFO;
 
         m_client.set_name(m->client_name()->str());
 
@@ -273,14 +278,14 @@ class MessageHandler {
 
     void handle_invoke(noodles::MethodInvokeMessage const* message) {
         if (!message) return;
-        qDebug() << Q_FUNC_INFO;
+        if (on_debug()) qDebug() << Q_FUNC_INFO;
 
         MethodContext             context;
         AttachedMethodList const* target_list = nullptr;
         bool                      is_table    = false;
 
         if (message->on_object()) {
-            qDebug() << "INVOKE on obj";
+            if (on_debug()) qDebug() << "INVOKE on obj";
 
             ObjectID source = convert_id(*message->on_object());
 
@@ -292,7 +297,7 @@ class MessageHandler {
             }
 
         } else if (message->on_table()) {
-            qDebug() << "INVOKE on table";
+            if (on_debug()) qDebug() << "INVOKE on table";
 
             TableID source = convert_id(*message->on_table());
 
@@ -305,7 +310,7 @@ class MessageHandler {
             }
 
         } else {
-            qDebug() << "INVOKE on doc";
+            if (on_debug()) qDebug() << "INVOKE on doc";
             target_list = &(get_document().att_method_list());
         }
 
@@ -340,7 +345,9 @@ class MessageHandler {
             return;
         }
 
-        qDebug() << "METHOD ID" << method_id.id_slot << method_id.id_gen;
+        if (on_debug()) {
+            qDebug() << "METHOD ID" << method_id.id_slot << method_id.id_gen;
+        }
 
         auto* method = target_list->find(method_id);
 
@@ -373,6 +380,11 @@ class MessageHandler {
             vars = AnyVarListRef(message->method_args());
         }
 
+        if (on_debug()) {
+            auto arg_str = vars.dump_string();
+            qDebug() << "Method arguments:" << arg_str.c_str();
+        }
+
         AnyVar      ret_data;
         std::string err_str;
 
@@ -386,8 +398,10 @@ class MessageHandler {
             err_str = exp.reason();
         }
 
-        qDebug() << "Method Done" << ret_data.dump_string().c_str()
-                 << err_str.c_str();
+        if (on_debug()) {
+            qDebug() << "Method Done" << ret_data.dump_string().c_str()
+                     << err_str.c_str();
+        }
 
         if (is_table) {
             auto this_tbl = context.get_table();
@@ -410,7 +424,7 @@ class MessageHandler {
 
     void handle_refresh(::noodles::AssetRefreshMessage const* message) {
         if (!message) return;
-        qDebug() << Q_FUNC_INFO;
+        if (on_debug()) { qDebug() << Q_FUNC_INFO; }
 
         auto buffer_list = message->for_buffers();
 
@@ -433,6 +447,8 @@ class MessageHandler {
 
 public:
     MessageHandler(ServerT* s, ClientT& c) : m_server(s), m_client(c) { }
+
+    bool on_debug() const { return m_server->debug_mode(); }
 
     void handle(IncomingMessage& message) {
         try {

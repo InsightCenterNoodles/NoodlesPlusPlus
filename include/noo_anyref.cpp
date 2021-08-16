@@ -313,6 +313,10 @@ size_t AnyVarListRef::size() const {
     return m_list_source->list()->size();
 }
 
+std::string AnyVarListRef::dump_string() const {
+    return to_string_part(*this);
+}
+
 // =============================================================================
 
 

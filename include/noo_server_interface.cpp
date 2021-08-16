@@ -73,8 +73,8 @@ SignalTPtr create_signal(DocumentT* server, SignalData const& data) {
 }
 
 // Server
-std::shared_ptr<ServerT> create_server(uint16_t port) {
-    return std::make_shared<ServerT>(port);
+std::shared_ptr<ServerT> create_server(ServerOptions const& options) {
+    return std::make_shared<ServerT>(options.port, options.stdout_trace);
 }
 
 // Document ====================================================================

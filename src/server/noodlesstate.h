@@ -57,6 +57,7 @@ class ServerT;
 
 class DocumentT {
     ServerT* m_server;
+    bool     m_debug;
 
     MethodList m_method_list;
     SignalList m_signal_list;
@@ -85,7 +86,7 @@ class DocumentT {
     void build_table_signals();
 
 public:
-    DocumentT(ServerT*);
+    DocumentT(ServerT*, bool debug);
 
     MethodList&   method_list();
     SignalList&   signal_list();
@@ -118,11 +119,14 @@ class NoodlesState : public QObject {
     Q_OBJECT
 
     ServerT* m_parent;
+    bool     m_debug;
 
     std::shared_ptr<DocumentT> m_document;
 
 public:
-    NoodlesState(ServerT* parent);
+    NoodlesState(ServerT* parent, bool debug);
+
+    bool debug_mode() const;
 
     std::shared_ptr<DocumentT> const& document();
 };

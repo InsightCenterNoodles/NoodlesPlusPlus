@@ -7,8 +7,9 @@
 
 namespace noo {
 
-DocumentT::DocumentT(ServerT* s)
+DocumentT::DocumentT(ServerT* s, bool debug)
     : m_server(s),
+      m_debug(debug),
       m_method_list(s),
       m_signal_list(s),
       m_buffer_list(s),
@@ -808,9 +809,13 @@ void DocumentT::build_table_builtins() {
 }
 
 
-NoodlesState::NoodlesState(ServerT* parent)
-    : QObject(parent), m_parent(parent) {
-    m_document = std::make_shared<DocumentT>(m_parent);
+NoodlesState::NoodlesState(ServerT* parent, bool debug)
+    : QObject(parent), m_parent(parent), m_debug(debug) {
+    m_document = std::make_shared<DocumentT>(m_parent, debug);
+}
+
+bool NoodlesState::debug_mode() const {
+    return m_debug;
 }
 
 std::shared_ptr<DocumentT> const& NoodlesState::document() {

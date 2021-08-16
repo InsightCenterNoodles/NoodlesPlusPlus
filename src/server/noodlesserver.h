@@ -56,6 +56,7 @@ class ServerT : public QObject {
     Q_OBJECT
 
     NoodlesState* m_state;
+    bool          m_debug;
 
     QWebSocketServer* m_socket_server;
 
@@ -63,9 +64,11 @@ class ServerT : public QObject {
 
 
 public:
-    explicit ServerT(quint16 port = 50000, QObject* parent = nullptr);
+    explicit ServerT(quint16 port, bool debug, QObject* parent = nullptr);
 
     NoodlesState* state();
+
+    bool debug_mode() const;
 
     std::unique_ptr<Writer> get_broadcast_writer();
     std::unique_ptr<Writer> get_single_client_writer(ClientT&);
