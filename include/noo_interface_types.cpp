@@ -4,15 +4,22 @@
 
 #include <QDebug>
 
+#include <string>
+
+using namespace std::string_literals;
+
 namespace noo {
+
+static auto const row_str       = "selected_rows"s;
+static auto const row_range_str = "selected_row_ranges"s;
 
 Selection::Selection(AnyVar&& v) {
     auto raw_obj = v.steal_map();
 
-    rows = steal_or_default(raw_obj, "rows").coerce_int_list();
+    rows = steal_or_default(raw_obj, row_str).coerce_int_list();
 
     auto raw_ranges_list =
-        steal_or_default(raw_obj, "row_ranges").coerce_int_list();
+        steal_or_default(raw_obj, row_range_str).coerce_int_list();
 
     row_ranges.reserve(raw_ranges_list.size() / 2);
 
@@ -31,8 +38,8 @@ AnyVar Selection::to_any() const {
 
     std::span<int64_t> ls((int64_t*)row_ranges.data(), row_ranges.size() * 2);
 
-    map["selected_rows"]       = rows;
-    map["selected_row_ranges"] = ls;
+    map[row_str]       = rows;
+    map[row_range_str] = ls;
 
     return ret;
 }
@@ -44,8 +51,8 @@ SelectionRef::SelectionRef(Selection const& s)
 SelectionRef::SelectionRef(AnyVarRef const& s) {
     auto raw_obj = s.to_map();
 
-    rows       = steal_or_default(raw_obj, "rows").coerce_int_list();
-    raw_ranges = steal_or_default(raw_obj, "row_ranges").coerce_int_list();
+    rows       = steal_or_default(raw_obj, row_str).coerce_int_list();
+    raw_ranges = steal_or_default(raw_obj, row_range_str).coerce_int_list();
 
     // turn the contiguous span into a pair span
 
@@ -57,8 +64,8 @@ AnyVar SelectionRef::to_any() const {
 
     auto& map = ret.emplace<AnyVarMap>();
 
-    map["selected_rows"]       = rows.span();
-    map["selected_row_ranges"] = cast_span_to<int64_t const>(row_ranges);
+    map[row_str]       = rows.span();
+    map[row_range_str] = cast_span_to<int64_t const>(row_ranges);
 
     return ret;
 }
