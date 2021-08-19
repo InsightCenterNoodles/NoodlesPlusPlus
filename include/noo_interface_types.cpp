@@ -10,8 +10,8 @@ using namespace std::string_literals;
 
 namespace noo {
 
-static auto const row_str       = "selected_rows"s;
-static auto const row_range_str = "selected_row_ranges"s;
+static auto const row_str       = "rows"s;
+static auto const row_range_str = "row_ranges"s;
 
 Selection::Selection(AnyVar&& v) {
     auto raw_obj = v.steal_map();
