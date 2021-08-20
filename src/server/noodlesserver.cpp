@@ -1,5 +1,3 @@
-#define FLATBUFFERS_DEBUG_VERIFICATION_FAILURE
-
 #include "noodlesserver.h"
 
 #include "noodlesstate.h"

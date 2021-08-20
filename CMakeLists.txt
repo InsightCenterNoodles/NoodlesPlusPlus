@@ -78,6 +78,8 @@ target_link_libraries(noodles PRIVATE glm)
 target_include_directories(noodles PRIVATE ${flatbuffers_SOURCE_DIR}/include)
 target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets)
 
+target_compile_definitions(noodles PRIVATE -DFLATBUFFERS_DEBUG_VERIFICATION_FAILURE)
+
 add_subdirectory(src)
 
 # We have to do this for the group-by-folders module
