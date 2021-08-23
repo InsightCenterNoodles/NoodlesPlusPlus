@@ -13,10 +13,10 @@ namespace nooc {
 
 template <class Delegate, class IDType, class NewData>
 class ComponentList {
-    std::deque<std::shared_ptr<Delegate>> m_list;
+    std::deque<std::unique_ptr<Delegate>> m_list;
 
     using Maker =
-        std::function<std::shared_ptr<Delegate>(IDType, NewData const&)>;
+        std::function<std::unique_ptr<Delegate>(IDType, NewData const&)>;
 
     Maker const& m_maker;
 
@@ -87,30 +87,22 @@ public:
             return false;
         }
 
-        slot->prepare_delete();
-
         slot.reset();
 
         return true;
     }
 
-    std::shared_ptr<Delegate> comp_at(IDType at) {
+    Delegate* comp_at(IDType at) {
         if (at.id_slot >= m_list.size()) return nullptr;
         auto& slot = m_list[at.id_slot];
 
         if (slot->id() != at) return nullptr;
-        return slot;
+        return slot.get();
     }
 
     void clear() { m_list.clear(); }
 };
 
-// struct InflightMethod {
-//    std::function<void(::noo::AnyVar)> on_done;
-
-//    InflightMethod(std::function<void(::noo::AnyVar)>&& m)
-//        : on_done(std::move(m)) { }
-//};
 
 class ClientState : public QObject {
     QWebSocket& m_socket;
@@ -152,12 +144,6 @@ public:
     auto& object_list() { return m_object_list; }
 
     auto& inflight_methods() { return m_in_flight_methods; }
-
-
-    //    void invoke_method(MethodDelegatePtr const&,
-    //                       MethodContext const&,
-    //                       noo::AnyVarList&&,
-    //                       std::function<void(::noo::AnyVar)>&&);
 
 public slots:
     void on_new_binary_message(QByteArray m);

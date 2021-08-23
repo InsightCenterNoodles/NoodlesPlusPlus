@@ -7,6 +7,8 @@
 
 #include <QWebSocket>
 
+#include <unordered_set>
+
 namespace nooc {
 
 void PendingMethodReply::interpret() { }
@@ -68,7 +70,7 @@ void PendingMethodReply::complete(noo::AnyVarRef v, QString string) {
     this->deleteLater();
 }
 
-namespace translators {
+namespace replies {
 
 void GetIntegerReply::interpret() {
     VMATCH_W(
@@ -123,19 +125,13 @@ void GetRealsReply::interpret() {
     emit recv(rlist);
 }
 
-void GetSelectionReply::interpret() {
-    auto sel = noo::SelectionRef(m_var);
-    emit recv(selection_id, sel);
-}
-
-
-} // namespace translators
+} // namespace replies
 
 // =============================================================================
 
 AttachedMethodList::AttachedMethodList(MethodContext c) : m_context(c) { }
 
-std::shared_ptr<MethodDelegate>
+MethodDelegate*
 AttachedMethodList::find_direct_by_name(std::string_view name) const {
     // try to find it
 
@@ -149,8 +145,7 @@ AttachedMethodList::find_direct_by_name(std::string_view name) const {
     return (*iter);
 }
 
-bool AttachedMethodList::check_direct_by_delegate(
-    MethodDelegatePtr const& p) const {
+bool AttachedMethodList::check_direct_by_delegate(MethodDelegate* p) const {
     // try to find it
 
     auto iter = std::find(m_list.begin(), m_list.end(), p);
@@ -162,13 +157,44 @@ bool AttachedMethodList::check_direct_by_delegate(
 
 // =============================================================================
 
-AttachedSignal::AttachedSignal(SignalDelegatePtr m) : m_signal(m) { }
+AttachedSignal::AttachedSignal(SignalDelegate* m) : m_signal(m) { }
 
-SignalDelegatePtr const& AttachedSignal::delegate() const {
+SignalDelegate* AttachedSignal::delegate() const {
     return m_signal;
 }
 
 AttachedSignalList::AttachedSignalList(MethodContext c) : m_context(c) { }
+
+AttachedSignalList&
+AttachedSignalList::operator=(std::vector<SignalDelegate*> const& l) {
+    // we want to preserve signals already attached. so we want to check if the
+    // new list has signals we already have.
+
+    std::unordered_set<SignalDelegate*> new_list;
+    for (auto const& p : l) {
+        if (!p) continue;
+        new_list.insert(p);
+    }
+
+
+    std::vector<std::unique_ptr<AttachedSignal>> to_keep;
+
+    for (auto& p : m_list) {
+        auto* ptr = p->delegate();
+        assert(ptr);
+        if (new_list.contains(ptr)) {
+            to_keep.emplace_back(std::move(p));
+            new_list.erase(ptr);
+        }
+    }
+
+    m_list = std::move(to_keep);
+
+    for (auto const& p : new_list) {
+        m_list.emplace_back(std::make_unique<AttachedSignal>(p));
+    }
+    return *this;
+}
 
 AttachedSignal* AttachedSignalList::find_by_name(std::string_view name) const {
     for (auto const& p : m_list) {
@@ -176,8 +202,9 @@ AttachedSignal* AttachedSignalList::find_by_name(std::string_view name) const {
     }
     return nullptr;
 }
+
 AttachedSignal*
-AttachedSignalList::find_by_delegate(SignalDelegatePtr const& ptr) const {
+AttachedSignalList::find_by_delegate(SignalDelegate* ptr) const {
     for (auto const& p : m_list) {
         if (p->delegate() == ptr) return p.get();
     }
@@ -202,8 +229,6 @@ std::string_view MethodDelegate::name() const {
     return m_method_name;
 }
 
-void MethodDelegate::prepare_delete() { }
-
 // =============================================================================
 
 SignalDelegate::SignalDelegate(noo::SignalID i, SignalData const& d)
@@ -216,13 +241,9 @@ std::string_view SignalDelegate::name() const {
     return m_signal_name;
 }
 
-void SignalDelegate::prepare_delete() { }
-
 // =============================================================================
 
 BASIC_DELEGATE_IMPL(BufferDelegate, BufferID, BufferData)
-
-void BufferDelegate::prepare_delete() { }
 
 // =============================================================================
 
@@ -417,23 +438,17 @@ BASIC_DELEGATE_IMPL(TextureDelegate, TextureID, TextureData)
 void TextureDelegate::update(TextureData const&) { }
 void TextureDelegate::on_update(TextureData const&) { }
 
-void TextureDelegate::prepare_delete() { }
-
 // =============================================================================
 
 BASIC_DELEGATE_IMPL(LightDelegate, LightID, LightData)
 void LightDelegate::update(LightData const&) { }
 void LightDelegate::on_update(LightData const&) { }
 
-void LightDelegate::prepare_delete() { }
-
 // =============================================================================
 
 BASIC_DELEGATE_IMPL(MaterialDelegate, MaterialID, MaterialData)
 void MaterialDelegate::update(MaterialData const&) { }
 void MaterialDelegate::on_update(MaterialData const&) { }
-
-void MaterialDelegate::prepare_delete() { }
 
 // =============================================================================
 
@@ -445,9 +460,6 @@ void MeshDelegate::prepare_delete() { }
 
 ObjectDelegate::ObjectDelegate(noo::ObjectID i, ObjectUpdateData const& data)
     : m_id(i), m_attached_methods(this), m_attached_signals(this) {
-
-    std::string       m_name;
-    ObjectDelegatePtr m_parent;
 
     if (data.name) {
         m_name = *data.name;
@@ -552,47 +564,47 @@ public:
 
     bool is_connecting() const { return m_connecting; }
 
-    TextureDelegatePtr get(noo::TextureID id) {
+    TextureDelegate* get(noo::TextureID id) {
         if (!m_state) return {};
 
         return m_state->texture_list().comp_at(id);
     }
-    BufferDelegatePtr get(noo::BufferID id) {
+    BufferDelegate* get(noo::BufferID id) {
         if (!m_state) return {};
 
         return m_state->buffer_list().comp_at(id);
     }
-    TableDelegatePtr get(noo::TableID id) {
+    TableDelegate* get(noo::TableID id) {
         if (!m_state) return {};
 
         return m_state->table_list().comp_at(id);
     }
-    LightDelegatePtr get(noo::LightID id) {
+    LightDelegate* get(noo::LightID id) {
         if (!m_state) return {};
 
         return m_state->light_list().comp_at(id);
     }
-    MaterialDelegatePtr get(noo::MaterialID id) {
+    MaterialDelegate* get(noo::MaterialID id) {
         if (!m_state) return {};
 
         return m_state->material_list().comp_at(id);
     }
-    MeshDelegatePtr get(noo::MeshID id) {
+    MeshDelegate* get(noo::MeshID id) {
         if (!m_state) return {};
 
         return m_state->mesh_list().comp_at(id);
     }
-    ObjectDelegatePtr get(noo::ObjectID id) {
+    ObjectDelegate* get(noo::ObjectID id) {
         if (!m_state) return {};
 
         return m_state->object_list().comp_at(id);
     }
-    SignalDelegatePtr get(noo::SignalID id) {
+    SignalDelegate* get(noo::SignalID id) {
         if (!m_state) return {};
 
         return m_state->signal_list().comp_at(id);
     }
-    MethodDelegatePtr get(noo::MethodID id) {
+    MethodDelegate* get(noo::MethodID id) {
         if (!m_state) return {};
 
         return m_state->method_list().comp_at(id);
@@ -617,7 +629,7 @@ create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
 #define CREATE_DEFAULT(E, ID, DATA, DEL)                                       \
     if (!d.E) {                                                                \
         d.E = [](noo::ID id, DATA const& d) {                                  \
-            return std::make_shared<DEL>(id, d);                               \
+            return std::make_unique<DEL>(id, d);                               \
         };                                                                     \
     }
 
@@ -633,7 +645,7 @@ create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
 
 
     if (!d.doc_maker) {
-        d.doc_maker = []() { return std::make_shared<DocumentDelegate>(); };
+        d.doc_maker = []() { return std::make_unique<DocumentDelegate>(); };
     }
 
 
@@ -654,47 +666,47 @@ void ClientConnection::open(QUrl server, ClientDelegates&& delegates) {
     m_data = create_client(this, server, std::move(delegates));
 }
 
-TextureDelegatePtr ClientConnection::get(noo::TextureID id) {
+TextureDelegate* ClientConnection::get(noo::TextureID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-BufferDelegatePtr ClientConnection::get(noo::BufferID id) {
+BufferDelegate* ClientConnection::get(noo::BufferID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-TableDelegatePtr ClientConnection::get(noo::TableID id) {
+TableDelegate* ClientConnection::get(noo::TableID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-LightDelegatePtr ClientConnection::get(noo::LightID id) {
+LightDelegate* ClientConnection::get(noo::LightID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-MaterialDelegatePtr ClientConnection::get(noo::MaterialID id) {
+MaterialDelegate* ClientConnection::get(noo::MaterialID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-MeshDelegatePtr ClientConnection::get(noo::MeshID id) {
+MeshDelegate* ClientConnection::get(noo::MeshID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-ObjectDelegatePtr ClientConnection::get(noo::ObjectID id) {
+ObjectDelegate* ClientConnection::get(noo::ObjectID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-SignalDelegatePtr ClientConnection::get(noo::SignalID id) {
+SignalDelegate* ClientConnection::get(noo::SignalID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-MethodDelegatePtr ClientConnection::get(noo::MethodID id) {
+MethodDelegate* ClientConnection::get(noo::MethodID id) {
     if (!m_data) return {};
 
     return m_data->get(id);

@@ -25,17 +25,17 @@ class ObjectDelegate;
 class SignalDelegate;
 class MethodDelegate;
 
-using DocumentDelegatePtr = std::shared_ptr<DocumentDelegate>;
+using DocumentDelegatePtr = std::unique_ptr<DocumentDelegate>;
 
-using TextureDelegatePtr  = std::shared_ptr<TextureDelegate>;
-using BufferDelegatePtr   = std::shared_ptr<BufferDelegate>;
-using TableDelegatePtr    = std::shared_ptr<TableDelegate>;
-using LightDelegatePtr    = std::shared_ptr<LightDelegate>;
-using MaterialDelegatePtr = std::shared_ptr<MaterialDelegate>;
-using MeshDelegatePtr     = std::shared_ptr<MeshDelegate>;
-using ObjectDelegatePtr   = std::shared_ptr<ObjectDelegate>;
-using SignalDelegatePtr   = std::shared_ptr<SignalDelegate>;
-using MethodDelegatePtr   = std::shared_ptr<MethodDelegate>;
+using TextureDelegatePtr  = std::unique_ptr<TextureDelegate>;
+using BufferDelegatePtr   = std::unique_ptr<BufferDelegate>;
+using TableDelegatePtr    = std::unique_ptr<TableDelegate>;
+using LightDelegatePtr    = std::unique_ptr<LightDelegate>;
+using MaterialDelegatePtr = std::unique_ptr<MaterialDelegate>;
+using MeshDelegatePtr     = std::unique_ptr<MeshDelegate>;
+using ObjectDelegatePtr   = std::unique_ptr<ObjectDelegate>;
+using SignalDelegatePtr   = std::unique_ptr<SignalDelegate>;
+using MethodDelegatePtr   = std::unique_ptr<MethodDelegate>;
 
 // Not to be stored by users!
 using MethodContext =
@@ -47,11 +47,14 @@ using MethodContextPtr = std::
 class MessageHandler;
 
 ///
-/// \brief The PendingMethodReply class
+/// The PendingMethodReply base class is a handle for you to call a noodles
+/// method. Thus the 'pending' part. As part of the Qt system, this will issue a
+/// signal when the method returns.
 ///
-/// Will delete itself automatically. Use a translator to change the type. This
-/// is a bit more overhead, but is more safe if things are deleted out from
-/// under your feet!
+/// Only invoke this method once!
+///
+/// Will delete itself automatically after a reply or failure is reported. Use a
+/// translator to interpret the returned type.
 ///
 class PendingMethodReply : public QObject {
     Q_OBJECT
@@ -70,22 +73,32 @@ protected:
 public:
     PendingMethodReply(MethodDelegate*, MethodContext);
 
+    /// \brief Call this method directly, ie, you have marshalled the arguments
+    /// to the Any type manually.
     void call_direct(noo::AnyVarList&&);
 
+    /// \brief Call this method, with automatic marshalling of arguments.
     template <class... Args>
     void call(Args&&... args) {
         call_direct(noo::marshall_to_any(std::forward<Args>(args)...));
     }
 
 private slots:
+    /// Internal use
     void complete(noo::AnyVarRef, QString);
 
 signals:
+    /// Issued when a non-error reply has been received
     void recv_data(noo::AnyVarRef);
+
+    /// Issued when the method raised an exception on the server side.
     void recv_fail(QString);
 };
 
-namespace translators {
+///
+/// Handy classes for translating a reply to a common non-noodles type.
+///
+namespace replies {
 
 class GetIntegerReply : public PendingMethodReply {
     Q_OBJECT
@@ -133,68 +146,10 @@ signals:
     void recv(noo::PossiblyOwnedView<double const> const&);
 };
 
-
-// special translators
-
-
-class GetSelectionReply : public PendingMethodReply {
-    Q_OBJECT
-
-public:
-    GetSelectionReply(MethodDelegate* d, MethodContext c, QString _selection_id)
-        : PendingMethodReply(d, c), selection_id(_selection_id) { }
-
-    QString selection_id;
-
-    void interpret() override;
-
-signals:
-    void recv(QString, noo::SelectionRef const&);
-};
-
-class GetTableRowReply : public GetRealsReply {
-public:
-    GetTableRowReply(MethodDelegate*    d,
-                     MethodContext      c,
-                     int64_t            _row,
-                     std::span<int64_t> _cols)
-        : GetRealsReply(d, c), row(_row), cols(_cols.begin(), _cols.end()) { }
-
-    int64_t              row;
-    std::vector<int64_t> cols;
-};
-
-class GetTableBlockReply : public GetRealsReply {
-public:
-    GetTableBlockReply(MethodDelegate*    d,
-                       MethodContext      c,
-                       int64_t            _row_from,
-                       int64_t            _row_to,
-                       std::span<int64_t> _cols)
-        : GetRealsReply(d, c),
-          row_from(_row_from),
-          row_to(_row_to),
-          cols(_cols.begin(), _cols.end()) { }
-
-    int64_t              row_from;
-    int64_t              row_to;
-    std::vector<int64_t> cols;
-};
-
-class GetTableSelectionReply : public GetRealsReply {
-public:
-    GetTableSelectionReply(MethodDelegate* d,
-                           MethodContext   c,
-                           QString         _selection_id)
-        : GetRealsReply(d, c), selection_id(_selection_id) { }
-
-    QString selection_id;
-};
+} // namespace replies
 
 
-} // namespace translators
-
-
+// Helper machinery to turn an any list into arguments required by a function.
 template <class T>
 T _any_call_getter(noo::AnyVar& source) {
     if constexpr (!noo::is_in_variant<T, noo::AnyVarBase>::value) {
@@ -257,6 +212,8 @@ struct ReplyCallHelper<R (C::*)(Arg) const> {
     }
 };
 
+/// Call a function with any vars, automatically translated to the parameter
+/// type
 template <class Func>
 auto reply_call_helper(Func&& f, noo::AnyVar& source) {
     using FType = std::remove_cvref_t<Func>;
@@ -267,24 +224,30 @@ auto reply_call_helper(Func&& f, noo::AnyVar& source) {
 
 // =============================================================================
 
+/// Contains methods attached to an object/table/document.
 class AttachedMethodList {
-    MethodContext                  m_context;
-    std::vector<MethodDelegatePtr> m_list;
+    MethodContext                m_context;
+    std::vector<MethodDelegate*> m_list;
 
-    std::shared_ptr<MethodDelegate> find_direct_by_name(std::string_view) const;
-    bool check_direct_by_delegate(MethodDelegatePtr const&) const;
+    MethodDelegate* find_direct_by_name(std::string_view) const;
+    bool            check_direct_by_delegate(MethodDelegate*) const;
 
 public:
+    /// Internal use only
     AttachedMethodList(MethodContext);
 
-    AttachedMethodList& operator=(std::vector<MethodDelegatePtr> const& l) {
+    /// Internal use only
+    AttachedMethodList& operator=(std::vector<MethodDelegate*> const& l) {
         m_list = l;
         return *this;
     }
 
-    std::vector<MethodDelegatePtr> const& list() const { return m_list; }
+    std::vector<MethodDelegate*> const& list() const { return m_list; }
 
 
+    /// Find a method by name. This returns a reply object that is actually used
+    /// to call the method. Returns null if the delegate is not attached to this
+    /// object/table/document.
     template <class Reply = PendingMethodReply, class... Args>
     Reply* new_call_by_name(std::string_view v, Args&&... args) const {
         static_assert(std::is_base_of_v<PendingMethodReply, Reply>);
@@ -294,68 +257,76 @@ public:
         if (!mptr) return nullptr;
 
         auto* reply_ptr =
-            new Reply(mptr.get(), m_context, std::forward<Args>(args)...);
+            new Reply(mptr, m_context, std::forward<Args>(args)...);
 
-        reply_ptr->setParent(mptr.get());
+        reply_ptr->setParent(mptr);
 
         return reply_ptr;
     }
 
+
+    /// Find a method by delegate. Returns a reply object to actually make the
+    /// call. Returns null if the delegate is not attached to this
+    /// object/table/document.
     template <class Reply = PendingMethodReply, class... Args>
-    Reply* new_call_by_delegate(MethodDelegatePtr const& p,
-                                Args&&... args) const {
+    Reply* new_call_by_delegate(MethodDelegate* p, Args&&... args) const {
+        if (!p) return nullptr;
         static_assert(std::is_base_of_v<PendingMethodReply, Reply>);
 
         if (!check_direct_by_delegate(p)) { return nullptr; }
 
-        auto* reply_ptr =
-            new Reply(p.get(), m_context, std::forward<Args>(args)...);
+        auto* reply_ptr = new Reply(p, m_context, std::forward<Args>(args)...);
 
-        reply_ptr->setParent(p.get());
+        reply_ptr->setParent(p);
 
         return reply_ptr;
     }
 };
 
+/// Represents a signal that is attached to an object/table/document. Allows a
+/// user to connect a Qt signal.
 class AttachedSignal : public QObject {
     Q_OBJECT
-    SignalDelegatePtr m_signal;
+    QPointer<SignalDelegate> m_signal;
 
 public:
-    AttachedSignal(SignalDelegatePtr);
+    AttachedSignal(SignalDelegate*);
 
-    SignalDelegatePtr const& delegate() const;
+    SignalDelegate* delegate() const;
 
 signals:
     void fired(noo::AnyVarListRef const&);
 };
 
+/// Contains signals attached to an object/table/document.
 class AttachedSignalList {
     MethodContext                                m_context;
     std::vector<std::unique_ptr<AttachedSignal>> m_list;
 
 public:
+    // Internal use
     AttachedSignalList(MethodContext);
 
-    AttachedSignalList& operator=(std::vector<SignalDelegatePtr> const& l) {
-        m_list.clear();
-        for (auto const& p : l) {
-            m_list.emplace_back(std::make_unique<AttachedSignal>(p));
-        }
-        return *this;
-    }
+    // Internal use
+    AttachedSignalList& operator=(std::vector<SignalDelegate*> const& l);
 
+    /// Find the attached signal by a name. Returns null if name is not found.
     AttachedSignal* find_by_name(std::string_view) const;
-    AttachedSignal* find_by_delegate(SignalDelegatePtr const&) const;
+
+    /// Find the attached signal by a delegate ptr. Returns null i the name is
+    /// not found.
+    AttachedSignal* find_by_delegate(SignalDelegate*) const;
 };
 
 #define NOODLES_CAN_UPDATE(B) static constexpr bool CAN_UPDATE = B;
 
+/// Represents an argument name/documentation pair for a method/signal.
 struct ArgDoc {
     std::string_view name;
     std::string_view doc;
 };
 
+/// Describes a noodles method
 struct MethodData {
     std::string_view  method_name;
     std::string_view  documentation;
@@ -363,11 +334,13 @@ struct MethodData {
     std::span<ArgDoc> argument_documentation;
 };
 
+/// The base delegate class for methods. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new methods from the
+/// server.
 class MethodDelegate : public QObject {
     Q_OBJECT
     noo::MethodID m_id;
     std::string   m_method_name;
-
 
 public:
     MethodDelegate(noo::MethodID, MethodData const&);
@@ -378,11 +351,9 @@ public:
     noo::MethodID    id() const;
     std::string_view name() const;
 
-    virtual void prepare_delete();
-
 signals:
     // private
-    void invoke(noo::MethodID, // this is weird, but its a signal.
+    void invoke(noo::MethodID,
                 MethodContext,
                 noo::AnyVarList const&,
                 PendingMethodReply*);
@@ -396,6 +367,9 @@ struct SignalData {
     std::span<ArgDoc> argument_documentation;
 };
 
+/// The base delegate class for signals. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new signals from the
+/// server.
 class SignalDelegate : public QObject {
     Q_OBJECT
     noo::SignalID m_id;
@@ -410,9 +384,8 @@ public:
     noo::SignalID    id() const;
     std::string_view name() const;
 
-    virtual void prepare_delete();
-
 signals:
+    /// Issued when this signal has been recv'ed.
     void fired(MethodContext, noo::AnyVarListRef const&);
 };
 
@@ -424,6 +397,9 @@ struct BufferData {
     size_t                     url_size;
 };
 
+/// The base delegate class for buffers. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new buffers from the
+/// server.
 class BufferDelegate : public QObject {
     Q_OBJECT
     noo::BufferID m_id;
@@ -435,18 +411,20 @@ public:
     NOODLES_CAN_UPDATE(false)
 
     noo::BufferID id() const;
-
-    virtual void prepare_delete();
 };
 
 // =============================================================================
 
 struct TextureData {
-    BufferDelegatePtr buffer = nullptr;
-    size_t            start  = 0;
-    size_t            size   = 0;
+    std::optional<BufferDelegate*> buffer;
+    std::optional<size_t>          start;
+    std::optional<size_t>          size;
 };
 
+
+/// The base delegate class for textures. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new textures from the
+/// server. Texture delegates can also be updated.
 class TextureDelegate : public QObject {
     Q_OBJECT
     noo::TextureID m_id;
@@ -462,8 +440,6 @@ public:
     void         update(TextureData const&);
     virtual void on_update(TextureData const&);
 
-    virtual void prepare_delete();
-
 signals:
     void updated();
 };
@@ -471,13 +447,16 @@ signals:
 // =============================================================================
 
 struct MaterialData {
-    glm::vec4          color        = { 1, 1, 1, 1 };
-    float              metallic     = 0;
-    float              roughness    = 1;
-    bool               use_blending = false;
-    TextureDelegatePtr texture      = nullptr;
+    std::optional<glm::vec4>        color;
+    std::optional<float>            metallic;
+    std::optional<float>            roughness;
+    std::optional<bool>             use_blending;
+    std::optional<TextureDelegate*> texture;
 };
 
+/// The base delegate class for materials. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new materials from
+/// the server. Material delegates can also be updated.
 class MaterialDelegate : public QObject {
     Q_OBJECT
     noo::MaterialID m_id;
@@ -493,8 +472,6 @@ public:
     void         update(MaterialData const&);
     virtual void on_update(MaterialData const&);
 
-    virtual void prepare_delete();
-
 signals:
     void updated();
 };
@@ -506,6 +483,9 @@ struct LightData {
     float     intensity = 0;
 };
 
+/// The base light class for buffers. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new lights from the
+/// server. Light delegates can also be updated.
 class LightDelegate : public QObject {
     Q_OBJECT
     noo::LightID m_id;
@@ -521,8 +501,6 @@ public:
     void         update(LightData const&);
     virtual void on_update(LightData const&);
 
-    virtual void prepare_delete();
-
 signals:
     void updated();
 };
@@ -530,12 +508,15 @@ signals:
 // =============================================================================
 
 struct ComponentRef {
-    BufferDelegatePtr buffer;
-    size_t            start  = 0;
-    size_t            size   = 0;
-    size_t            stride = 0;
+    BufferDelegate* buffer;
+    size_t          start  = 0;
+    size_t          size   = 0;
+    size_t          stride = 0;
 };
 
+/// The base delegate class for meshes. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new meshes from the
+/// server. Mesh delegates can also be updated.
 struct MeshData {
     glm::vec3 extent_min;
     glm::vec3 extent_max;
@@ -573,25 +554,29 @@ struct ObjectText {
 };
 
 struct ObjectUpdateData {
-    std::optional<std::string_view>               name;
-    std::optional<ObjectDelegatePtr>              parent;
-    std::optional<glm::mat4>                      transform;
-    std::optional<MaterialDelegatePtr>            material;
-    std::optional<MeshDelegatePtr>                mesh;
-    std::optional<std::vector<LightDelegatePtr>>  lights;
-    std::optional<std::vector<TableDelegatePtr>>  tables;
-    std::optional<std::span<glm::mat4 const>>     instances;
-    std::optional<std::vector<std::string_view>>  tags;
-    std::optional<std::vector<MethodDelegatePtr>> method_list;
-    std::optional<std::vector<SignalDelegatePtr>> signal_list;
-    std::optional<ObjectText>                     text;
+    std::optional<std::string_view>              name;
+    std::optional<ObjectDelegate*>               parent;
+    std::optional<glm::mat4>                     transform;
+    std::optional<MaterialDelegate*>             material;
+    std::optional<MeshDelegate*>                 mesh;
+    std::optional<std::vector<LightDelegate*>>   lights;
+    std::optional<std::vector<TableDelegate*>>   tables;
+    std::optional<std::span<glm::mat4 const>>    instances;
+    std::optional<std::vector<std::string_view>> tags;
+    std::optional<std::vector<MethodDelegate*>>  method_list;
+    std::optional<std::vector<SignalDelegate*>>  signal_list;
+    std::optional<ObjectText>                    text;
 };
 
+
+/// The base delegate class for objects. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new objects from the
+/// server. Object delegates can also be updated.
 class ObjectDelegate : public QObject {
     Q_OBJECT
-    noo::ObjectID     m_id;
-    std::string       m_name;
-    ObjectDelegatePtr m_parent;
+    noo::ObjectID            m_id;
+    std::string              m_name;
+    QPointer<ObjectDelegate> m_parent;
 
     AttachedMethodList m_attached_methods;
     AttachedSignalList m_attached_signals;
@@ -620,11 +605,14 @@ signals:
 // =============================================================================
 
 struct TableData {
-    std::optional<std::string_view>               name;
-    std::optional<std::vector<MethodDelegatePtr>> method_list;
-    std::optional<std::vector<SignalDelegatePtr>> signal_list;
+    std::optional<std::string_view>             name;
+    std::optional<std::vector<MethodDelegate*>> method_list;
+    std::optional<std::vector<SignalDelegate*>> signal_list;
 };
 
+/// The base delegate class for tables. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new tables from the
+/// server. Table delegates can also be updated.
 class TableDelegate : public QObject {
     Q_OBJECT
     noo::TableID       m_id;
@@ -692,11 +680,14 @@ signals:
 // =============================================================================
 
 struct DocumentData {
-    std::vector<MethodDelegatePtr> method_list;
-    std::vector<SignalDelegatePtr> signal_list;
+    std::vector<MethodDelegate*> method_list;
+    std::vector<SignalDelegate*> signal_list;
 };
 
 
+/// The base delegate class for the document. Users can inherit from this to add
+/// their own functionality. This delegate is instantiated on connection. The
+/// document delegate can also be updated.
 class DocumentDelegate : public QObject {
     Q_OBJECT
     AttachedMethodList m_attached_methods;
@@ -723,7 +714,12 @@ signals:
 
 // =============================================================================
 
-
+///
+/// The ClientDelegates struct allows users to specify the delegates they wish
+/// to use. Each maker function below is called when a new delegate of that type
+/// is needed. If the function object is empty, the default delegate will be
+/// used instead.
+///
 struct ClientDelegates {
     QString client_name;
 
@@ -743,10 +739,17 @@ struct ClientDelegates {
     std::function<MethodDelegatePtr(noo::MethodID, MethodData const&)>
         method_maker;
 
-    std::function<std::shared_ptr<DocumentDelegate>()> doc_maker;
+    std::function<std::unique_ptr<DocumentDelegate>()> doc_maker;
 };
 
 class ClientCore;
+
+///
+/// The core client object. Create one of these to connect to a noodles server.
+///
+/// Delegates here should never be deleted manually; lifetimes are managed by
+/// this library instead!
+///
 class ClientConnection : public QObject {
     Q_OBJECT
     std::unique_ptr<ClientCore> m_data;
@@ -755,22 +758,29 @@ public:
     ClientConnection(QObject* parent = nullptr);
     ~ClientConnection();
 
+    /// Open a new connection to a server, with the supplied clients.
     void open(QUrl server, ClientDelegates&&);
 
-    TextureDelegatePtr  get(noo::TextureID);
-    BufferDelegatePtr   get(noo::BufferID);
-    TableDelegatePtr    get(noo::TableID);
-    LightDelegatePtr    get(noo::LightID);
-    MaterialDelegatePtr get(noo::MaterialID);
-    MeshDelegatePtr     get(noo::MeshID);
-    ObjectDelegatePtr   get(noo::ObjectID);
-    SignalDelegatePtr   get(noo::SignalID);
-    MethodDelegatePtr   get(noo::MethodID);
+    // translate given IDs to the noodles object.
+    TextureDelegate*  get(noo::TextureID);
+    BufferDelegate*   get(noo::BufferID);
+    TableDelegate*    get(noo::TableID);
+    LightDelegate*    get(noo::LightID);
+    MaterialDelegate* get(noo::MaterialID);
+    MeshDelegate*     get(noo::MeshID);
+    ObjectDelegate*   get(noo::ObjectID);
+    SignalDelegate*   get(noo::SignalID);
+    MethodDelegate*   get(noo::MethodID);
 
 signals:
+    /// Issued when something goes wrong with the websocket, with a string about
+    /// the error.
     void socket_error(QString);
 
+    /// Issued when the connection is open and ready.
     void connected();
+
+    /// Issued when we (or the server) close the connection.
     void disconnected();
 };
 

@@ -22,40 +22,40 @@ ClientWriter::~ClientWriter() {
 }
 
 
-static MethodDelegatePtr lookup(ClientState&               state,
-                                ::noodles::MethodID const& ptr) {
+static MethodDelegate* lookup(ClientState&               state,
+                              ::noodles::MethodID const& ptr) {
     return state.method_list().comp_at(noo::convert_id(ptr));
 }
-static SignalDelegatePtr lookup(ClientState&               state,
-                                ::noodles::SignalID const& ptr) {
+static SignalDelegate* lookup(ClientState&               state,
+                              ::noodles::SignalID const& ptr) {
     return state.signal_list().comp_at(noo::convert_id(ptr));
 }
-static BufferDelegatePtr lookup(ClientState&               state,
-                                ::noodles::BufferID const& ptr) {
+static BufferDelegate* lookup(ClientState&               state,
+                              ::noodles::BufferID const& ptr) {
     return state.buffer_list().comp_at(noo::convert_id(ptr));
 }
-static TableDelegatePtr lookup(ClientState&              state,
-                               ::noodles::TableID const& ptr) {
+static TableDelegate* lookup(ClientState&              state,
+                             ::noodles::TableID const& ptr) {
     return state.table_list().comp_at(noo::convert_id(ptr));
 }
-static TextureDelegatePtr lookup(ClientState&                state,
-                                 ::noodles::TextureID const& ptr) {
+static TextureDelegate* lookup(ClientState&                state,
+                               ::noodles::TextureID const& ptr) {
     return state.texture_list().comp_at(noo::convert_id(ptr));
 }
-static LightDelegatePtr lookup(ClientState&              state,
-                               ::noodles::LightID const& ptr) {
+static LightDelegate* lookup(ClientState&              state,
+                             ::noodles::LightID const& ptr) {
     return state.light_list().comp_at(noo::convert_id(ptr));
 }
-static MaterialDelegatePtr lookup(ClientState&                 state,
-                                  ::noodles::MaterialID const& ptr) {
+static MaterialDelegate* lookup(ClientState&                 state,
+                                ::noodles::MaterialID const& ptr) {
     return state.material_list().comp_at(noo::convert_id(ptr));
 }
-static MeshDelegatePtr lookup(ClientState&                 state,
-                              ::noodles::GeometryID const& ptr) {
+static MeshDelegate* lookup(ClientState&                 state,
+                            ::noodles::GeometryID const& ptr) {
     return state.mesh_list().comp_at(noo::convert_id(ptr));
 }
-static ObjectDelegatePtr lookup(ClientState&               state,
-                                ::noodles::ObjectID const& ptr) {
+static ObjectDelegate* lookup(ClientState&               state,
+                              ::noodles::ObjectID const& ptr) {
     return state.object_list().comp_at(noo::convert_id(ptr));
 }
 
@@ -362,7 +362,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
             qWarning() << "Unknown object for signal!";
             return;
         }
-        ctx = obj.get();
+        ctx = obj;
         // listener notification
         attached = obj->attached_signals().find_by_delegate(sig);
 
@@ -373,7 +373,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
             qWarning() << "Unknown table for signal!";
             return;
         }
-        ctx      = tbl.get();
+        ctx      = tbl;
         attached = tbl->attached_signals().find_by_delegate(sig);
     } else {
         qDebug() << "Invoke on document";
