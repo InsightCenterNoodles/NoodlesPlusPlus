@@ -10,6 +10,51 @@ class QString;
 
 namespace noo {
 
+// common strings as defined by the spec
+
+namespace names {
+
+#define NOO_STRING(t, d) inline constexpr std::string_view t##d = #d;
+
+NOO_STRING(mthd_, tbl_subscribe);
+NOO_STRING(mthd_, tbl_insert);
+NOO_STRING(mthd_, tbl_update);
+NOO_STRING(mthd_, tbl_remove);
+NOO_STRING(mthd_, tbl_clear);
+NOO_STRING(mthd_, tbl_update_selection);
+
+NOO_STRING(sig_, tbl_reset);
+NOO_STRING(sig_, tbl_updated);
+NOO_STRING(sig_, tbl_rows_removed);
+NOO_STRING(sig_, tbl_selection_updated);
+
+NOO_STRING(mthd_, activate);
+NOO_STRING(mthd_, get_activation_choices);
+
+NOO_STRING(mthd_, get_option_choices);
+NOO_STRING(mthd_, get_current_option);
+NOO_STRING(mthd_, set_current_option);
+
+NOO_STRING(mthd_, set_position);
+NOO_STRING(mthd_, set_rotation);
+NOO_STRING(mthd_, set_scale);
+
+NOO_STRING(mthd_, select_region);
+NOO_STRING(mthd_, select_sphere);
+NOO_STRING(mthd_, select_half_plane);
+
+NOO_STRING(mthd_, probe_at);
+
+NOO_STRING(mthd_, signal_attention);
+
+NOO_STRING(mthd_, noo_client_view);
+
+NOO_STRING(tag_, noo_user_hidden);
+
+#undef NOO_STRING
+} // namespace names
+
+
 /// Attempt to find and move a type out of a variant. If the type is not active
 /// in the variant, returns a default constructed instance. The variant will
 /// still consider that type active, afterwards, but in a moved-from state.
