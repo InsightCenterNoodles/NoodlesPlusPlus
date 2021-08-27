@@ -299,4 +299,18 @@ inline AnyVar to_any(glm::vec3 const& v) {
 
 } // namespace noo
 
+
+#if (QT_VERSION > QT_VERSION_CHECK(6, 1, 0))
+namespace QTypeTraits {
+template <>
+struct has_operator_less_than<noo::AnyVar> : std::false_type { };
+
+template <>
+struct has_operator_less_than<noo::AnyVarList> : std::false_type { };
+
+} // namespace QTypeTraits
+#endif
+
+Q_DECLARE_METATYPE(noo::AnyVar);
+
 #endif // NOO_ANY_H

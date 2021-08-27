@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13...3.16)
+cmake_minimum_required(VERSION 3.16)
 
 project(noodles VERSION 0.2 LANGUAGES CXX)
 
@@ -35,18 +35,17 @@ CPMAddPackage(
     "FLATBUFFERS_LIBCXX_WITH_CLANG ON"
 )
 
-#if (flatbuffers_ADDED)
-  #add_library(flatbuffers INTERFACE IMPORTED)
-  #target_include_directories(flatbuffers INTERFACE ${flatbuffers_SOURCE_DIR}/include)
-#endif()
-
 CPMAddPackage(
     NAME glm
     URL  https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.7z
     VERSION 0.9.9.8
 )
 
-find_package(Qt5 COMPONENTS Gui Widgets WebSockets Core 3DCore 3DExtras 3DRender Quick)
+find_package(Qt6 COMPONENTS Gui Widgets Core Websockets)
+
+if (NOT Qt6_FOUND)
+    find_package(Qt5 COMPONENTS Gui Widgets Core Websockets)
+endif()
 
 # Options ======================================================================
 
