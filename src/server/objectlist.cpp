@@ -37,20 +37,55 @@ ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
     if (m_data.create_callbacks) {
         m_callback = m_data.create_callbacks(this);
 
-        connect(m_callback.get(),
-                &ObjectCallbacks::signal_attention_plain,
-                this,
-                &ObjectT::on_signal_attention_plain);
+        auto const& enabled = m_callback->callbacks_enabled();
 
-        connect(m_callback.get(),
-                &ObjectCallbacks::signal_attention_at,
-                this,
-                &ObjectT::on_signal_attention_at);
+        auto doc = get_document(m_parent_list->m_server);
 
-        connect(m_callback.get(),
-                &ObjectCallbacks::signal_attention_anno,
-                this,
-                &ObjectT::on_signal_attention_anno);
+        std::vector<noo::MethodTPtr> m_to_attach;
+
+        auto add_bt = [&m_to_attach, &doc](BuiltinMethods b) {
+            m_to_attach.emplace_back(doc->get_builtin(b));
+        };
+
+        if (enabled.activation) {
+            add_bt(BuiltinMethods::OBJ_ACTIVATE);
+            add_bt(BuiltinMethods::OBJ_GET_ACTIVATE_CHOICES);
+        }
+
+        if (enabled.options) {
+            add_bt(BuiltinMethods::OBJ_GET_OPTS);
+            add_bt(BuiltinMethods::OBJ_GET_CURR_OPT);
+            add_bt(BuiltinMethods::OBJ_SET_CURR_OPT);
+        }
+
+        if (enabled.transform_position) { add_bt(BuiltinMethods::OBJ_SET_POS); }
+        if (enabled.transform_rotation) { add_bt(BuiltinMethods::OBJ_SET_ROT); }
+        if (enabled.transform_scale) { add_bt(BuiltinMethods::OBJ_SET_SCALE); }
+
+        if (enabled.selection) {
+            add_bt(BuiltinMethods::OBJ_SEL_REGION);
+            add_bt(BuiltinMethods::OBJ_SEL_SPHERE);
+            add_bt(BuiltinMethods::OBJ_SEL_PLANE);
+        }
+
+        if (enabled.probing) { add_bt(BuiltinMethods::OBJ_PROBE); }
+
+        if (enabled.attention_signals) {
+            connect(m_callback.get(),
+                    &ObjectCallbacks::signal_attention_plain,
+                    this,
+                    &ObjectT::on_signal_attention_plain);
+
+            connect(m_callback.get(),
+                    &ObjectCallbacks::signal_attention_at,
+                    this,
+                    &ObjectT::on_signal_attention_at);
+
+            connect(m_callback.get(),
+                    &ObjectCallbacks::signal_attention_anno,
+                    this,
+                    &ObjectT::on_signal_attention_anno);
+        }
     }
 }
 

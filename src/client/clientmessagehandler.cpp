@@ -85,11 +85,11 @@ void MessageHandler::process_message(noodles::MethodCreate const& c) {
     MethodData md;
     md.method_name          = c.name()->string_view();
     md.documentation        = c.documentation()->string_view();
-    md.return_documentation = c.returnDoc()->string_view();
+    md.return_documentation = c.return_doc()->string_view();
 
     std::vector<ArgDoc> arg_docs;
 
-    for (auto* d : *c.argDoc()) {
+    for (auto* d : *c.arg_doc()) {
         arg_docs.push_back(
             { d->name()->string_view(), d->doc()->string_view() });
     }
@@ -116,7 +116,7 @@ void MessageHandler::process_message(noodles::SignalCreate const& m) {
 
     std::vector<ArgDoc> arg_docs;
 
-    for (auto* d : *m.argDoc()) {
+    for (auto* d : *m.arg_doc()) {
         arg_docs.push_back(
             { d->name()->string_view(), d->doc()->string_view() });
     }
@@ -290,7 +290,7 @@ void MessageHandler::process_message(noodles::GeometryCreate const& m) {
 
     EXIST_EXE(m.positions(), md.positions = convert(m_state, VALUE););
     EXIST_EXE(m.normals(), md.normals = convert(m_state, VALUE););
-    EXIST_EXE(m.texCoords(), md.textures = convert(m_state, VALUE););
+    EXIST_EXE(m.tex_coords(), md.textures = convert(m_state, VALUE););
     EXIST_EXE(m.colors(), md.colors = convert(m_state, VALUE););
     EXIST_EXE(m.lines(), md.lines = convert(m_state, VALUE););
     EXIST_EXE(m.triangles(), md.triangles = convert(m_state, VALUE););
@@ -402,16 +402,27 @@ void MessageHandler::process_message(noodles::MethodReply const& m) {
     Q_ASSERT(reply_ptr);
 
     noo::AnyVarRef av;
-    QString        err;
+
+    std::optional<MethodException> err;
 
     if (m.method_data()) { av = noo::AnyVarRef(m.method_data()); }
 
     if (m.method_exception()) {
-        err = QString::fromLocal8Bit(m.method_exception()->c_str());
+        err.emplace();
+
+        auto* excp = m.method_exception();
+
+        err->code = excp->code();
+
+        if (excp->message()) {
+            err->message = QString::fromUtf8(excp->message()->c_str());
+        }
+
+        if (excp->data()) { err->additional = noo::AnyVarRef(excp->data()); }
     }
 
     qDebug() << "Completing reply...";
-    reply_ptr->complete(std::move(av), err);
+    reply_ptr->complete(std::move(av), err ? &err.value() : nullptr);
 
     qDebug() << "Clean up...";
     reply_ptr->deleteLater();

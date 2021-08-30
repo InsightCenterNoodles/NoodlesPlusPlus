@@ -180,6 +180,12 @@ void ServerT::on_client_done() {
     c->deleteLater();
 }
 
+struct ErrorState {
+    int         code;
+    std::string message;
+    AnyVar      additional;
+};
+
 class MessageHandler {
     ServerT* m_server;
     ClientT& m_client;
@@ -239,13 +245,18 @@ class MessageHandler {
     }
 
     void send_method_error_reply(std::string const& id,
-                                 std::string const& view) {
+                                 ErrorState const&  state) {
         if (id.empty()) return;
 
         auto w = m_server->get_single_client_writer(m_client);
 
-        auto x =
-            noodles::CreateMethodReplyDirect(*w, id.c_str(), 0, view.c_str());
+        auto e = noodles::CreateMethodExceptionDirect(
+            *w,
+            state.code,
+            state.message.data(),
+            write_to(state.additional, *w));
+
+        auto x = noodles::CreateMethodReplyDirect(*w, id.c_str(), 0, e);
 
         w->complete_message(x);
     }
@@ -254,7 +265,7 @@ class MessageHandler {
                           TableT&            table,
                           bool               exclusive,
                           AnyVar const*      var,
-                          std::string const* err) {
+                          ErrorState const*  err) {
 
         if (id.empty()) return;
 
@@ -266,9 +277,18 @@ class MessageHandler {
         if (var) {
             x = noodles::CreateMethodReplyDirect(
                 *w, id.c_str(), write_to(*var, *w));
+        } else if (err) {
+
+            auto e = noodles::CreateMethodExceptionDirect(
+                *w,
+                err->code,
+                err->message.data(),
+                write_to(err->additional, *w));
+
+            x = noodles::CreateMethodReplyDirect(*w, id.c_str(), 0, e);
         } else {
-            x = noodles::CreateMethodReplyDirect(
-                *w, id.c_str(), 0, err->c_str());
+            // uh oh
+            qFatal("Not supposed to get here");
         }
 
         w->complete_message(x);
@@ -320,23 +340,25 @@ class MessageHandler {
 
         if (!target_list) {
             if (must_reply) {
-                MethodException exp(MethodException::CLIENT,
-                                    "Unable to find method.");
-                send_method_error_reply(id, exp.reason());
+                send_method_error_reply(
+                    id,
+                    { ErrorCodes::METHOD_NOT_FOUND, "Method not found!", {} });
             }
 
             qWarning() << "unable to find method target!";
             return;
         }
 
-        MethodID method_id = convert_id(message->methodId());
+        MethodID method_id = convert_id(message->method_id());
 
         if (!method_id.valid()) {
 
             if (must_reply) {
-                MethodException exp(MethodException::CLIENT,
-                                    "Unable to find method.");
-                send_method_error_reply(id, exp.reason());
+                send_method_error_reply(
+                    id,
+                    { ErrorCodes::METHOD_NOT_FOUND,
+                      "Unable to find method; bad method id!",
+                      {} });
             }
 
             qWarning() << "Invalid method";
@@ -351,9 +373,10 @@ class MessageHandler {
 
         if (!method) {
             if (must_reply) {
-                MethodException exp(MethodException::CLIENT,
-                                    "Unable to find method on context");
-                send_method_error_reply(id, exp.reason());
+                send_method_error_reply(id,
+                                        { ErrorCodes::METHOD_NOT_FOUND,
+                                          "Unable to find method on context",
+                                          {} });
             }
             qWarning() << "unable to find method" << method_id.id_slot;
             return;
@@ -363,10 +386,11 @@ class MessageHandler {
 
         if (!function) {
             if (must_reply) {
-                MethodException exp(
-                    MethodException::APPLICATION,
-                    "Unable to execute method: method has no code.");
-                send_method_error_reply(id, exp.reason());
+                send_method_error_reply(
+                    id,
+                    { ErrorCodes::INTERNAL_ERROR,
+                      "Unable to execute method; method has no implementation.",
+                      {} });
             }
             qWarning() << "method has no code";
             return;
@@ -383,36 +407,40 @@ class MessageHandler {
             qDebug() << "Method arguments:" << arg_str.c_str();
         }
 
-        AnyVar      ret_data;
-        std::string err_str;
+        AnyVar                    ret_data;
+        std::optional<ErrorState> err_state;
 
         try {
             ret_data = function(context, vars);
         } catch (MethodException const& e) {
-            err_str = e.reason();
+            auto& estate      = err_state.emplace();
+            estate.code       = e.code();
+            estate.message    = e.reason();
+            estate.additional = e.data();
         } catch (...) {
-            MethodException exp(MethodException::APPLICATION,
-                                "An error occurred; check server!");
-            err_str = exp.reason();
+            auto& estate   = err_state.emplace();
+            estate.code    = ErrorCodes::INTERNAL_ERROR;
+            estate.message = "An internal error occured";
         }
 
         if (on_debug()) {
             qDebug() << "Method Done" << ret_data.dump_string().c_str()
-                     << err_str.c_str();
+                     << (err_state ? "ERROR" : "OK");
         }
 
         if (is_table) {
             auto this_tbl = context.get_table();
 
-            if (err_str.size()) {
-                send_table_reply(id, *this_tbl, true, nullptr, &err_str);
+            if (err_state) {
+                send_table_reply(
+                    id, *this_tbl, true, nullptr, &err_state.value());
             } else {
                 send_table_reply(id, *this_tbl, true, &ret_data, nullptr);
             }
         } else {
             if (must_reply) {
-                if (err_str.size()) {
-                    send_method_error_reply(id, err_str);
+                if (err_state) {
+                    send_method_error_reply(id, err_state.value());
                 } else {
                     send_method_ok_reply(id, ret_data);
                 }

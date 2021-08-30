@@ -143,24 +143,20 @@ auto any_call_helper(Func&&               f,
 /// This should only be thrown inside code that handles method requests, and is
 /// used to communicate disappointment to calling clients.
 struct MethodException : public std::exception {
+    int         m_code;
     std::string m_reason;
+    AnyVar      m_data;
 
 public:
-    enum Responsibility {
-        UNKNOWN,
-        SERVER,      // i.e. the library writer needs to fix this
-        APPLICATION, // i.e. you called it correctly, but we cant do that
-        CLIENT       // i.e. you didnt call this correctly
-    };
+    MethodException(int code, std::string_view message, AnyVar data = {});
 
-    MethodException(std::string_view reason)
-        : MethodException(CLIENT, reason) { }
+    int              code() const { return m_code; }
+    std::string_view reason() const { return m_reason; }
+    AnyVar const&    data() const { return m_data; }
 
-    MethodException(Responsibility r, std::string_view reason);
+    char const* what() const noexcept override;
 
-    char const* what() const noexcept override { return m_reason.c_str(); }
-
-    std::string const& reason() const { return m_reason; }
+    std::string to_string() const;
 };
 
 // Methods =====================================================================
@@ -577,8 +573,6 @@ void issue_signal_direct(TableT*, SignalT*, AnyVarList);
 class ObjectCallbacks : public QObject {
     Q_OBJECT
 
-    ObjectT* m_host;
-
 protected:
     ObjectT* get_host();
 
@@ -588,15 +582,28 @@ public:
         SELECT,
     };
 
-    explicit ObjectCallbacks(ObjectT*);
+    struct EnableCallback {
+        bool activation         = false;
+        bool options            = false;
+        bool transform_position = false;
+        bool transform_rotation = false;
+        bool transform_scale    = false;
+        bool selection          = false;
+        bool probing            = false;
+        bool attention_signals  = false;
+    };
 
-    virtual void                     on_activate_str(std::string);
+    ObjectCallbacks(ObjectT*, EnableCallback);
+
+    EnableCallback const& callbacks_enabled() const;
+
+    virtual void                     on_activate_str(std::string_view);
     virtual void                     on_activate_int(int);
     virtual std::vector<std::string> get_activation_choices();
 
     virtual std::vector<std::string> get_option_choices();
     virtual std::string              get_current_option();
-    virtual void                     set_current_option(std::string);
+    virtual void                     set_current_option(std::string_view);
 
     virtual void set_position(glm::vec3);
     virtual void set_rotation(glm::quat);
@@ -611,11 +618,14 @@ public:
     virtual std::pair<glm::vec3, std::string> probe_at(glm::vec3);
 
 signals:
-
-    // User signals
+    // Issue these signals to emit attention getting
     void signal_attention_plain();
     void signal_attention_at(glm::vec3);
     void signal_attention_anno(glm::vec3, std::string);
+
+private:
+    ObjectT*       m_host;
+    EnableCallback m_enabled;
 };
 
 struct ObjectTextDefinition {

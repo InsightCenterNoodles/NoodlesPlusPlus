@@ -332,8 +332,9 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec2 FLATBUFFERS_FINAL_CLASS {
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return Vec2TypeTable();
   }
-  Vec2() {
-    memset(static_cast<void *>(this), 0, sizeof(Vec2));
+  Vec2()
+      : x_(0),
+        y_(0) {
   }
   Vec2(float _x, float _y)
       : x_(flatbuffers::EndianScalar(_x)),
@@ -364,8 +365,10 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec3 FLATBUFFERS_FINAL_CLASS {
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return Vec3TypeTable();
   }
-  Vec3() {
-    memset(static_cast<void *>(this), 0, sizeof(Vec3));
+  Vec3()
+      : x_(0),
+        y_(0),
+        z_(0) {
   }
   Vec3(float _x, float _y, float _z)
       : x_(flatbuffers::EndianScalar(_x)),
@@ -404,8 +407,11 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Vec4 FLATBUFFERS_FINAL_CLASS {
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return Vec4TypeTable();
   }
-  Vec4() {
-    memset(static_cast<void *>(this), 0, sizeof(Vec4));
+  Vec4()
+      : x_(0),
+        y_(0),
+        z_(0),
+        w_(0) {
   }
   Vec4(float _x, float _y, float _z, float _w)
       : x_(flatbuffers::EndianScalar(_x)),
@@ -451,8 +457,11 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Mat4 FLATBUFFERS_FINAL_CLASS {
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
     return Mat4TypeTable();
   }
-  Mat4() {
-    memset(static_cast<void *>(this), 0, sizeof(Mat4));
+  Mat4()
+      : c1_(),
+        c2_(),
+        c3_(),
+        c4_() {
   }
   Mat4(const noodles::Vec4 &_c1, const noodles::Vec4 &_c2, const noodles::Vec4 &_c3, const noodles::Vec4 &_c4)
       : c1_(_c1),
@@ -530,7 +539,6 @@ struct ObjectIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ObjectIDBuilder &operator=(const ObjectIDBuilder &);
   flatbuffers::Offset<ObjectID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<ObjectID>(end);
@@ -591,7 +599,6 @@ struct TableIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  TableIDBuilder &operator=(const TableIDBuilder &);
   flatbuffers::Offset<TableID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<TableID>(end);
@@ -652,7 +659,6 @@ struct SignalIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  SignalIDBuilder &operator=(const SignalIDBuilder &);
   flatbuffers::Offset<SignalID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<SignalID>(end);
@@ -713,7 +719,6 @@ struct MethodIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  MethodIDBuilder &operator=(const MethodIDBuilder &);
   flatbuffers::Offset<MethodID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<MethodID>(end);
@@ -774,7 +779,6 @@ struct MaterialIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  MaterialIDBuilder &operator=(const MaterialIDBuilder &);
   flatbuffers::Offset<MaterialID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<MaterialID>(end);
@@ -835,7 +839,6 @@ struct GeometryIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  GeometryIDBuilder &operator=(const GeometryIDBuilder &);
   flatbuffers::Offset<GeometryID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<GeometryID>(end);
@@ -896,7 +899,6 @@ struct LightIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  LightIDBuilder &operator=(const LightIDBuilder &);
   flatbuffers::Offset<LightID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<LightID>(end);
@@ -957,7 +959,6 @@ struct TextureIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  TextureIDBuilder &operator=(const TextureIDBuilder &);
   flatbuffers::Offset<TextureID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<TextureID>(end);
@@ -1018,7 +1019,6 @@ struct BufferIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  BufferIDBuilder &operator=(const BufferIDBuilder &);
   flatbuffers::Offset<BufferID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<BufferID>(end);
@@ -1141,7 +1141,6 @@ struct AnyIDBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  AnyIDBuilder &operator=(const AnyIDBuilder &);
   flatbuffers::Offset<AnyID> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<AnyID>(end);
@@ -1211,7 +1210,6 @@ struct MapEntryBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  MapEntryBuilder &operator=(const MapEntryBuilder &);
   flatbuffers::Offset<MapEntry> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<MapEntry>(end);
@@ -1274,7 +1272,6 @@ struct TextBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  TextBuilder &operator=(const TextBuilder &);
   flatbuffers::Offset<Text> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Text>(end);
@@ -1331,7 +1328,6 @@ struct IntegerBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  IntegerBuilder &operator=(const IntegerBuilder &);
   flatbuffers::Offset<Integer> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Integer>(end);
@@ -1380,7 +1376,6 @@ struct IntegerListBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  IntegerListBuilder &operator=(const IntegerListBuilder &);
   flatbuffers::Offset<IntegerList> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<IntegerList>(end);
@@ -1437,7 +1432,6 @@ struct RealBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  RealBuilder &operator=(const RealBuilder &);
   flatbuffers::Offset<Real> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Real>(end);
@@ -1486,7 +1480,6 @@ struct RealListBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  RealListBuilder &operator=(const RealListBuilder &);
   flatbuffers::Offset<RealList> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<RealList>(end);
@@ -1544,7 +1537,6 @@ struct DataBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  DataBuilder &operator=(const DataBuilder &);
   flatbuffers::Offset<Data> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Data>(end);
@@ -1603,7 +1595,6 @@ struct AnyListBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  AnyListBuilder &operator=(const AnyListBuilder &);
   flatbuffers::Offset<AnyList> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<AnyList>(end);
@@ -1662,7 +1653,6 @@ struct AnyMapBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  AnyMapBuilder &operator=(const AnyMapBuilder &);
   flatbuffers::Offset<AnyMap> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<AnyMap>(end);
@@ -1792,7 +1782,6 @@ struct AnyBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  AnyBuilder &operator=(const AnyBuilder &);
   flatbuffers::Offset<Any> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<Any>(end);
@@ -1865,7 +1854,6 @@ struct BufferRefBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  BufferRefBuilder &operator=(const BufferRefBuilder &);
   flatbuffers::Offset<BufferRef> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<BufferRef>(end);
@@ -2036,7 +2024,7 @@ inline const flatbuffers::TypeTable *AnyIDTypeTypeTable() {
     "BufferID"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_UNION, 10, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_UNION, 10, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2078,7 +2066,7 @@ inline const flatbuffers::TypeTable *AnyTypeTypeTable() {
     "AnyID"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_UNION, 10, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_UNION, 10, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2093,7 +2081,7 @@ inline const flatbuffers::TypeTable *ObjectIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2108,7 +2096,7 @@ inline const flatbuffers::TypeTable *TableIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2123,7 +2111,7 @@ inline const flatbuffers::TypeTable *SignalIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2138,7 +2126,7 @@ inline const flatbuffers::TypeTable *MethodIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2153,7 +2141,7 @@ inline const flatbuffers::TypeTable *MaterialIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2168,7 +2156,7 @@ inline const flatbuffers::TypeTable *GeometryIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2183,7 +2171,7 @@ inline const flatbuffers::TypeTable *LightIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2198,7 +2186,7 @@ inline const flatbuffers::TypeTable *TextureIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2213,7 +2201,7 @@ inline const flatbuffers::TypeTable *BufferIDTypeTable() {
     "id_gen"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2231,7 +2219,7 @@ inline const flatbuffers::TypeTable *AnyIDTypeTable() {
     "id"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2249,7 +2237,7 @@ inline const flatbuffers::TypeTable *MapEntryTypeTable() {
     "value"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2262,7 +2250,7 @@ inline const flatbuffers::TypeTable *TextTypeTable() {
     "text"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2275,7 +2263,7 @@ inline const flatbuffers::TypeTable *IntegerTypeTable() {
     "integer"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2288,7 +2276,7 @@ inline const flatbuffers::TypeTable *IntegerListTypeTable() {
     "integers"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2301,7 +2289,7 @@ inline const flatbuffers::TypeTable *RealTypeTable() {
     "real"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2314,7 +2302,7 @@ inline const flatbuffers::TypeTable *RealListTypeTable() {
     "reals"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2327,7 +2315,7 @@ inline const flatbuffers::TypeTable *DataTypeTable() {
     "data"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2343,7 +2331,7 @@ inline const flatbuffers::TypeTable *AnyListTypeTable() {
     "list"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2359,7 +2347,7 @@ inline const flatbuffers::TypeTable *AnyMapTypeTable() {
     "entries"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2377,7 +2365,7 @@ inline const flatbuffers::TypeTable *AnyTypeTable() {
     "any"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -2393,7 +2381,7 @@ inline const flatbuffers::TypeTable *Vec2TypeTable() {
     "y"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_STRUCT, 2, type_codes, nullptr, values, names
+    flatbuffers::ST_STRUCT, 2, type_codes, nullptr, nullptr, values, names
   };
   return &tt;
 }
@@ -2411,7 +2399,7 @@ inline const flatbuffers::TypeTable *Vec3TypeTable() {
     "z"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_STRUCT, 3, type_codes, nullptr, values, names
+    flatbuffers::ST_STRUCT, 3, type_codes, nullptr, nullptr, values, names
   };
   return &tt;
 }
@@ -2431,7 +2419,7 @@ inline const flatbuffers::TypeTable *Vec4TypeTable() {
     "w"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_STRUCT, 4, type_codes, nullptr, values, names
+    flatbuffers::ST_STRUCT, 4, type_codes, nullptr, nullptr, values, names
   };
   return &tt;
 }
@@ -2454,7 +2442,7 @@ inline const flatbuffers::TypeTable *Mat4TypeTable() {
     "c4"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_STRUCT, 4, type_codes, type_refs, values, names
+    flatbuffers::ST_STRUCT, 4, type_codes, type_refs, nullptr, values, names
   };
   return &tt;
 }
@@ -2474,7 +2462,7 @@ inline const flatbuffers::TypeTable *BufferRefTypeTable() {
     "size"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }

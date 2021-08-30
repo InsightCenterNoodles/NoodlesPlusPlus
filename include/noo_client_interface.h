@@ -46,6 +46,15 @@ using MethodContextPtr = std::
 
 class MessageHandler;
 
+/// Represents exception information as provided by the server
+struct MethodException {
+    int            code;
+    QString        message;
+    noo::AnyVarRef additional;
+};
+
+QString to_string(MethodException const&);
+
 ///
 /// The PendingMethodReply base class is a handle for you to call a noodles
 /// method. Thus the 'pending' part. As part of the Qt system, this will issue a
@@ -85,7 +94,7 @@ public:
 
 private slots:
     /// Internal use
-    void complete(noo::AnyVarRef, QString);
+    void complete(noo::AnyVarRef, MethodException*);
 
 signals:
     /// Issued when a non-error reply has been received
@@ -93,6 +102,9 @@ signals:
 
     /// Issued when the method raised an exception on the server side.
     void recv_fail(QString);
+
+    /// Issued when the method raised an exception on the server side.
+    void recv_exception(MethodException);
 };
 
 ///

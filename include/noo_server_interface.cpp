@@ -8,30 +8,47 @@
 #include <QDebug>
 
 #include <fstream>
+#include <sstream>
 
 #include <glm/gtx/component_wise.hpp>
 
 namespace noo {
 
-static std::string_view exception_postfix(MethodException::Responsibility r) {
-    switch (r) {
-    case MethodException::UNKNOWN: return " (Unknown exception type)";
-    case MethodException::SERVER:
-        return " (Server exception: ask server library developer to fix this "
-               "error)";
-    case MethodException::APPLICATION:
-        return " (Application exception: ask application developer to fix this "
-               "error)";
-    case MethodException::CLIENT:
-        return " (Client exception: Please check the calling documentation and "
-               "try again)";
+
+MethodException::MethodException(int              code,
+                                 std::string_view message,
+                                 AnyVar           data)
+    : m_code(code), m_reason(message), m_data(data) { }
+
+static char const* code_to_name(int code) {
+    switch (code) {
+    case -32700: return "Parse error";
+    case -32600: return "Invalid request";
+    case -32601: return "Method not found";
+    case -32602: return "Invalid parameters";
+    case -32603: return "Internal error";
+    default: return "Unknown code";
     }
 }
 
-MethodException::MethodException(Responsibility r, std::string_view reason)
-    : m_reason(reason) {
-    m_reason += exception_postfix(r);
+char const* MethodException::what() const noexcept {
+    // api prevents us from adding data
+    return code_to_name(m_code);
 }
+
+std::string MethodException::to_string() const {
+    std::stringstream ss;
+
+    ss << "Code " << m_code << " " << code_to_name(m_code) << ": ";
+    ss << m_reason;
+    if (m_data.index() != 0) {
+        ss << " Additional data: " << m_data.dump_string();
+    }
+
+    return ss.str();
+}
+
+// =============================================================================
 
 TableTPtr MethodContext::get_table() const {
     auto const* ptr_ptr = std::get_if<TableTPtr>(this);
@@ -985,7 +1002,22 @@ void update_object(ObjectTPtr item, ObjectUpdateData& data) {
     item->update(data);
 }
 
-void                     ObjectCallbacks::on_activate_str(std::string) { }
+
+// Callbacks
+
+ObjectCallbacks::ObjectCallbacks(ObjectT* h, EnableCallback c)
+    : m_host(h), m_enabled(c) { }
+
+ObjectT* ObjectCallbacks::get_host() {
+    return m_host;
+}
+
+ObjectCallbacks::EnableCallback const&
+ObjectCallbacks::callbacks_enabled() const {
+    return m_enabled;
+}
+
+void                     ObjectCallbacks::on_activate_str(std::string_view) { }
 void                     ObjectCallbacks::on_activate_int(int) { }
 std::vector<std::string> ObjectCallbacks::get_activation_choices() {
     return {};
@@ -997,7 +1029,7 @@ std::vector<std::string> ObjectCallbacks::get_option_choices() {
 std::string ObjectCallbacks::get_current_option() {
     return {};
 }
-void ObjectCallbacks::set_current_option(std::string) { }
+void ObjectCallbacks::set_current_option(std::string_view) { }
 
 void ObjectCallbacks::set_position(glm::vec3) { }
 void ObjectCallbacks::set_rotation(glm::quat) { }

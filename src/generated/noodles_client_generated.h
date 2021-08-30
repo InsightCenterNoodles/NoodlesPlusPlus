@@ -123,7 +123,6 @@ struct IntroductionMessageBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  IntroductionMessageBuilder &operator=(const IntroductionMessageBuilder &);
   flatbuffers::Offset<IntroductionMessage> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<IntroductionMessage>(end);
@@ -155,17 +154,17 @@ struct MethodInvokeMessage FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table 
     return MethodInvokeMessageTypeTable();
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_METHODID = 4,
+    VT_METHOD_ID = 4,
     VT_ON_OBJECT = 6,
     VT_ON_TABLE = 8,
     VT_INVOKE_IDENT = 10,
     VT_METHOD_ARGS = 12
   };
-  const noodles::MethodID *methodId() const {
-    return GetPointer<const noodles::MethodID *>(VT_METHODID);
+  const noodles::MethodID *method_id() const {
+    return GetPointer<const noodles::MethodID *>(VT_METHOD_ID);
   }
-  noodles::MethodID *mutable_methodId() {
-    return GetPointer<noodles::MethodID *>(VT_METHODID);
+  noodles::MethodID *mutable_method_id() {
+    return GetPointer<noodles::MethodID *>(VT_METHOD_ID);
   }
   const noodles::ObjectID *on_object() const {
     return GetPointer<const noodles::ObjectID *>(VT_ON_OBJECT);
@@ -193,8 +192,8 @@ struct MethodInvokeMessage FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table 
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffsetRequired(verifier, VT_METHODID) &&
-           verifier.VerifyTable(methodId()) &&
+           VerifyOffsetRequired(verifier, VT_METHOD_ID) &&
+           verifier.VerifyTable(method_id()) &&
            VerifyOffset(verifier, VT_ON_OBJECT) &&
            verifier.VerifyTable(on_object()) &&
            VerifyOffset(verifier, VT_ON_TABLE) &&
@@ -211,8 +210,8 @@ struct MethodInvokeMessageBuilder {
   typedef MethodInvokeMessage Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
-  void add_methodId(flatbuffers::Offset<noodles::MethodID> methodId) {
-    fbb_.AddOffset(MethodInvokeMessage::VT_METHODID, methodId);
+  void add_method_id(flatbuffers::Offset<noodles::MethodID> method_id) {
+    fbb_.AddOffset(MethodInvokeMessage::VT_METHOD_ID, method_id);
   }
   void add_on_object(flatbuffers::Offset<noodles::ObjectID> on_object) {
     fbb_.AddOffset(MethodInvokeMessage::VT_ON_OBJECT, on_object);
@@ -230,11 +229,10 @@ struct MethodInvokeMessageBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  MethodInvokeMessageBuilder &operator=(const MethodInvokeMessageBuilder &);
   flatbuffers::Offset<MethodInvokeMessage> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<MethodInvokeMessage>(end);
-    fbb_.Required(o, MethodInvokeMessage::VT_METHODID);
+    fbb_.Required(o, MethodInvokeMessage::VT_METHOD_ID);
     fbb_.Required(o, MethodInvokeMessage::VT_INVOKE_IDENT);
     return o;
   }
@@ -242,7 +240,7 @@ struct MethodInvokeMessageBuilder {
 
 inline flatbuffers::Offset<MethodInvokeMessage> CreateMethodInvokeMessage(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<noodles::MethodID> methodId = 0,
+    flatbuffers::Offset<noodles::MethodID> method_id = 0,
     flatbuffers::Offset<noodles::ObjectID> on_object = 0,
     flatbuffers::Offset<noodles::TableID> on_table = 0,
     flatbuffers::Offset<flatbuffers::String> invoke_ident = 0,
@@ -252,13 +250,13 @@ inline flatbuffers::Offset<MethodInvokeMessage> CreateMethodInvokeMessage(
   builder_.add_invoke_ident(invoke_ident);
   builder_.add_on_table(on_table);
   builder_.add_on_object(on_object);
-  builder_.add_methodId(methodId);
+  builder_.add_method_id(method_id);
   return builder_.Finish();
 }
 
 inline flatbuffers::Offset<MethodInvokeMessage> CreateMethodInvokeMessageDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<noodles::MethodID> methodId = 0,
+    flatbuffers::Offset<noodles::MethodID> method_id = 0,
     flatbuffers::Offset<noodles::ObjectID> on_object = 0,
     flatbuffers::Offset<noodles::TableID> on_table = 0,
     const char *invoke_ident = nullptr,
@@ -266,7 +264,7 @@ inline flatbuffers::Offset<MethodInvokeMessage> CreateMethodInvokeMessageDirect(
   auto invoke_ident__ = invoke_ident ? _fbb.CreateString(invoke_ident) : 0;
   return noodles::CreateMethodInvokeMessage(
       _fbb,
-      methodId,
+      method_id,
       on_object,
       on_table,
       invoke_ident__,
@@ -307,7 +305,6 @@ struct AssetRefreshMessageBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  AssetRefreshMessageBuilder &operator=(const AssetRefreshMessageBuilder &);
   flatbuffers::Offset<AssetRefreshMessage> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<AssetRefreshMessage>(end);
@@ -396,7 +393,6 @@ struct ClientMessageBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ClientMessageBuilder &operator=(const ClientMessageBuilder &);
   flatbuffers::Offset<ClientMessage> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<ClientMessage>(end);
@@ -449,7 +445,6 @@ struct ClientMessagesBuilder {
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ClientMessagesBuilder &operator=(const ClientMessagesBuilder &);
   flatbuffers::Offset<ClientMessages> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<ClientMessages>(end);
@@ -527,7 +522,7 @@ inline const flatbuffers::TypeTable *ClientMessageTypeTypeTable() {
     "AssetRefreshMessage"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_UNION, 4, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_UNION, 4, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -540,7 +535,7 @@ inline const flatbuffers::TypeTable *IntroductionMessageTypeTable() {
     "client_name"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -560,14 +555,14 @@ inline const flatbuffers::TypeTable *MethodInvokeMessageTypeTable() {
     noodles::AnyListTypeTable
   };
   static const char * const names[] = {
-    "methodId",
+    "method_id",
     "on_object",
     "on_table",
     "invoke_ident",
     "method_args"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 5, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 5, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -583,7 +578,7 @@ inline const flatbuffers::TypeTable *AssetRefreshMessageTypeTable() {
     "for_buffers"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -601,7 +596,7 @@ inline const flatbuffers::TypeTable *ClientMessageTypeTable() {
     "content"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -617,7 +612,7 @@ inline const flatbuffers::TypeTable *ClientMessagesTypeTable() {
     "messages"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }

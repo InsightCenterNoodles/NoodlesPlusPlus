@@ -11,6 +11,14 @@
 
 namespace nooc {
 
+QString to_string(MethodException const& me) {
+    auto str = me.additional.dump_string();
+    return QString("Code %1: %2 Additional: %3")
+        .arg(me.code)
+        .arg(me.message)
+        .arg(str.c_str());
+}
+
 void PendingMethodReply::interpret() { }
 
 PendingMethodReply::PendingMethodReply(MethodDelegate* d, MethodContext ctx)
@@ -20,15 +28,26 @@ PendingMethodReply::PendingMethodReply(MethodDelegate* d, MethodContext ctx)
 }
 
 void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
-    if (m_called)
-        return complete(
-            {},
-            "Create a new invocation object instead of re-calling this one.");
+    if (m_called) {
+        MethodException exception {
+            .code    = -10000,
+            .message = "Create a new invocation object instead of re-calling "
+                       "this one",
+        };
+
+        return complete({}, &exception);
+    }
 
     m_called = true;
 
 
-    if (!m_method) return complete({}, "Tried to call a missing method");
+    if (!m_method) {
+        MethodException exception {
+            .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
+            .message = "Method does not exist on this object",
+        };
+        return complete({}, &exception);
+    }
 
     qDebug() << "Invoking" << noo::to_qstring(m_method->name());
 
@@ -39,28 +58,35 @@ void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
         },
         VCASE(QPointer<ObjectDelegate> & p) {
             if (!p) {
-                return complete(
-                    {},
-                    "Tried to call method on object that no longer exists!");
+                MethodException exception {
+                    .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
+                    .message = "Method does not exist on this object anymore",
+                };
+                return complete({}, &exception);
             }
 
             emit m_method->invoke(m_method->id(), p.data(), l, this);
         },
         VCASE(QPointer<TableDelegate> & p) {
             if (!p) {
-                return complete(
-                    {}, "Tried to call method on table that no longer exists!");
+                MethodException exception {
+                    .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
+                    .message = "Method does not exist on this table anymore",
+                };
+                return complete({}, &exception);
             }
 
             emit m_method->invoke(m_method->id(), p.data(), l, this);
         });
 }
 
-void PendingMethodReply::complete(noo::AnyVarRef v, QString string) {
+void PendingMethodReply::complete(noo::AnyVarRef   v,
+                                  MethodException* exception_info) {
     qDebug() << Q_FUNC_INFO;
 
-    if (!string.isEmpty()) {
-        emit recv_fail(string);
+    if (exception_info) {
+        emit recv_exception(*exception_info);
+        emit recv_fail(to_string(*exception_info));
         return;
     }
 

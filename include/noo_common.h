@@ -174,6 +174,26 @@ auto safe_subspan(std::span<T> sp,
     return sp.subspan(offset, count);
 }
 
+// =============================================================================
+
+enum ErrorCodes {
+    // defined by the spec
+    PARSE_ERROR      = -32700,
+    INVALID_REQUEST  = -32600,
+    METHOD_NOT_FOUND = -32601,
+    INVALID_PARAMS   = -32602,
+    INTERNAL_ERROR   = -32603,
+
+
+    // defined by this library
+    TABLE_REJECT_INSERT = -40000,
+    TABLE_REJECT_UPDATE = -40001,
+    TABLE_REJECT_REMOVE = -40002,
+    TABLE_REJECT_CLEAR  = -40003,
+
+    TABLE_REJECT_SELECTION_UPDATE = -40100
+};
+
 } // namespace noo
 
 #endif // COMMON_H

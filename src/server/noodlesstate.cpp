@@ -104,7 +104,7 @@ SignalTPtr DocumentT::get_builtin(BuiltinSignals e) {
 static TableTPtr get_table(MethodContext const& context) {
     auto ctlb = context.get_table();
     if (!ctlb)
-        throw MethodException(MethodException::CLIENT,
+        throw MethodException(ErrorCodes::INVALID_REQUEST,
                               "Can only be called on a table.");
     return ctlb;
 }
@@ -199,7 +199,8 @@ static AnyVar table_data_insert(MethodContext const& context, AnyListArg ref) {
     bool ok = tbl->get_source()->ask_insert(ref.list);
 
     if (!ok) {
-        throw MethodException(MethodException::CLIENT, "Unable to insert data");
+        throw MethodException(ErrorCodes::TABLE_REJECT_INSERT,
+                              "Unable to insert data");
     }
 
     return {};
@@ -214,7 +215,8 @@ static AnyVar table_data_update(MethodContext const& context,
     bool ok = tbl->get_source()->ask_update(keys, cols.list);
 
     if (!ok) {
-        throw MethodException(MethodException::CLIENT, "Unable to update data");
+        throw MethodException(ErrorCodes::TABLE_REJECT_UPDATE,
+                              "Unable to update data");
     }
 
     return {};
@@ -226,7 +228,8 @@ static AnyVar table_data_remove(MethodContext const& context, AnyVarRef keys) {
     bool ok = tbl->get_source()->ask_delete(keys);
 
     if (!ok) {
-        throw MethodException(MethodException::CLIENT, "Unable to remove data");
+        throw MethodException(ErrorCodes::TABLE_REJECT_REMOVE,
+                              "Unable to remove data");
     }
 
     return {};
@@ -238,7 +241,8 @@ static AnyVar table_data_clear(MethodContext const& context) {
     bool ok = tbl->get_source()->ask_clear();
 
     if (!ok) {
-        throw MethodException(MethodException::CLIENT, "Unable to clear table");
+        throw MethodException(ErrorCodes::TABLE_REJECT_CLEAR,
+                              "Unable to clear table");
     }
 
     return {};
@@ -256,7 +260,7 @@ static AnyVar table_update_selection(MethodContext const& context,
     bool ok = src->ask_update_selection(selection_id, selection_ref);
 
     if (!ok) {
-        throw MethodException(MethodException::CLIENT,
+        throw MethodException(ErrorCodes::TABLE_REJECT_SELECTION_UPDATE,
                               "Unable to update selection");
     }
 
@@ -269,7 +273,7 @@ static AnyVar table_update_selection(MethodContext const& context,
 static ObjectTPtr get_object(MethodContext const& context) {
     auto ctlb = context.get_object();
     if (!ctlb)
-        throw MethodException(MethodException::CLIENT,
+        throw MethodException(ErrorCodes::INVALID_REQUEST,
                               "Can only be called on an object.");
     return ctlb;
 }
@@ -278,9 +282,9 @@ static ObjectCallbacks* get_callbacks(ObjectTPtr const& p) {
     auto* cb = p->callbacks();
     if (!cb) {
         throw MethodException(
-            MethodException::CLIENT,
-            "Object supports methods, but does not have a method "
-            "implementation. This is an application issue.");
+            ErrorCodes::INTERNAL_ERROR,
+            "Object supports methods, but does not have an implementation for "
+            "the called method implementation. This is an application issue.");
     }
     return cb;
 }
@@ -316,7 +320,7 @@ static AnyVar object_activate(MethodContext const& context,
         return {};
     }
 
-    throw MethodException(MethodException::CLIENT,
+    throw MethodException(ErrorCodes::INVALID_PARAMS,
                           "Argument must be int or string!");
 }
 
@@ -366,7 +370,8 @@ static AnyVar object_set_position(MethodContext const& context, Vec3Arg arg) {
     auto* cb = get_callbacks(obj);
 
     if (!arg)
-        throw MethodException(MethodException::CLIENT, "Need a vec3 argument");
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
+                              "Need a vec3 argument");
 
     cb->set_position(*arg);
 
@@ -380,7 +385,8 @@ static AnyVar object_set_rotation(MethodContext const& context, Vec4Arg v4arg) {
     auto* cb = get_callbacks(obj);
 
     if (!v4arg)
-        throw MethodException(MethodException::CLIENT, "Need a vec4 argument");
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
+                              "Need a vec4 argument");
 
     auto arg = *v4arg;
 
@@ -396,7 +402,8 @@ static AnyVar object_set_scale(MethodContext const& context, Vec3Arg arg) {
     auto* cb = get_callbacks(obj);
 
     if (!arg)
-        throw MethodException(MethodException::CLIENT, "Need a vec3 argument");
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
+                              "Need a vec3 argument");
 
     cb->set_scale(*arg);
 
@@ -413,7 +420,7 @@ static AnyVar object_select_region(MethodContext const& context,
     auto* cb = get_callbacks(obj);
 
     if (!min or !max or !select)
-        throw MethodException(MethodException::CLIENT,
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
                               "Need a vec3 min and max argument!");
 
     cb->select_region(*min,
@@ -434,7 +441,8 @@ static AnyVar object_select_sphere(MethodContext const& context,
     auto* cb = get_callbacks(obj);
 
     if (!p or !select)
-        throw MethodException(MethodException::CLIENT, "Need a vec3 position!");
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
+                              "Need a vec3 position!");
 
     cb->select_sphere(*p,
                       radius,
@@ -454,7 +462,7 @@ static AnyVar object_select_plane(MethodContext const& context,
     auto* cb = get_callbacks(obj);
 
     if (!p or !n or !select)
-        throw MethodException(MethodException::CLIENT,
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
                               "Need vec3 position and normal!");
 
     cb->select_plane(
@@ -471,7 +479,8 @@ static AnyVar object_probe_at(MethodContext const& context, Vec3Arg p) {
     auto* cb = get_callbacks(obj);
 
     if (!p)
-        throw MethodException(MethodException::CLIENT, "Need a vec3 position!");
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
+                              "Need a vec3 position!");
 
     return cb->probe_at(*p);
 }
@@ -481,7 +490,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = "tbl_subscribe"sv;
+        d.method_name          = noo::names::mthd_tbl_subscribe;
         d.documentation        = "Subscribe to this table's signals"sv;
         d.return_documentation = "A table initialization object."sv;
         d.code                 = table_subscribe;
@@ -492,7 +501,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name = "tbl_insert"sv;
+        d.method_name = noo::names::mthd_tbl_insert;
         d.documentation =
             "Request that given data be inserted into the table."sv;
         d.argument_documentation = {
@@ -509,7 +518,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name   = "tbl_update"sv;
+        d.method_name   = noo::names::mthd_tbl_update;
         d.documentation = "Request that rows be updated with given data."sv;
         d.argument_documentation = {
             { "[keys]", "Integer list of keys to update" },
@@ -525,7 +534,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "tbl_remove"sv;
+        d.method_name            = noo::names::mthd_tbl_remove;
         d.documentation          = "Request that data be deleted"sv;
         d.argument_documentation = { { "[keys]", "A list of keys to delete" } };
         d.return_documentation   = "None"sv;
@@ -537,7 +546,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "tbl_update_selection"sv;
+        d.method_name            = noo::names::mthd_tbl_update_selection;
         d.documentation          = "Set the table selection."sv;
         d.argument_documentation = {
             {
@@ -555,7 +564,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = "tbl_clear"sv;
+        d.method_name          = noo::names::mthd_tbl_clear;
         d.documentation        = "Request to clear all data and selections"sv;
         d.return_documentation = "None"sv;
         d.set_code(table_data_clear);
@@ -568,7 +577,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "activate"sv;
+        d.method_name            = noo::names::mthd_activate;
         d.documentation          = "Activate the object"sv;
         d.argument_documentation = {
             { "int | string",
@@ -585,7 +594,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = "get_activation_choices"sv;
+        d.method_name          = noo::names::mthd_get_activation_choices;
         d.documentation        = "Get the names of activations on the object"sv;
         d.return_documentation = "[string]"sv;
 
@@ -597,7 +606,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = "get_option_choices"sv;
+        d.method_name          = noo::names::mthd_get_option_choices;
         d.documentation        = "Get the names of options on the object"sv;
         d.return_documentation = "[string]"sv;
 
@@ -609,7 +618,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = "get_current_option"sv;
+        d.method_name          = noo::names::mthd_get_current_option;
         d.documentation        = "Get the current option name"sv;
         d.return_documentation = "string"sv;
 
@@ -621,7 +630,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "set_current_option"sv;
+        d.method_name            = noo::names::mthd_set_current_option;
         d.documentation          = "Set the current option on an object"sv;
         d.argument_documentation = { { "string", "The option name to set." } };
         d.return_documentation   = "None"sv;
@@ -634,7 +643,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "set_position"sv;
+        d.method_name            = noo::names::mthd_set_position;
         d.documentation          = "Ask to set the object position."sv;
         d.argument_documentation = {
             { "vec3", "A list of 3 reals as an object local position" }
@@ -648,7 +657,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "set_rotation"sv;
+        d.method_name            = noo::names::mthd_set_rotation;
         d.documentation          = "Ask to set the object rotation."sv;
         d.argument_documentation = { { "vec4",
                                        "A list of 4 reals as an object local "
@@ -662,7 +671,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "set_scale"sv;
+        d.method_name            = noo::names::mthd_set_scale;
         d.documentation          = "Ask to set the object scale."sv;
         d.argument_documentation = {
             { "vec3", "A list of 3 reals as an object local scale." }
@@ -677,7 +686,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name            = "select_region"sv;
+        d.method_name            = noo::names::mthd_select_region;
         d.documentation          = "Ask the object to select an AABB region."sv;
         d.argument_documentation = {
             { "vec3", "The minimum extent of the BB" },
@@ -694,7 +703,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name   = "select_sphere"sv;
+        d.method_name   = noo::names::mthd_select_sphere;
         d.documentation = "Ask the object to select a spherical region."sv;
         d.argument_documentation = {
             { "vec3", "The position of the sphere center" },
@@ -711,7 +720,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name   = "select_plane"sv;
+        d.method_name   = noo::names::mthd_select_half_plane;
         d.documentation = "Ask the object to select a half plane region"sv;
         d.argument_documentation = {
             { "vec3", "A position on the plane" },
@@ -728,7 +737,7 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name = "probe_at"sv;
+        d.method_name = noo::names::mthd_probe_at;
         d.documentation =
             "Ask the object to probe a given point. Returns a list of a string to display, and a possibly edited (or snapped) point."sv;
         d.argument_documentation = { { "vec3",

@@ -24,8 +24,8 @@ CPMAddPackage("gh:TheLartians/PackageProject.cmake@1.6.0")
 
 CPMAddPackage(
   NAME flatbuffers
-  URL https://github.com/google/flatbuffers/archive/v1.12.0.zip
-  VERSION 1.12.0
+  URL https://github.com/google/flatbuffers/archive/v2.0.0.zip
+  VERSION 2.0.0
   OPTIONS
     "FLATBUFFERS_CODE_COVERAGE OFF"
     "FLATBUFFERS_BUILD_TESTS OFF"
