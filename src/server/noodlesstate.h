@@ -40,6 +40,7 @@ enum class BuiltinMethods {
     OBJ_SEL_REGION,
     OBJ_SEL_SPHERE,
     OBJ_SEL_PLANE,
+    OBJ_SEL_HULL,
 
     OBJ_PROBE,
 };

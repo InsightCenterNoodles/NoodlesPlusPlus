@@ -471,6 +471,25 @@ static AnyVar object_select_plane(MethodContext const& context,
     return {};
 }
 
+static AnyVar object_select_hull(MethodContext const& context,
+                                 Vec3ListArg          point_list,
+                                 BoolArg              select) {
+
+    auto obj = get_object(context);
+
+    auto* cb = get_callbacks(obj);
+
+    if (point_list.empty() or !select)
+        throw MethodException(
+            ErrorCodes::INVALID_PARAMS,
+            "Need a list of positions and a boolean argument!");
+
+    cb->select_hull(point_list,
+                    *select ? ObjectCallbacks::SELECT
+                            : ObjectCallbacks::DESELECT);
+
+    return {};
+}
 
 static AnyVar object_probe_at(MethodContext const& context, Vec3Arg p) {
 
@@ -732,6 +751,22 @@ void DocumentT::build_table_methods() {
         d.set_code(object_select_plane);
 
         m_builtin_methods[BuiltinMethods::OBJ_SEL_PLANE] =
+            create_method(this, d);
+    }
+
+    {
+        MethodData d;
+        d.method_name   = noo::names::mthd_select_hull;
+        d.documentation = "Ask the object to select a convex hull region"sv;
+        d.argument_documentation = {
+            { "[ vec3 ]", "A list of points" },
+            { "bool", "Select (true) or deselect (false)" },
+        };
+        d.return_documentation = "None"sv;
+
+        d.set_code(object_select_hull);
+
+        m_builtin_methods[BuiltinMethods::OBJ_SEL_HULL] =
             create_method(this, d);
     }
 

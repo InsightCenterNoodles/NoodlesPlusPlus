@@ -66,6 +66,7 @@ ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
             add_bt(BuiltinMethods::OBJ_SEL_REGION);
             add_bt(BuiltinMethods::OBJ_SEL_SPHERE);
             add_bt(BuiltinMethods::OBJ_SEL_PLANE);
+            add_bt(BuiltinMethods::OBJ_SEL_HULL);
         }
 
         if (enabled.probing) { add_bt(BuiltinMethods::OBJ_PROBE); }

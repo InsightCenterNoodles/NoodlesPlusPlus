@@ -96,6 +96,15 @@ Vec3Arg::Vec3Arg(AnyVarRef const& a) {
     this->emplace(l[0], l[1], l[2]);
 }
 
+Vec3ListArg::Vec3ListArg(AnyVarRef const& a) {
+    auto l = a.to_vector();
+
+    l.for_each([this](auto, AnyVarRef const& v) {
+        Vec3Arg this_point(v);
+        if (this_point) this->push_back(*this_point);
+    });
+}
+
 Vec4Arg::Vec4Arg(AnyVarRef const& a) {
     auto l = a.to_real_list();
 

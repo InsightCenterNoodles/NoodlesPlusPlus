@@ -42,6 +42,7 @@ NOO_STRING(mthd_, set_scale);
 NOO_STRING(mthd_, select_region);
 NOO_STRING(mthd_, select_sphere);
 NOO_STRING(mthd_, select_half_plane);
+NOO_STRING(mthd_, select_hull);
 
 NOO_STRING(mthd_, probe_at);
 

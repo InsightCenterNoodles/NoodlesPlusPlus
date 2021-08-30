@@ -136,6 +136,11 @@ struct Vec3Arg : std::optional<glm::vec3> {
     Vec3Arg(AnyVarRef const&);
 };
 
+struct Vec3ListArg : std::vector<glm::vec3> {
+    Vec3ListArg() = default;
+    Vec3ListArg(AnyVarRef const&);
+};
+
 struct Vec4Arg : std::optional<glm::vec4> {
     Vec4Arg() = default;
     Vec4Arg(AnyVarRef const&);
