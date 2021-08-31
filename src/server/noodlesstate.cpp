@@ -187,12 +187,6 @@ static AnyVar table_subscribe(MethodContext const& context,
     return return_obj;
 }
 
-static auto get_builtin(TableT* tbl, BuiltinSignals b) {
-    auto* server = server_from_component(tbl);
-    return server->state()->document()->get_builtin(b);
-}
-
-
 static AnyVar table_data_insert(MethodContext const& context, AnyListArg ref) {
     auto tbl = get_table(context);
 
@@ -473,18 +467,24 @@ static AnyVar object_select_plane(MethodContext const& context,
 
 static AnyVar object_select_hull(MethodContext const& context,
                                  Vec3ListArg          point_list,
+                                 IntListArg           index_list,
                                  BoolArg              select) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    if (point_list.empty() or !select)
-        throw MethodException(
-            ErrorCodes::INVALID_PARAMS,
-            "Need a list of positions and a boolean argument!");
+    if (point_list.empty() or index_list.list.size() == 0 or !select)
+        throw MethodException(ErrorCodes::INVALID_PARAMS,
+                              "Need a list of positions, a list of indicies, "
+                              "and a boolean argument!");
+
+    if (index_list.list.size() % 3 != 0) {
+        throw MethodException(ErrorCodes::INVALID_PARAMS, "Indicies should be");
+    }
 
     cb->select_hull(point_list,
+                    index_list.list.span(),
                     *select ? ObjectCallbacks::SELECT
                             : ObjectCallbacks::DESELECT);
 
@@ -760,6 +760,7 @@ void DocumentT::build_table_methods() {
         d.documentation = "Ask the object to select a convex hull region"sv;
         d.argument_documentation = {
             { "[ vec3 ]", "A list of points" },
+            { "[ int64 ]", "A list of indicies, each triple is a triangle" },
             { "bool", "Select (true) or deselect (false)" },
         };
         d.return_documentation = "None"sv;

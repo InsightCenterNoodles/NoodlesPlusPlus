@@ -1045,7 +1045,8 @@ void ObjectCallbacks::select_plane(glm::vec3 /*point*/,
                                    glm::vec3 /*normal*/,
                                    SelAction /*select*/) { }
 
-void ObjectCallbacks::select_hull(std::span<glm::vec3> /*point_list*/,
+void ObjectCallbacks::select_hull(std::span<glm::vec3 const> /*point_list*/,
+                                  std::span<int64_t const> /*index_list*/,
                                   SelAction /*select*/) { }
 
 std::pair<glm::vec3, std::string> ObjectCallbacks::probe_at(glm::vec3) {

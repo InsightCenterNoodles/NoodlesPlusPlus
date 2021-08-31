@@ -614,7 +614,9 @@ public:
     select_sphere(glm::vec3 point, float distance, SelAction select);
     virtual void
     select_plane(glm::vec3 point, glm::vec3 normal, SelAction select);
-    virtual void select_hull(std::span<glm::vec3> point_list, SelAction select);
+    virtual void select_hull(std::span<glm::vec3 const> point_list,
+                             std::span<int64_t const>   index_list,
+                             SelAction                  select);
 
     virtual std::pair<glm::vec3, std::string> probe_at(glm::vec3);
 
