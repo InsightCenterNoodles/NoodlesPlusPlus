@@ -1049,7 +1049,7 @@ void ObjectCallbacks::select_hull(std::span<glm::vec3 const> /*point_list*/,
                                   std::span<int64_t const> /*index_list*/,
                                   SelAction /*select*/) { }
 
-std::pair<glm::vec3, std::string> ObjectCallbacks::probe_at(glm::vec3) {
+std::pair<std::string, glm::vec3> ObjectCallbacks::probe_at(glm::vec3) {
     return {};
 }
 

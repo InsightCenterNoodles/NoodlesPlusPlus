@@ -619,7 +619,7 @@ public:
                              std::span<int64_t const>   index_list,
                              SelAction                  select);
 
-    virtual std::pair<glm::vec3, std::string> probe_at(glm::vec3);
+    virtual std::pair<std::string, glm::vec3> probe_at(glm::vec3);
 
 signals:
     // Issue these signals to emit attention getting
