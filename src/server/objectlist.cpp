@@ -41,10 +41,8 @@ ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
 
         auto doc = get_document(m_parent_list->m_server);
 
-        std::vector<noo::MethodTPtr> m_to_attach;
-
-        auto add_bt = [&m_to_attach, &doc](BuiltinMethods b) {
-            m_to_attach.emplace_back(doc->get_builtin(b));
+        auto add_bt = [this, &doc](BuiltinMethods b) {
+            m_method_search.insert(doc->get_builtin(b));
         };
 
         if (enabled.activation) {
