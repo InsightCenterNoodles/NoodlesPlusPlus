@@ -146,6 +146,11 @@ struct Vec4Arg : std::optional<glm::vec4> {
     Vec4Arg(AnyVarRef const&);
 };
 
+struct IntArg : std::optional<int64_t> {
+    IntArg() = default;
+    IntArg(AnyVarRef const&);
+};
+
 struct BoolArg {
     char state = -1;
 

@@ -577,9 +577,10 @@ protected:
     ObjectT* get_host();
 
 public:
-    enum SelAction : uint8_t {
-        DESELECT,
-        SELECT,
+    enum SelAction : int8_t {
+        DESELECT = -1,
+        REPLACE  = 0,
+        SELECT   = 1,
     };
 
     struct EnableCallback {

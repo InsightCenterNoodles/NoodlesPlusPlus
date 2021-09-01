@@ -404,10 +404,14 @@ static AnyVar object_set_scale(MethodContext const& context, Vec3Arg arg) {
     return {};
 }
 
+static ObjectCallbacks::SelAction decode_selection_action(int64_t i) {
+    return ObjectCallbacks::SelAction(std::clamp<int64_t>(i, -1, 1));
+}
+
 static AnyVar object_select_region(MethodContext const& context,
                                    Vec3Arg              min,
                                    Vec3Arg              max,
-                                   BoolArg              select) {
+                                   IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -417,10 +421,7 @@ static AnyVar object_select_region(MethodContext const& context,
         throw MethodException(ErrorCodes::INVALID_PARAMS,
                               "Need a vec3 min and max argument!");
 
-    cb->select_region(*min,
-                      *max,
-                      *select ? ObjectCallbacks::SELECT
-                              : ObjectCallbacks::DESELECT);
+    cb->select_region(*min, *max, decode_selection_action(*select));
 
     return {};
 }
@@ -428,7 +429,7 @@ static AnyVar object_select_region(MethodContext const& context,
 static AnyVar object_select_sphere(MethodContext const& context,
                                    Vec3Arg              p,
                                    double               radius,
-                                   BoolArg              select) {
+                                   IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -438,10 +439,7 @@ static AnyVar object_select_sphere(MethodContext const& context,
         throw MethodException(ErrorCodes::INVALID_PARAMS,
                               "Need a vec3 position!");
 
-    cb->select_sphere(*p,
-                      radius,
-                      *select ? ObjectCallbacks::SELECT
-                              : ObjectCallbacks::DESELECT);
+    cb->select_sphere(*p, radius, decode_selection_action(*select));
 
     return {};
 }
@@ -449,7 +447,7 @@ static AnyVar object_select_sphere(MethodContext const& context,
 static AnyVar object_select_plane(MethodContext const& context,
                                   Vec3Arg              p,
                                   Vec3Arg              n,
-                                  BoolArg              select) {
+                                  IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -459,8 +457,7 @@ static AnyVar object_select_plane(MethodContext const& context,
         throw MethodException(ErrorCodes::INVALID_PARAMS,
                               "Need vec3 position and normal!");
 
-    cb->select_plane(
-        *p, *n, *select ? ObjectCallbacks::SELECT : ObjectCallbacks::DESELECT);
+    cb->select_plane(*p, *n, decode_selection_action(*select));
 
     return {};
 }
@@ -468,7 +465,7 @@ static AnyVar object_select_plane(MethodContext const& context,
 static AnyVar object_select_hull(MethodContext const& context,
                                  Vec3ListArg          point_list,
                                  IntListArg           index_list,
-                                 BoolArg              select) {
+                                 IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -483,10 +480,8 @@ static AnyVar object_select_hull(MethodContext const& context,
         throw MethodException(ErrorCodes::INVALID_PARAMS, "Indicies should be");
     }
 
-    cb->select_hull(point_list,
-                    index_list.list.span(),
-                    *select ? ObjectCallbacks::SELECT
-                            : ObjectCallbacks::DESELECT);
+    cb->select_hull(
+        point_list, index_list.list.span(), decode_selection_action(*select));
 
     return {};
 }

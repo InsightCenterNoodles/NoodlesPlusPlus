@@ -113,6 +113,10 @@ Vec4Arg::Vec4Arg(AnyVarRef const& a) {
     this->emplace(l[0], l[1], l[2], l[3]);
 }
 
+IntArg::IntArg(AnyVarRef const& a) {
+    if (a.has_int()) { this->emplace(a.to_int()); }
+}
+
 BoolArg::BoolArg(AnyVarRef const& a) {
     if (!a.has_int()) return;
 
