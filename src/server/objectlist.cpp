@@ -31,8 +31,6 @@ public:
 
 ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
     : ComponentMixin(id, host), m_data(d) {
-    m_method_search = m_data.method_list;
-    m_signal_search = m_data.signal_list;
 
     if (m_data.create_callbacks) {
         m_callback = m_data.create_callbacks(this);
@@ -42,7 +40,7 @@ ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
         auto doc = get_document(m_parent_list->m_server);
 
         auto add_bt = [this, &doc](BuiltinMethods b) {
-            m_method_search.insert(doc->get_builtin(b));
+            m_data.method_list.push_back(doc->get_builtin(b));
         };
 
         if (enabled.activation) {
@@ -86,6 +84,10 @@ ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
                     &ObjectT::on_signal_attention_anno);
         }
     }
+
+
+    m_method_search = m_data.method_list;
+    m_signal_search = m_data.signal_list;
 }
 
 static std::vector<noodles::Mat4>
