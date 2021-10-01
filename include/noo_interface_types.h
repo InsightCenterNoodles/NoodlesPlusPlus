@@ -162,6 +162,11 @@ struct BoolArg {
     bool operator*() const { return state == 1; }
 };
 
+struct BoundingBox {
+    glm::vec3 aabb_min;
+    glm::vec3 aabb_max;
+};
+
 
 } // namespace noo
 

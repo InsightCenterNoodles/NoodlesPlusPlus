@@ -61,11 +61,6 @@ static ObjectDelegate* lookup(ClientState&               state,
 
 // =============================================================================
 
-#define EXIST_EXE(NPTR, OP)                                                    \
-    if (NPTR) {                                                                \
-        auto& VALUE = *NPTR;                                                   \
-        OP                                                                     \
-    }
 
 template <class U>
 auto make_v(ClientState& state, U const& arr) {
@@ -132,6 +127,13 @@ void MessageHandler::process_message(noodles::SignalDelete const& m) {
 
     m_state.signal_list().handle_delete(at);
 }
+
+#define EXIST_EXE(NPTR, OP)                                                    \
+    if (NPTR) {                                                                \
+        auto& VALUE = *NPTR;                                                   \
+        OP                                                                     \
+    }
+
 void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
     qDebug() << Q_FUNC_INFO << at.to_qstring();
@@ -142,30 +144,73 @@ void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
     EXIST_EXE(m.parent(), { od.parent = lookup(m_state, VALUE); })
     EXIST_EXE(m.transform(), { od.transform = noo::convert(VALUE); })
 
-    EXIST_EXE(m.material(), { od.material = lookup(m_state, VALUE); })
-    EXIST_EXE(m.mesh(), { od.mesh = lookup(m_state, VALUE); })
+    if (m.definition()) {
+        auto& def = od.definition.emplace();
+
+        switch (m.definition_type()) {
+        case noodles::ObjectDefinition::EmptyDefinition:
+            def = std::monostate();
+            break;
+        case noodles::ObjectDefinition::TextDefinition: {
+            auto* v  = m.definition_as_TextDefinition();
+            auto& ot = def.emplace<ObjectTextDefinition>();
+
+            ot.text   = v->text()->c_str();
+            ot.font   = v->font()->c_str();
+            ot.height = v->height();
+            ot.width  = v->width();
+            break;
+        }
+        case noodles::ObjectDefinition::WebpageDefinition: {
+            auto* v  = m.definition_as_WebpageDefinition();
+            auto& ot = def.emplace<ObjectWebpageDefinition>();
+
+            ot.url    = QUrl(v->url()->c_str());
+            ot.height = v->height();
+            ot.width  = v->width();
+
+            break;
+        }
+        case noodles::ObjectDefinition::RenderableDefinition: {
+            auto* v  = m.definition_as_RenderableDefinition();
+            auto& ot = def.emplace<ObjectRenderableDefinition>();
+
+            ot.material = lookup(m_state, *(v->material()));
+            ot.mesh     = lookup(m_state, *(v->mesh()));
+
+            if (v->instances()) {
+                auto* inst_v = v->instances();
+                if (inst_v->size() > 0) {
+                    static_assert(sizeof(glm::mat4) == sizeof(noodles::Mat4));
+
+                    assert(inst_v->Data());
+
+                    auto const* lm =
+                        reinterpret_cast<glm::mat4 const*>(inst_v->Data());
+
+                    ot.instances =
+                        std::span<glm::mat4 const>(lm, inst_v->size());
+                }
+            }
+
+            if (v->instance_bb()) {
+                ot.instance_bb = noo::convert(*v->instance_bb());
+            }
+
+
+            break;
+        }
+
+        default: def = std::monostate();
+        }
+    }
 
     EXIST_EXE(m.lights(), { od.lights = make_v(m_state, VALUE); })
     EXIST_EXE(m.tables(), { od.tables = make_v(m_state, VALUE); })
 
-    EXIST_EXE(m.instances(), {
-        if (VALUE.size() == 0) {
-            od.instances = std::span<glm::mat4 const>();
-        } else {
-            static_assert(sizeof(glm::mat4) == sizeof(noodles::Mat4));
+    EXIST_EXE(m.influence(), { od.influence = noo::convert(VALUE); })
+    EXIST_EXE(m.visibility(), { od.visibility = VALUE.visible(); })
 
-            assert(VALUE.Data());
-
-            auto const* lm = reinterpret_cast<glm::mat4 const*>(VALUE.Data());
-
-            od.instances =
-                std::span<glm::mat4 const>(lm, m.instances()->size());
-
-            //            for (auto const& mat : *(od.instances)) {
-            //                qDebug() << mat[0][0];
-            //            }
-        }
-    })
 
     EXIST_EXE(m.tags(), {
         std::vector<std::string_view> t;
@@ -179,15 +224,6 @@ void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
 
     EXIST_EXE(m.methods_list(), { od.method_list = make_v(m_state, VALUE); })
     EXIST_EXE(m.signals_list(), { od.signal_list = make_v(m_state, VALUE); })
-
-    EXIST_EXE(m.text(), {
-        ObjectText& ot = od.text.emplace();
-
-        ot.text   = VALUE.text()->c_str();
-        ot.font   = VALUE.font()->c_str();
-        ot.height = VALUE.height();
-        ot.width  = VALUE.opt_width();
-    })
 
     m_state.object_list().handle_new(at, std::move(od));
 }
@@ -285,8 +321,7 @@ void MessageHandler::process_message(noodles::GeometryCreate const& m) {
 
     MeshData md;
 
-    EXIST_EXE(m.min_extent(), md.extent_min = noo::convert(VALUE););
-    EXIST_EXE(m.max_extent(), md.extent_max = noo::convert(VALUE););
+    EXIST_EXE(m.extent(), md.extent = noo::convert(VALUE););
 
     EXIST_EXE(m.positions(), md.positions = convert(m_state, VALUE););
     EXIST_EXE(m.normals(), md.normals = convert(m_state, VALUE););

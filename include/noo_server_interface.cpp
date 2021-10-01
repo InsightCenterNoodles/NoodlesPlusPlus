@@ -136,12 +136,12 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
         extent_max = glm::max(extent_max, p);
     }
 
-    ret.extent_min = extent_min;
-    ret.extent_max = extent_max;
+    ret.bounding_box = { extent_min, extent_max };
 
-    qDebug() << "Mesh extents" << ret.extent_min.x << ret.extent_min.y
-             << ret.extent_min.z << "|" << ret.extent_max.x << ret.extent_max.y
-             << ret.extent_max.z;
+    //    qDebug() << "Mesh extents" << ret.extent_min.x << ret.extent_min.y
+    //             << ret.extent_min.z << "|" << ret.extent_max.x <<
+    //             ret.extent_max.y
+    //             << ret.extent_max.z;
 
     // compute cell size
     const size_t cell_byte_size =
@@ -334,8 +334,7 @@ MeshData::MeshData(PackedMeshDataResult const& res, BufferTPtr ptr) {
         qDebug() << d.start << d.stride << d.size;
     };
 
-    extent_min = res.extent_min;
-    extent_max = res.extent_max;
+    bounding_box = res.bounding_box;
 
     positions.buffer = ptr;
     positions.start  = res.positions.start;

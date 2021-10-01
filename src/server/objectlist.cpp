@@ -3,6 +3,7 @@
 #include "noodlesserver.h"
 #include "noodlesstate.h"
 #include "serialize.h"
+#include "src/common/variant_tools.h"
 #include "src/generated/interface_tools.h"
 
 namespace noo {
@@ -18,15 +19,15 @@ public:
     bool name        = false;
     bool parent      = false;
     bool transform   = false;
-    bool material    = false;
-    bool mesh        = false;
+    bool definition  = false;
     bool lights      = false;
     bool tables      = false;
     bool instances   = false;
     bool tags        = false;
     bool method_list = false;
     bool signal_list = false;
-    bool text        = false;
+    bool influence   = false;
+    bool visibility  = false;
 };
 
 ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
@@ -113,26 +114,62 @@ void ObjectT::update_common(ObjectTUpdateHelper const& opt, Writer& w) {
     auto lid = convert_id(id(), w);
 
 
-    std::optional<flatbuffers::Offset<noodles::ObjectID>>   update_parent;
-    std::optional<noodles::Mat4>                            update_transform;
-    std::optional<flatbuffers::Offset<noodles::MaterialID>> update_material;
-    std::optional<flatbuffers::Offset<noodles::GeometryID>> update_mesh;
-    std::optional<OffsetList<noodles::LightID>>             update_lights;
-    std::optional<OffsetList<noodles::TableID>>             update_tables;
-    std::optional<std::vector<noodles::Mat4>>               update_instances;
+    std::optional<flatbuffers::Offset<noodles::ObjectID>> update_parent;
+    std::optional<noodles::Mat4>                          update_transform;
+
+    std::optional<flatbuffers::Offset<void>> update_definition;
+    noodles::ObjectDefinition definition_type = noodles::ObjectDefinition::NONE;
+
+    std::optional<OffsetList<noodles::LightID>> update_lights;
+    std::optional<OffsetList<noodles::TableID>> update_tables;
+    std::optional<std::vector<noodles::Mat4>>   update_instances;
     std::optional<std::vector<flatbuffers::Offset<flatbuffers::String>>>
                                                  update_tags;
     std::optional<OffsetList<noodles::MethodID>> update_methods_list;
     std::optional<OffsetList<noodles::SignalID>> update_signals_list;
-    std::optional<flatbuffers::Offset<noodles::TextDefinition>> update_text;
+
+    std::optional<noodles::BoundingBox>      update_inf;
+    std::optional<noodles::ObjectVisibility> update_vis;
 
     if (opt.parent) { update_parent = convert_id(m_data.parent, w); }
     if (opt.transform) { update_transform = convert(m_data.transform); }
-    if (opt.material) { update_material = convert_id(m_data.material, w); }
-    if (opt.mesh) { update_mesh = convert_id(m_data.mesh, w); }
+
+    if (opt.definition) {
+        VMATCH(
+            m_data.definition,
+            VCASE(std::monostate) {
+                auto def = noodles::CreateEmptyDefinition(w);
+
+                update_definition = def.Union();
+                definition_type   = noodles::ObjectDefinition::EmptyDefinition;
+            },
+            VCASE(ObjectTextDefinition const& t) {
+                auto def = noodles::CreateTextDefinitionDirect(
+                    w, t.text.c_str(), t.font.c_str(), t.height, t.width);
+                update_definition = def.Union();
+                definition_type   = noodles::ObjectDefinition::TextDefinition;
+            },
+            VCASE(ObjectWebpageDefinition const& t) {
+                auto url = t.url.toString().toStdString();
+                auto def = noodles::CreateWebpageDefinitionDirect(
+                    w, url.c_str(), t.height, t.width);
+                update_definition = def.Union();
+                definition_type = noodles::ObjectDefinition::WebpageDefinition;
+            },
+            VCASE(ObjectRenderableDefinition const& t) {
+                auto mat       = convert_id(t.material, w);
+                auto mesh      = convert_id(t.mesh, w);
+                auto inst_list = make_inst_list(t.instances);
+                auto def       = noodles::CreateRenderableDefinitionDirect(
+                    w, mat, mesh, &inst_list, nullptr);
+                update_definition = def.Union();
+                definition_type =
+                    noodles::ObjectDefinition::RenderableDefinition;
+            });
+    }
+
     if (opt.lights) { update_lights = make_id_list(m_data.lights, w); }
     if (opt.tables) { update_tables = make_id_list(m_data.tables, w); }
-    if (opt.instances) { update_instances = make_inst_list(m_data.instances); }
     if (opt.tags) {
         auto& ret = update_tags.emplace();
         for (auto const& s : m_data.tags) {
@@ -146,13 +183,11 @@ void ObjectT::update_common(ObjectTUpdateHelper const& opt, Writer& w) {
         update_signals_list = make_id_list(m_data.signal_list, w);
     }
 
-    if (opt.text and m_data.text) {
-        update_text =
-            noodles::CreateTextDefinitionDirect(w,
-                                                m_data.text->text.c_str(),
-                                                m_data.text->font.c_str(),
-                                                m_data.text->height,
-                                                m_data.text->width);
+    if (opt.influence) { update_inf = convert(*m_data.influence); }
+
+    if (opt.visibility) {
+        auto& v = update_vis.emplace();
+        v.mutate_visible(m_data.visibility);
     }
 
     auto opt_or    = [](auto& o) { return o ? &o.value() : nullptr; };
@@ -169,15 +204,15 @@ void ObjectT::update_common(ObjectTUpdateHelper const& opt, Writer& w) {
         opt.name ? m_data.name.c_str() : nullptr,
         id_opt_or(update_parent),
         opt_or(update_transform),
-        id_opt_or(update_material),
-        id_opt_or(update_mesh),
+        definition_type,
+        update_definition ? *update_definition : 0,
         opt_or(update_lights),
         opt_or(update_tables),
-        opt_or(update_instances),
         opt_or(update_tags),
         opt_or(update_methods_list),
         opt_or(update_signals_list),
-        update_text.value_or(flatbuffers::Offset<noodles::TextDefinition>()));
+        opt_or(update_inf),
+        opt_or(update_vis));
 
     w.complete_message(x);
 }
@@ -188,21 +223,20 @@ void ObjectT::write_new_to(Writer& w) {
     update_opts.name        = true;
     update_opts.parent      = true;
     update_opts.transform   = true;
-    update_opts.material    = true;
-    update_opts.mesh        = true;
+    update_opts.definition  = true;
     update_opts.lights      = true;
     update_opts.tables      = true;
-    update_opts.instances   = true;
     update_opts.tags        = true;
     update_opts.method_list = true;
     update_opts.signal_list = true;
-    update_opts.text        = true;
+    update_opts.influence   = true;
+    update_opts.visibility  = true;
 
     update_common(update_opts, w);
 }
 
-// moving from an optional does NOT reset the optional! we can thus use it as
-// change flags
+// moving from an optional does NOT reset the optional! we can thus use it
+// as change flags
 
 #define CHECK_UPDATE(FLD)                                                      \
     {                                                                          \
@@ -218,15 +252,14 @@ void ObjectT::update(ObjectUpdateData& data, Writer& w) {
     CHECK_UPDATE(name)
     CHECK_UPDATE(parent)
     CHECK_UPDATE(transform)
-    CHECK_UPDATE(material)
-    CHECK_UPDATE(mesh)
+    CHECK_UPDATE(definition)
     CHECK_UPDATE(lights)
     CHECK_UPDATE(tables)
-    CHECK_UPDATE(instances)
     CHECK_UPDATE(tags)
     CHECK_UPDATE(method_list)
     CHECK_UPDATE(signal_list)
-    CHECK_UPDATE(text)
+    CHECK_UPDATE(influence)
+    CHECK_UPDATE(visibility)
 
     if (update_opts.method_list) { m_method_search = m_data.method_list; }
     if (update_opts.signal_list) { m_signal_search = m_data.signal_list; }

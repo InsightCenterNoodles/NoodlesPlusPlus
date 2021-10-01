@@ -62,6 +62,9 @@ write_to(AnyID const& anyid, flatbuffers::FlatBufferBuilder& b) {
         VCASE(MethodID id) {
             return set_from<noodles::MethodID>(noodles::CreateMethodID, id, b);
         },
+        VCASE(PlotID id) {
+            return set_from<noodles::PlotID>(noodles::CreatePlotID, id, b);
+        },
 
     );
 }
@@ -221,6 +224,19 @@ glm::mat4 convert(::noodles::Mat4 const& m) {
 
     memcpy(&ret, &m, sizeof(glm::mat4));
 
+    return ret;
+}
+
+::noo::BoundingBox convert(::noodles::BoundingBox const& bb) {
+    static_assert(sizeof(::noodles::BoundingBox) == sizeof(::noo::BoundingBox));
+    ::noo::BoundingBox ret;
+    memcpy(&ret, &bb, sizeof(ret));
+    return ret;
+}
+::noodles::BoundingBox convert(::noo::BoundingBox const& bb) {
+    static_assert(sizeof(::noodles::BoundingBox) == sizeof(::noo::BoundingBox));
+    ::noodles::BoundingBox ret;
+    memcpy(&ret, &bb, sizeof(ret));
     return ret;
 }
 
@@ -405,6 +421,10 @@ flatbuffers::Offset<::noodles::MethodID>
 convert_id(MethodID id, flatbuffers::FlatBufferBuilder& b) {
     return noodles::CreateMethodID(b, id.id_slot, id.id_gen);
 }
+flatbuffers::Offset<::noodles::PlotID>
+convert_id(PlotID id, flatbuffers::FlatBufferBuilder& b) {
+    return noodles::CreatePlotID(b, id.id_slot, id.id_gen);
+}
 
 
 TextureID convert_id(::noodles::TextureID const& id) {
@@ -432,6 +452,9 @@ SignalID convert_id(::noodles::SignalID const& id) {
     return { id.id_slot(), id.id_gen() };
 }
 MethodID convert_id(::noodles::MethodID const& id) {
+    return { id.id_slot(), id.id_gen() };
+}
+PlotID convert_id(::noodles::PlotID const& id) {
     return { id.id_slot(), id.id_gen() };
 }
 
@@ -468,6 +491,10 @@ SignalID convert_id(::noodles::SignalID const* p) {
     return {};
 }
 MethodID convert_id(::noodles::MethodID const* p) {
+    if (p) return convert_id(*p);
+    return {};
+}
+PlotID convert_id(::noodles::PlotID const* p) {
     if (p) return convert_id(*p);
     return {};
 }

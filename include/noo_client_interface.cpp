@@ -49,7 +49,7 @@ void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
         return complete({}, &exception);
     }
 
-    qDebug() << "Invoking" << noo::to_qstring(m_method->name());
+    // qDebug() << "Invoking" << noo::to_qstring(m_method->name());
 
     VMATCH(
         m_context,

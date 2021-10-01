@@ -68,6 +68,7 @@ struct TextureIDTag;
 struct BufferIDTag;
 struct MethodIDTag;
 struct SignalIDTag;
+struct PlotIDTag;
 
 // Typedefs for used ID types
 using TextureID  = ID<TextureIDTag>;
@@ -79,6 +80,7 @@ using MeshID     = ID<MeshIDTag>;
 using ObjectID   = ID<ObjectIDTag>;
 using SignalID   = ID<SignalIDTag>;
 using MethodID   = ID<MethodIDTag>;
+using PlotID     = ID<PlotIDTag>;
 
 template <>
 struct TagToString<ObjectIDTag> {
@@ -116,6 +118,11 @@ template <>
 struct TagToString<SignalIDTag> {
     static constexpr const char* str = "Signal";
 };
+template <>
+struct TagToString<PlotIDTag> {
+    static constexpr const char* str = "Plot";
+};
+
 
 ///
 /// \brief The AnyID struct models the NOODLES Any type
@@ -129,7 +136,8 @@ struct AnyID : public std::variant<std::monostate,
                                    MeshID,
                                    ObjectID,
                                    SignalID,
-                                   MethodID> {
+                                   MethodID,
+                                   PlotID> {
     using variant::variant;
 };
 

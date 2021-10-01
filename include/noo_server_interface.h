@@ -290,8 +290,7 @@ struct BufferMeshDataRef {
 /// buffer.
 ///
 struct PackedMeshDataResult {
-    glm::vec3 extent_min;
-    glm::vec3 extent_max;
+    BoundingBox bounding_box;
 
     struct Ref {
         size_t start  = 0;
@@ -423,8 +422,7 @@ struct ComponentRef {
 /// components
 ///
 struct MeshData {
-    glm::vec3 extent_min;
-    glm::vec3 extent_max;
+    BoundingBox bounding_box;
 
     ComponentRef                positions;
     std::optional<ComponentRef> normals;
@@ -639,36 +637,53 @@ struct ObjectTextDefinition {
     float       width = -1;
 };
 
+struct ObjectWebpageDefinition {
+    QUrl  url;
+    float height;
+    float width;
+};
+
+struct ObjectRenderableDefinition {
+    MaterialTPtr               material;
+    MeshTPtr                   mesh;
+    std::vector<glm::mat4>     instances;
+    std::optional<BoundingBox> instance_bb;
+};
+
+using ObjectDefinition = std::variant<std::monostate,
+                                      ObjectTextDefinition,
+                                      ObjectWebpageDefinition,
+                                      ObjectRenderableDefinition>;
+
+
 struct ObjectData {
-    ObjectTPtr                          parent;
-    std::string                         name;
-    glm::mat4                           transform = glm::mat4(1);
-    MaterialTPtr                        material;
-    MeshTPtr                            mesh;
-    std::vector<LightTPtr>              lights;
-    std::vector<TableTPtr>              tables;
-    std::vector<glm::mat4>              instances;
-    std::vector<std::string>            tags;
-    std::vector<MethodTPtr>             method_list;
-    std::vector<SignalTPtr>             signal_list;
-    std::optional<ObjectTextDefinition> text;
+    ObjectTPtr                 parent;
+    std::string                name;
+    glm::mat4                  transform = glm::mat4(1);
+    ObjectDefinition           definition;
+    std::vector<LightTPtr>     lights;
+    std::vector<TableTPtr>     tables;
+    std::vector<std::string>   tags;
+    std::vector<MethodTPtr>    method_list;
+    std::vector<SignalTPtr>    signal_list;
+    std::optional<BoundingBox> influence;
+    bool                       visibility = true;
 
     std::function<std::unique_ptr<ObjectCallbacks>(ObjectT*)> create_callbacks;
 };
 
 struct ObjectUpdateData {
-    std::optional<ObjectTPtr>               parent;
-    std::optional<std::string>              name;
-    std::optional<glm::mat4>                transform;
-    std::optional<MaterialTPtr>             material;
-    std::optional<MeshTPtr>                 mesh;
-    std::optional<std::vector<LightTPtr>>   lights;
-    std::optional<std::vector<TableTPtr>>   tables;
-    std::optional<std::vector<glm::mat4>>   instances;
-    std::optional<std::vector<std::string>> tags;
-    std::optional<std::vector<MethodTPtr>>  method_list;
-    std::optional<std::vector<SignalTPtr>>  signal_list;
-    std::optional<ObjectTextDefinition>     text;
+    std::optional<ObjectTPtr>                 parent;
+    std::optional<std::string>                name;
+    std::optional<glm::mat4>                  transform;
+    std::optional<ObjectDefinition>           definition;
+    std::optional<std::vector<LightTPtr>>     lights;
+    std::optional<std::vector<TableTPtr>>     tables;
+    std::optional<std::vector<std::string>>   tags;
+    std::optional<std::vector<MethodTPtr>>    method_list;
+    std::optional<std::vector<SignalTPtr>>    signal_list;
+    std::optional<std::optional<BoundingBox>> influence;
+    std::optional<bool>                       visibility;
 };
 
 ObjectTPtr create_object(DocumentTPtrRef, ObjectData const&);

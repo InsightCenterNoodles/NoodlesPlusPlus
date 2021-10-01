@@ -11,6 +11,9 @@ namespace noodles {
 struct ObjectID;
 struct ObjectIDBuilder;
 
+struct PlotID;
+struct PlotIDBuilder;
+
 struct TableID;
 struct TableIDBuilder;
 
@@ -76,10 +79,14 @@ struct Vec4;
 
 struct Mat4;
 
+struct BoundingBox;
+
 struct BufferRef;
 struct BufferRefBuilder;
 
 inline const flatbuffers::TypeTable *ObjectIDTypeTable();
+
+inline const flatbuffers::TypeTable *PlotIDTypeTable();
 
 inline const flatbuffers::TypeTable *TableIDTypeTable();
 
@@ -126,6 +133,8 @@ inline const flatbuffers::TypeTable *Vec3TypeTable();
 inline const flatbuffers::TypeTable *Vec4TypeTable();
 
 inline const flatbuffers::TypeTable *Mat4TypeTable();
+
+inline const flatbuffers::TypeTable *BoundingBoxTypeTable();
 
 inline const flatbuffers::TypeTable *BufferRefTypeTable();
 
@@ -496,6 +505,38 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) Mat4 FLATBUFFERS_FINAL_CLASS {
 };
 FLATBUFFERS_STRUCT_END(Mat4, 64);
 
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) BoundingBox FLATBUFFERS_FINAL_CLASS {
+ private:
+  noodles::Vec3 aabb_min_;
+  noodles::Vec3 aabb_max_;
+
+ public:
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return BoundingBoxTypeTable();
+  }
+  BoundingBox()
+      : aabb_min_(),
+        aabb_max_() {
+  }
+  BoundingBox(const noodles::Vec3 &_aabb_min, const noodles::Vec3 &_aabb_max)
+      : aabb_min_(_aabb_min),
+        aabb_max_(_aabb_max) {
+  }
+  const noodles::Vec3 &aabb_min() const {
+    return aabb_min_;
+  }
+  noodles::Vec3 &mutable_aabb_min() {
+    return aabb_min_;
+  }
+  const noodles::Vec3 &aabb_max() const {
+    return aabb_max_;
+  }
+  noodles::Vec3 &mutable_aabb_max() {
+    return aabb_max_;
+  }
+};
+FLATBUFFERS_STRUCT_END(BoundingBox, 24);
+
 struct ObjectID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef ObjectIDBuilder Builder;
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
@@ -551,6 +592,66 @@ inline flatbuffers::Offset<ObjectID> CreateObjectID(
     uint32_t id_slot = 0,
     uint32_t id_gen = 0) {
   ObjectIDBuilder builder_(_fbb);
+  builder_.add_id_gen(id_gen);
+  builder_.add_id_slot(id_slot);
+  return builder_.Finish();
+}
+
+struct PlotID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef PlotIDBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return PlotIDTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ID_SLOT = 4,
+    VT_ID_GEN = 6
+  };
+  uint32_t id_slot() const {
+    return GetField<uint32_t>(VT_ID_SLOT, 0);
+  }
+  bool mutate_id_slot(uint32_t _id_slot) {
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+  }
+  uint32_t id_gen() const {
+    return GetField<uint32_t>(VT_ID_GEN, 0);
+  }
+  bool mutate_id_gen(uint32_t _id_gen) {
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_ID_SLOT) &&
+           VerifyField<uint32_t>(verifier, VT_ID_GEN) &&
+           verifier.EndTable();
+  }
+};
+
+struct PlotIDBuilder {
+  typedef PlotID Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_id_slot(uint32_t id_slot) {
+    fbb_.AddElement<uint32_t>(PlotID::VT_ID_SLOT, id_slot, 0);
+  }
+  void add_id_gen(uint32_t id_gen) {
+    fbb_.AddElement<uint32_t>(PlotID::VT_ID_GEN, id_gen, 0);
+  }
+  explicit PlotIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<PlotID> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<PlotID>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<PlotID> CreatePlotID(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t id_slot = 0,
+    uint32_t id_gen = 0) {
+  PlotIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
   return builder_.Finish();
@@ -2086,6 +2187,21 @@ inline const flatbuffers::TypeTable *ObjectIDTypeTable() {
   return &tt;
 }
 
+inline const flatbuffers::TypeTable *PlotIDTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_UINT, 0, -1 },
+    { flatbuffers::ET_UINT, 0, -1 }
+  };
+  static const char * const names[] = {
+    "id_slot",
+    "id_gen"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
 inline const flatbuffers::TypeTable *TableIDTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_UINT, 0, -1 },
@@ -2443,6 +2559,25 @@ inline const flatbuffers::TypeTable *Mat4TypeTable() {
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_STRUCT, 4, type_codes, type_refs, nullptr, values, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *BoundingBoxTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    noodles::Vec3TypeTable
+  };
+  static const int64_t values[] = { 0, 12, 24 };
+  static const char * const names[] = {
+    "aabb_min",
+    "aabb_max"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_STRUCT, 2, type_codes, type_refs, nullptr, values, names
   };
   return &tt;
 }

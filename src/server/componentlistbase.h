@@ -109,8 +109,8 @@ public:
     }
 
     void mark_free(IDType id) {
-        qDebug() << typeid(Derived).name() << "Marking free" << id.id_slot
-                 << id.id_gen;
+        // qDebug() << typeid(Derived).name() << "Marking free" << id.id_slot
+        //         << id.id_gen;
         auto& slot = m_list.at(id.id_slot);
 
         auto ptr = slot.lock();

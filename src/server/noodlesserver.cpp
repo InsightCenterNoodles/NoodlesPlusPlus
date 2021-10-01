@@ -17,8 +17,8 @@ class IncomingMessage {
     noodles::ClientMessages const* m_messages = nullptr;
 
 public:
-    IncomingMessage(QByteArray bytes) {
-        qDebug() << Q_FUNC_INFO << bytes.size();
+    IncomingMessage(QByteArray bytes, bool debug) {
+        if (debug) qDebug() << Q_FUNC_INFO << bytes.size();
 
         // need to hold onto where our data is coming from
         // as the reader uses refs to it.
@@ -28,10 +28,10 @@ public:
             flatbuffers::Verifier v((uint8_t*)bytes.data(), bytes.size());
 
             if (!noodles::VerifyClientMessagesBuffer(v)) {
-                qCritical() << "Bad message!";
+                qCritical() << "Unable to verify message from client!";
                 return;
             }
-            qDebug() << "Message verified";
+            if (debug) qDebug() << "Message verified";
         }
 
         m_messages = noodles::GetClientMessages(m_data_ref.data());
@@ -44,8 +44,8 @@ public:
 
 // =============================================================================
 
-ClientT::ClientT(QWebSocket* socket, QObject* parent)
-    : QObject(parent), m_socket(socket) {
+ClientT::ClientT(QWebSocket* socket, QObject* parent, bool debug)
+    : QObject(parent), m_socket(socket), m_debug(debug) {
     socket->setParent(this);
     connect(socket, &QWebSocket::disconnected, this, &ClientT::finished);
 
@@ -65,7 +65,7 @@ void ClientT::on_text(QString text) {
 
 void ClientT::on_binary(QByteArray array) {
 
-    auto ptr = std::make_shared<IncomingMessage>(array);
+    auto ptr = std::make_shared<IncomingMessage>(array, m_debug);
 
     if (!ptr->get_root()) {
         qCritical() << "Bad message from ClientT" << this;
@@ -79,7 +79,8 @@ void ClientT::on_binary(QByteArray array) {
 
 void ClientT::set_name(std::string const& s) {
     m_name = QString::fromStdString(s);
-    qDebug() << "Identifying ClientT" << m_socket << "as" << m_name;
+    if (m_debug)
+        qDebug() << "Identifying ClientT" << m_socket << "as" << m_name;
 }
 
 void ClientT::kill() {
@@ -158,9 +159,10 @@ void ServerT::broadcast(QByteArray ptr) {
 void ServerT::on_new_connection() {
     QWebSocket* socket = m_socket_server->nextPendingConnection();
 
-    ClientT* client = new ClientT(socket, this);
+    ClientT* client = new ClientT(socket, this, m_debug);
 
-    qDebug() << Q_FUNC_INFO << client;
+    // qDebug() << Q_FUNC_INFO << client;
+    qInfo() << "New client:" << socket->origin();
 
     connect(client, &ClientT::finished, this, &ServerT::on_client_done);
     connect(client, &ClientT::message_recvd, this, &ServerT::on_client_message);
@@ -173,7 +175,7 @@ void ServerT::on_client_done() {
 
     if (!c) return;
 
-    qDebug() << Q_FUNC_INFO << c;
+    // qDebug() << Q_FUNC_INFO << c;
 
     m_connected_clients.remove(c);
 
@@ -502,8 +504,11 @@ public:
             }
 
 
+        } catch (std::exception const& e) {
+            qCritical() << "Internal exception while handling client message!"
+                        << e.what();
         } catch (...) {
-            qCritical() << "Exception while handling client message!";
+            qCritical() << "Internal exception while handling client message!";
         }
     }
 };
@@ -514,7 +519,8 @@ void ServerT::on_client_message(std::shared_ptr<IncomingMessage> ptr) {
     assert(ptr);
 
     ClientT* c = qobject_cast<ClientT*>(sender());
-    qDebug() << Q_FUNC_INFO << c;
+
+    if (debug_mode()) qDebug() << Q_FUNC_INFO << c;
 
     if (!c) return;
 

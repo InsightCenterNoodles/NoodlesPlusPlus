@@ -37,14 +37,12 @@ void MeshT::write_new_to(Writer& w) {
 
     auto lid = convert_id(id(), w);
 
-    auto lem = convert(m_data.extent_min);
-    auto lea = convert(m_data.extent_max);
+    auto bb = convert(m_data.bounding_box);
 
     auto x = noodles::CreateGeometryCreate(
         w,
         lid,
-        &lem,
-        &lea,
+        &bb,
         conditional_comp_ref(m_data.positions, w),
         conditional_comp_ref(m_data.normals, w),
         conditional_comp_ref(m_data.textures, w),

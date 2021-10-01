@@ -27,11 +27,12 @@ class ClientT : public QObject {
 
     QString     m_name;
     QWebSocket* m_socket;
+    bool        m_debug;
 
     size_t m_bytes_counter = 0;
 
 public:
-    ClientT(QWebSocket*, QObject*);
+    ClientT(QWebSocket*, QObject*, bool debug);
     ~ClientT();
 
     void set_name(std::string const&);

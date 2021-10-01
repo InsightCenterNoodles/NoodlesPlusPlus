@@ -25,14 +25,37 @@ struct SignalCreateBuilder;
 struct SignalDelete;
 struct SignalDeleteBuilder;
 
+struct EmptyDefinition;
+struct EmptyDefinitionBuilder;
+
 struct TextDefinition;
 struct TextDefinitionBuilder;
+
+struct WebpageDefinition;
+struct WebpageDefinitionBuilder;
+
+struct RenderableDefinition;
+struct RenderableDefinitionBuilder;
+
+struct ObjectVisibility;
 
 struct ObjectCreateUpdate;
 struct ObjectCreateUpdateBuilder;
 
 struct ObjectDelete;
 struct ObjectDeleteBuilder;
+
+struct SimplePlot;
+struct SimplePlotBuilder;
+
+struct URLPlot;
+struct URLPlotBuilder;
+
+struct PlotCreateUpdate;
+struct PlotCreateUpdateBuilder;
+
+struct PlotDelete;
+struct PlotDeleteBuilder;
 
 struct BufferCreate;
 struct BufferCreateBuilder;
@@ -104,11 +127,27 @@ inline const flatbuffers::TypeTable *SignalCreateTypeTable();
 
 inline const flatbuffers::TypeTable *SignalDeleteTypeTable();
 
+inline const flatbuffers::TypeTable *EmptyDefinitionTypeTable();
+
 inline const flatbuffers::TypeTable *TextDefinitionTypeTable();
+
+inline const flatbuffers::TypeTable *WebpageDefinitionTypeTable();
+
+inline const flatbuffers::TypeTable *RenderableDefinitionTypeTable();
+
+inline const flatbuffers::TypeTable *ObjectVisibilityTypeTable();
 
 inline const flatbuffers::TypeTable *ObjectCreateUpdateTypeTable();
 
 inline const flatbuffers::TypeTable *ObjectDeleteTypeTable();
+
+inline const flatbuffers::TypeTable *SimplePlotTypeTable();
+
+inline const flatbuffers::TypeTable *URLPlotTypeTable();
+
+inline const flatbuffers::TypeTable *PlotCreateUpdateTypeTable();
+
+inline const flatbuffers::TypeTable *PlotDeleteTypeTable();
 
 inline const flatbuffers::TypeTable *BufferCreateTypeTable();
 
@@ -149,6 +188,146 @@ inline const flatbuffers::TypeTable *MethodReplyTypeTable();
 inline const flatbuffers::TypeTable *ServerMessageTypeTable();
 
 inline const flatbuffers::TypeTable *ServerMessagesTypeTable();
+
+enum class ObjectDefinition : uint8_t {
+  NONE = 0,
+  EmptyDefinition = 1,
+  TextDefinition = 2,
+  WebpageDefinition = 3,
+  RenderableDefinition = 4,
+  MIN = NONE,
+  MAX = RenderableDefinition
+};
+
+inline const ObjectDefinition (&EnumValuesObjectDefinition())[5] {
+  static const ObjectDefinition values[] = {
+    ObjectDefinition::NONE,
+    ObjectDefinition::EmptyDefinition,
+    ObjectDefinition::TextDefinition,
+    ObjectDefinition::WebpageDefinition,
+    ObjectDefinition::RenderableDefinition
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesObjectDefinition() {
+  static const char * const names[6] = {
+    "NONE",
+    "EmptyDefinition",
+    "TextDefinition",
+    "WebpageDefinition",
+    "RenderableDefinition",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameObjectDefinition(ObjectDefinition e) {
+  if (flatbuffers::IsOutRange(e, ObjectDefinition::NONE, ObjectDefinition::RenderableDefinition)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesObjectDefinition()[index];
+}
+
+template<typename T> struct ObjectDefinitionTraits {
+  static const ObjectDefinition enum_value = ObjectDefinition::NONE;
+};
+
+template<> struct ObjectDefinitionTraits<noodles::EmptyDefinition> {
+  static const ObjectDefinition enum_value = ObjectDefinition::EmptyDefinition;
+};
+
+template<> struct ObjectDefinitionTraits<noodles::TextDefinition> {
+  static const ObjectDefinition enum_value = ObjectDefinition::TextDefinition;
+};
+
+template<> struct ObjectDefinitionTraits<noodles::WebpageDefinition> {
+  static const ObjectDefinition enum_value = ObjectDefinition::WebpageDefinition;
+};
+
+template<> struct ObjectDefinitionTraits<noodles::RenderableDefinition> {
+  static const ObjectDefinition enum_value = ObjectDefinition::RenderableDefinition;
+};
+
+bool VerifyObjectDefinition(flatbuffers::Verifier &verifier, const void *obj, ObjectDefinition type);
+bool VerifyObjectDefinitionVector(flatbuffers::Verifier &verifier, const flatbuffers::Vector<flatbuffers::Offset<void>> *values, const flatbuffers::Vector<uint8_t> *types);
+
+enum class PlotType : uint8_t {
+  NONE = 0,
+  SimplePlot = 1,
+  URLPlot = 2,
+  MIN = NONE,
+  MAX = URLPlot
+};
+
+inline const PlotType (&EnumValuesPlotType())[3] {
+  static const PlotType values[] = {
+    PlotType::NONE,
+    PlotType::SimplePlot,
+    PlotType::URLPlot
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesPlotType() {
+  static const char * const names[4] = {
+    "NONE",
+    "SimplePlot",
+    "URLPlot",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNamePlotType(PlotType e) {
+  if (flatbuffers::IsOutRange(e, PlotType::NONE, PlotType::URLPlot)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesPlotType()[index];
+}
+
+template<typename T> struct PlotTypeTraits {
+  static const PlotType enum_value = PlotType::NONE;
+};
+
+template<> struct PlotTypeTraits<noodles::SimplePlot> {
+  static const PlotType enum_value = PlotType::SimplePlot;
+};
+
+template<> struct PlotTypeTraits<noodles::URLPlot> {
+  static const PlotType enum_value = PlotType::URLPlot;
+};
+
+bool VerifyPlotType(flatbuffers::Verifier &verifier, const void *obj, PlotType type);
+bool VerifyPlotTypeVector(flatbuffers::Verifier &verifier, const flatbuffers::Vector<flatbuffers::Offset<void>> *values, const flatbuffers::Vector<uint8_t> *types);
+
+enum class LightType : int8_t {
+  POINT = 0,
+  SUN = 1,
+  MIN = POINT,
+  MAX = SUN
+};
+
+inline const LightType (&EnumValuesLightType())[2] {
+  static const LightType values[] = {
+    LightType::POINT,
+    LightType::SUN
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesLightType() {
+  static const char * const names[3] = {
+    "POINT",
+    "SUN",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNameLightType(LightType e) {
+  if (flatbuffers::IsOutRange(e, LightType::POINT, LightType::SUN)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesLightType()[index];
+}
 
 enum class ServerMessageType : uint8_t {
   NONE = 0,
@@ -337,6 +516,29 @@ template<> struct ServerMessageTypeTraits<noodles::MethodReply> {
 
 bool VerifyServerMessageType(flatbuffers::Verifier &verifier, const void *obj, ServerMessageType type);
 bool VerifyServerMessageTypeVector(flatbuffers::Verifier &verifier, const flatbuffers::Vector<flatbuffers::Offset<void>> *values, const flatbuffers::Vector<uint8_t> *types);
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) ObjectVisibility FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t visible_;
+
+ public:
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return ObjectVisibilityTypeTable();
+  }
+  ObjectVisibility()
+      : visible_(0) {
+  }
+  ObjectVisibility(bool _visible)
+      : visible_(flatbuffers::EndianScalar(static_cast<uint8_t>(_visible))) {
+  }
+  bool visible() const {
+    return flatbuffers::EndianScalar(visible_) != 0;
+  }
+  void mutate_visible(bool _visible) {
+    flatbuffers::WriteScalar(&visible_, static_cast<uint8_t>(_visible));
+  }
+};
+FLATBUFFERS_STRUCT_END(ObjectVisibility, 1);
 
 struct MethodArg FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef MethodArgBuilder Builder;
@@ -745,6 +947,53 @@ inline flatbuffers::Offset<SignalDelete> CreateSignalDelete(
   return builder_.Finish();
 }
 
+struct EmptyDefinition FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef EmptyDefinitionBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return EmptyDefinitionTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_PADDING = 4
+  };
+  bool padding() const {
+    return GetField<uint8_t>(VT_PADDING, 0) != 0;
+  }
+  bool mutate_padding(bool _padding) {
+    return SetField<uint8_t>(VT_PADDING, static_cast<uint8_t>(_padding), 0);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_PADDING) &&
+           verifier.EndTable();
+  }
+};
+
+struct EmptyDefinitionBuilder {
+  typedef EmptyDefinition Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_padding(bool padding) {
+    fbb_.AddElement<uint8_t>(EmptyDefinition::VT_PADDING, static_cast<uint8_t>(padding), 0);
+  }
+  explicit EmptyDefinitionBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<EmptyDefinition> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<EmptyDefinition>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<EmptyDefinition> CreateEmptyDefinition(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    bool padding = false) {
+  EmptyDefinitionBuilder builder_(_fbb);
+  builder_.add_padding(padding);
+  return builder_.Finish();
+}
+
 struct TextDefinition FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef TextDefinitionBuilder Builder;
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
@@ -754,7 +1003,7 @@ struct TextDefinition FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_TEXT = 4,
     VT_FONT = 6,
     VT_HEIGHT = 8,
-    VT_OPT_WIDTH = 10
+    VT_WIDTH = 10
   };
   const flatbuffers::String *text() const {
     return GetPointer<const flatbuffers::String *>(VT_TEXT);
@@ -774,11 +1023,11 @@ struct TextDefinition FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   bool mutate_height(float _height) {
     return SetField<float>(VT_HEIGHT, _height, 0.0f);
   }
-  float opt_width() const {
-    return GetField<float>(VT_OPT_WIDTH, 0.0f);
+  float width() const {
+    return GetField<float>(VT_WIDTH, -1.0f);
   }
-  bool mutate_opt_width(float _opt_width) {
-    return SetField<float>(VT_OPT_WIDTH, _opt_width, 0.0f);
+  bool mutate_width(float _width) {
+    return SetField<float>(VT_WIDTH, _width, -1.0f);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -787,7 +1036,7 @@ struct TextDefinition FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffsetRequired(verifier, VT_FONT) &&
            verifier.VerifyString(font()) &&
            VerifyField<float>(verifier, VT_HEIGHT) &&
-           VerifyField<float>(verifier, VT_OPT_WIDTH) &&
+           VerifyField<float>(verifier, VT_WIDTH) &&
            verifier.EndTable();
   }
 };
@@ -805,8 +1054,8 @@ struct TextDefinitionBuilder {
   void add_height(float height) {
     fbb_.AddElement<float>(TextDefinition::VT_HEIGHT, height, 0.0f);
   }
-  void add_opt_width(float opt_width) {
-    fbb_.AddElement<float>(TextDefinition::VT_OPT_WIDTH, opt_width, 0.0f);
+  void add_width(float width) {
+    fbb_.AddElement<float>(TextDefinition::VT_WIDTH, width, -1.0f);
   }
   explicit TextDefinitionBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -826,9 +1075,9 @@ inline flatbuffers::Offset<TextDefinition> CreateTextDefinition(
     flatbuffers::Offset<flatbuffers::String> text = 0,
     flatbuffers::Offset<flatbuffers::String> font = 0,
     float height = 0.0f,
-    float opt_width = 0.0f) {
+    float width = -1.0f) {
   TextDefinitionBuilder builder_(_fbb);
-  builder_.add_opt_width(opt_width);
+  builder_.add_width(width);
   builder_.add_height(height);
   builder_.add_font(font);
   builder_.add_text(text);
@@ -840,7 +1089,7 @@ inline flatbuffers::Offset<TextDefinition> CreateTextDefinitionDirect(
     const char *text = nullptr,
     const char *font = nullptr,
     float height = 0.0f,
-    float opt_width = 0.0f) {
+    float width = -1.0f) {
   auto text__ = text ? _fbb.CreateString(text) : 0;
   auto font__ = font ? _fbb.CreateString(font) : 0;
   return noodles::CreateTextDefinition(
@@ -848,7 +1097,201 @@ inline flatbuffers::Offset<TextDefinition> CreateTextDefinitionDirect(
       text__,
       font__,
       height,
-      opt_width);
+      width);
+}
+
+struct WebpageDefinition FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef WebpageDefinitionBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return WebpageDefinitionTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_URL = 4,
+    VT_HEIGHT = 6,
+    VT_WIDTH = 8
+  };
+  const flatbuffers::String *url() const {
+    return GetPointer<const flatbuffers::String *>(VT_URL);
+  }
+  flatbuffers::String *mutable_url() {
+    return GetPointer<flatbuffers::String *>(VT_URL);
+  }
+  float height() const {
+    return GetField<float>(VT_HEIGHT, .5f);
+  }
+  bool mutate_height(float _height) {
+    return SetField<float>(VT_HEIGHT, _height, .5f);
+  }
+  float width() const {
+    return GetField<float>(VT_WIDTH, .5f);
+  }
+  bool mutate_width(float _width) {
+    return SetField<float>(VT_WIDTH, _width, .5f);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffsetRequired(verifier, VT_URL) &&
+           verifier.VerifyString(url()) &&
+           VerifyField<float>(verifier, VT_HEIGHT) &&
+           VerifyField<float>(verifier, VT_WIDTH) &&
+           verifier.EndTable();
+  }
+};
+
+struct WebpageDefinitionBuilder {
+  typedef WebpageDefinition Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_url(flatbuffers::Offset<flatbuffers::String> url) {
+    fbb_.AddOffset(WebpageDefinition::VT_URL, url);
+  }
+  void add_height(float height) {
+    fbb_.AddElement<float>(WebpageDefinition::VT_HEIGHT, height, .5f);
+  }
+  void add_width(float width) {
+    fbb_.AddElement<float>(WebpageDefinition::VT_WIDTH, width, .5f);
+  }
+  explicit WebpageDefinitionBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<WebpageDefinition> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<WebpageDefinition>(end);
+    fbb_.Required(o, WebpageDefinition::VT_URL);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<WebpageDefinition> CreateWebpageDefinition(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<flatbuffers::String> url = 0,
+    float height = .5f,
+    float width = .5f) {
+  WebpageDefinitionBuilder builder_(_fbb);
+  builder_.add_width(width);
+  builder_.add_height(height);
+  builder_.add_url(url);
+  return builder_.Finish();
+}
+
+inline flatbuffers::Offset<WebpageDefinition> CreateWebpageDefinitionDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    const char *url = nullptr,
+    float height = .5f,
+    float width = .5f) {
+  auto url__ = url ? _fbb.CreateString(url) : 0;
+  return noodles::CreateWebpageDefinition(
+      _fbb,
+      url__,
+      height,
+      width);
+}
+
+struct RenderableDefinition FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef RenderableDefinitionBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return RenderableDefinitionTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_MATERIAL = 4,
+    VT_MESH = 6,
+    VT_INSTANCES = 8,
+    VT_INSTANCE_BB = 10
+  };
+  const noodles::MaterialID *material() const {
+    return GetPointer<const noodles::MaterialID *>(VT_MATERIAL);
+  }
+  noodles::MaterialID *mutable_material() {
+    return GetPointer<noodles::MaterialID *>(VT_MATERIAL);
+  }
+  const noodles::GeometryID *mesh() const {
+    return GetPointer<const noodles::GeometryID *>(VT_MESH);
+  }
+  noodles::GeometryID *mutable_mesh() {
+    return GetPointer<noodles::GeometryID *>(VT_MESH);
+  }
+  const flatbuffers::Vector<const noodles::Mat4 *> *instances() const {
+    return GetPointer<const flatbuffers::Vector<const noodles::Mat4 *> *>(VT_INSTANCES);
+  }
+  flatbuffers::Vector<const noodles::Mat4 *> *mutable_instances() {
+    return GetPointer<flatbuffers::Vector<const noodles::Mat4 *> *>(VT_INSTANCES);
+  }
+  const noodles::BoundingBox *instance_bb() const {
+    return GetStruct<const noodles::BoundingBox *>(VT_INSTANCE_BB);
+  }
+  noodles::BoundingBox *mutable_instance_bb() {
+    return GetStruct<noodles::BoundingBox *>(VT_INSTANCE_BB);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffsetRequired(verifier, VT_MATERIAL) &&
+           verifier.VerifyTable(material()) &&
+           VerifyOffsetRequired(verifier, VT_MESH) &&
+           verifier.VerifyTable(mesh()) &&
+           VerifyOffset(verifier, VT_INSTANCES) &&
+           verifier.VerifyVector(instances()) &&
+           VerifyField<noodles::BoundingBox>(verifier, VT_INSTANCE_BB) &&
+           verifier.EndTable();
+  }
+};
+
+struct RenderableDefinitionBuilder {
+  typedef RenderableDefinition Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_material(flatbuffers::Offset<noodles::MaterialID> material) {
+    fbb_.AddOffset(RenderableDefinition::VT_MATERIAL, material);
+  }
+  void add_mesh(flatbuffers::Offset<noodles::GeometryID> mesh) {
+    fbb_.AddOffset(RenderableDefinition::VT_MESH, mesh);
+  }
+  void add_instances(flatbuffers::Offset<flatbuffers::Vector<const noodles::Mat4 *>> instances) {
+    fbb_.AddOffset(RenderableDefinition::VT_INSTANCES, instances);
+  }
+  void add_instance_bb(const noodles::BoundingBox *instance_bb) {
+    fbb_.AddStruct(RenderableDefinition::VT_INSTANCE_BB, instance_bb);
+  }
+  explicit RenderableDefinitionBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<RenderableDefinition> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<RenderableDefinition>(end);
+    fbb_.Required(o, RenderableDefinition::VT_MATERIAL);
+    fbb_.Required(o, RenderableDefinition::VT_MESH);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<RenderableDefinition> CreateRenderableDefinition(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<noodles::MaterialID> material = 0,
+    flatbuffers::Offset<noodles::GeometryID> mesh = 0,
+    flatbuffers::Offset<flatbuffers::Vector<const noodles::Mat4 *>> instances = 0,
+    const noodles::BoundingBox *instance_bb = 0) {
+  RenderableDefinitionBuilder builder_(_fbb);
+  builder_.add_instance_bb(instance_bb);
+  builder_.add_instances(instances);
+  builder_.add_mesh(mesh);
+  builder_.add_material(material);
+  return builder_.Finish();
+}
+
+inline flatbuffers::Offset<RenderableDefinition> CreateRenderableDefinitionDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<noodles::MaterialID> material = 0,
+    flatbuffers::Offset<noodles::GeometryID> mesh = 0,
+    const std::vector<noodles::Mat4> *instances = nullptr,
+    const noodles::BoundingBox *instance_bb = 0) {
+  auto instances__ = instances ? _fbb.CreateVectorOfStructs<noodles::Mat4>(*instances) : 0;
+  return noodles::CreateRenderableDefinition(
+      _fbb,
+      material,
+      mesh,
+      instances__,
+      instance_bb);
 }
 
 struct ObjectCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
@@ -861,15 +1304,15 @@ struct ObjectCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_NAME = 6,
     VT_PARENT = 8,
     VT_TRANSFORM = 10,
-    VT_MATERIAL = 12,
-    VT_MESH = 14,
+    VT_DEFINITION_TYPE = 12,
+    VT_DEFINITION = 14,
     VT_LIGHTS = 16,
     VT_TABLES = 18,
-    VT_INSTANCES = 20,
-    VT_TAGS = 22,
-    VT_METHODS_LIST = 24,
-    VT_SIGNALS_LIST = 26,
-    VT_TEXT = 28
+    VT_TAGS = 20,
+    VT_METHODS_LIST = 22,
+    VT_SIGNALS_LIST = 24,
+    VT_INFLUENCE = 26,
+    VT_VISIBILITY = 28
   };
   const noodles::ObjectID *id() const {
     return GetPointer<const noodles::ObjectID *>(VT_ID);
@@ -895,17 +1338,27 @@ struct ObjectCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   noodles::Mat4 *mutable_transform() {
     return GetStruct<noodles::Mat4 *>(VT_TRANSFORM);
   }
-  const noodles::MaterialID *material() const {
-    return GetPointer<const noodles::MaterialID *>(VT_MATERIAL);
+  noodles::ObjectDefinition definition_type() const {
+    return static_cast<noodles::ObjectDefinition>(GetField<uint8_t>(VT_DEFINITION_TYPE, 0));
   }
-  noodles::MaterialID *mutable_material() {
-    return GetPointer<noodles::MaterialID *>(VT_MATERIAL);
+  const void *definition() const {
+    return GetPointer<const void *>(VT_DEFINITION);
   }
-  const noodles::GeometryID *mesh() const {
-    return GetPointer<const noodles::GeometryID *>(VT_MESH);
+  template<typename T> const T *definition_as() const;
+  const noodles::EmptyDefinition *definition_as_EmptyDefinition() const {
+    return definition_type() == noodles::ObjectDefinition::EmptyDefinition ? static_cast<const noodles::EmptyDefinition *>(definition()) : nullptr;
   }
-  noodles::GeometryID *mutable_mesh() {
-    return GetPointer<noodles::GeometryID *>(VT_MESH);
+  const noodles::TextDefinition *definition_as_TextDefinition() const {
+    return definition_type() == noodles::ObjectDefinition::TextDefinition ? static_cast<const noodles::TextDefinition *>(definition()) : nullptr;
+  }
+  const noodles::WebpageDefinition *definition_as_WebpageDefinition() const {
+    return definition_type() == noodles::ObjectDefinition::WebpageDefinition ? static_cast<const noodles::WebpageDefinition *>(definition()) : nullptr;
+  }
+  const noodles::RenderableDefinition *definition_as_RenderableDefinition() const {
+    return definition_type() == noodles::ObjectDefinition::RenderableDefinition ? static_cast<const noodles::RenderableDefinition *>(definition()) : nullptr;
+  }
+  void *mutable_definition() {
+    return GetPointer<void *>(VT_DEFINITION);
   }
   const flatbuffers::Vector<flatbuffers::Offset<noodles::LightID>> *lights() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<noodles::LightID>> *>(VT_LIGHTS);
@@ -918,12 +1371,6 @@ struct ObjectCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   flatbuffers::Vector<flatbuffers::Offset<noodles::TableID>> *mutable_tables() {
     return GetPointer<flatbuffers::Vector<flatbuffers::Offset<noodles::TableID>> *>(VT_TABLES);
-  }
-  const flatbuffers::Vector<const noodles::Mat4 *> *instances() const {
-    return GetPointer<const flatbuffers::Vector<const noodles::Mat4 *> *>(VT_INSTANCES);
-  }
-  flatbuffers::Vector<const noodles::Mat4 *> *mutable_instances() {
-    return GetPointer<flatbuffers::Vector<const noodles::Mat4 *> *>(VT_INSTANCES);
   }
   const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>> *tags() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>> *>(VT_TAGS);
@@ -943,11 +1390,17 @@ struct ObjectCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>> *mutable_signals_list() {
     return GetPointer<flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>> *>(VT_SIGNALS_LIST);
   }
-  const noodles::TextDefinition *text() const {
-    return GetPointer<const noodles::TextDefinition *>(VT_TEXT);
+  const noodles::BoundingBox *influence() const {
+    return GetStruct<const noodles::BoundingBox *>(VT_INFLUENCE);
   }
-  noodles::TextDefinition *mutable_text() {
-    return GetPointer<noodles::TextDefinition *>(VT_TEXT);
+  noodles::BoundingBox *mutable_influence() {
+    return GetStruct<noodles::BoundingBox *>(VT_INFLUENCE);
+  }
+  const noodles::ObjectVisibility *visibility() const {
+    return GetStruct<const noodles::ObjectVisibility *>(VT_VISIBILITY);
+  }
+  noodles::ObjectVisibility *mutable_visibility() {
+    return GetStruct<noodles::ObjectVisibility *>(VT_VISIBILITY);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -958,18 +1411,15 @@ struct ObjectCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffset(verifier, VT_PARENT) &&
            verifier.VerifyTable(parent()) &&
            VerifyField<noodles::Mat4>(verifier, VT_TRANSFORM) &&
-           VerifyOffset(verifier, VT_MATERIAL) &&
-           verifier.VerifyTable(material()) &&
-           VerifyOffset(verifier, VT_MESH) &&
-           verifier.VerifyTable(mesh()) &&
+           VerifyField<uint8_t>(verifier, VT_DEFINITION_TYPE) &&
+           VerifyOffset(verifier, VT_DEFINITION) &&
+           VerifyObjectDefinition(verifier, definition(), definition_type()) &&
            VerifyOffset(verifier, VT_LIGHTS) &&
            verifier.VerifyVector(lights()) &&
            verifier.VerifyVectorOfTables(lights()) &&
            VerifyOffset(verifier, VT_TABLES) &&
            verifier.VerifyVector(tables()) &&
            verifier.VerifyVectorOfTables(tables()) &&
-           VerifyOffset(verifier, VT_INSTANCES) &&
-           verifier.VerifyVector(instances()) &&
            VerifyOffset(verifier, VT_TAGS) &&
            verifier.VerifyVector(tags()) &&
            verifier.VerifyVectorOfStrings(tags()) &&
@@ -979,11 +1429,27 @@ struct ObjectCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffset(verifier, VT_SIGNALS_LIST) &&
            verifier.VerifyVector(signals_list()) &&
            verifier.VerifyVectorOfTables(signals_list()) &&
-           VerifyOffset(verifier, VT_TEXT) &&
-           verifier.VerifyTable(text()) &&
+           VerifyField<noodles::BoundingBox>(verifier, VT_INFLUENCE) &&
+           VerifyField<noodles::ObjectVisibility>(verifier, VT_VISIBILITY) &&
            verifier.EndTable();
   }
 };
+
+template<> inline const noodles::EmptyDefinition *ObjectCreateUpdate::definition_as<noodles::EmptyDefinition>() const {
+  return definition_as_EmptyDefinition();
+}
+
+template<> inline const noodles::TextDefinition *ObjectCreateUpdate::definition_as<noodles::TextDefinition>() const {
+  return definition_as_TextDefinition();
+}
+
+template<> inline const noodles::WebpageDefinition *ObjectCreateUpdate::definition_as<noodles::WebpageDefinition>() const {
+  return definition_as_WebpageDefinition();
+}
+
+template<> inline const noodles::RenderableDefinition *ObjectCreateUpdate::definition_as<noodles::RenderableDefinition>() const {
+  return definition_as_RenderableDefinition();
+}
 
 struct ObjectCreateUpdateBuilder {
   typedef ObjectCreateUpdate Table;
@@ -1001,20 +1467,17 @@ struct ObjectCreateUpdateBuilder {
   void add_transform(const noodles::Mat4 *transform) {
     fbb_.AddStruct(ObjectCreateUpdate::VT_TRANSFORM, transform);
   }
-  void add_material(flatbuffers::Offset<noodles::MaterialID> material) {
-    fbb_.AddOffset(ObjectCreateUpdate::VT_MATERIAL, material);
+  void add_definition_type(noodles::ObjectDefinition definition_type) {
+    fbb_.AddElement<uint8_t>(ObjectCreateUpdate::VT_DEFINITION_TYPE, static_cast<uint8_t>(definition_type), 0);
   }
-  void add_mesh(flatbuffers::Offset<noodles::GeometryID> mesh) {
-    fbb_.AddOffset(ObjectCreateUpdate::VT_MESH, mesh);
+  void add_definition(flatbuffers::Offset<void> definition) {
+    fbb_.AddOffset(ObjectCreateUpdate::VT_DEFINITION, definition);
   }
   void add_lights(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::LightID>>> lights) {
     fbb_.AddOffset(ObjectCreateUpdate::VT_LIGHTS, lights);
   }
   void add_tables(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::TableID>>> tables) {
     fbb_.AddOffset(ObjectCreateUpdate::VT_TABLES, tables);
-  }
-  void add_instances(flatbuffers::Offset<flatbuffers::Vector<const noodles::Mat4 *>> instances) {
-    fbb_.AddOffset(ObjectCreateUpdate::VT_INSTANCES, instances);
   }
   void add_tags(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> tags) {
     fbb_.AddOffset(ObjectCreateUpdate::VT_TAGS, tags);
@@ -1025,8 +1488,11 @@ struct ObjectCreateUpdateBuilder {
   void add_signals_list(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>>> signals_list) {
     fbb_.AddOffset(ObjectCreateUpdate::VT_SIGNALS_LIST, signals_list);
   }
-  void add_text(flatbuffers::Offset<noodles::TextDefinition> text) {
-    fbb_.AddOffset(ObjectCreateUpdate::VT_TEXT, text);
+  void add_influence(const noodles::BoundingBox *influence) {
+    fbb_.AddStruct(ObjectCreateUpdate::VT_INFLUENCE, influence);
+  }
+  void add_visibility(const noodles::ObjectVisibility *visibility) {
+    fbb_.AddStruct(ObjectCreateUpdate::VT_VISIBILITY, visibility);
   }
   explicit ObjectCreateUpdateBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1046,29 +1512,29 @@ inline flatbuffers::Offset<ObjectCreateUpdate> CreateObjectCreateUpdate(
     flatbuffers::Offset<flatbuffers::String> name = 0,
     flatbuffers::Offset<noodles::ObjectID> parent = 0,
     const noodles::Mat4 *transform = 0,
-    flatbuffers::Offset<noodles::MaterialID> material = 0,
-    flatbuffers::Offset<noodles::GeometryID> mesh = 0,
+    noodles::ObjectDefinition definition_type = noodles::ObjectDefinition::NONE,
+    flatbuffers::Offset<void> definition = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::LightID>>> lights = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::TableID>>> tables = 0,
-    flatbuffers::Offset<flatbuffers::Vector<const noodles::Mat4 *>> instances = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> tags = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::MethodID>>> methods_list = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>>> signals_list = 0,
-    flatbuffers::Offset<noodles::TextDefinition> text = 0) {
+    const noodles::BoundingBox *influence = 0,
+    const noodles::ObjectVisibility *visibility = 0) {
   ObjectCreateUpdateBuilder builder_(_fbb);
-  builder_.add_text(text);
+  builder_.add_visibility(visibility);
+  builder_.add_influence(influence);
   builder_.add_signals_list(signals_list);
   builder_.add_methods_list(methods_list);
   builder_.add_tags(tags);
-  builder_.add_instances(instances);
   builder_.add_tables(tables);
   builder_.add_lights(lights);
-  builder_.add_mesh(mesh);
-  builder_.add_material(material);
+  builder_.add_definition(definition);
   builder_.add_transform(transform);
   builder_.add_parent(parent);
   builder_.add_name(name);
   builder_.add_id(id);
+  builder_.add_definition_type(definition_type);
   return builder_.Finish();
 }
 
@@ -1078,19 +1544,18 @@ inline flatbuffers::Offset<ObjectCreateUpdate> CreateObjectCreateUpdateDirect(
     const char *name = nullptr,
     flatbuffers::Offset<noodles::ObjectID> parent = 0,
     const noodles::Mat4 *transform = 0,
-    flatbuffers::Offset<noodles::MaterialID> material = 0,
-    flatbuffers::Offset<noodles::GeometryID> mesh = 0,
+    noodles::ObjectDefinition definition_type = noodles::ObjectDefinition::NONE,
+    flatbuffers::Offset<void> definition = 0,
     const std::vector<flatbuffers::Offset<noodles::LightID>> *lights = nullptr,
     const std::vector<flatbuffers::Offset<noodles::TableID>> *tables = nullptr,
-    const std::vector<noodles::Mat4> *instances = nullptr,
     const std::vector<flatbuffers::Offset<flatbuffers::String>> *tags = nullptr,
     const std::vector<flatbuffers::Offset<noodles::MethodID>> *methods_list = nullptr,
     const std::vector<flatbuffers::Offset<noodles::SignalID>> *signals_list = nullptr,
-    flatbuffers::Offset<noodles::TextDefinition> text = 0) {
+    const noodles::BoundingBox *influence = 0,
+    const noodles::ObjectVisibility *visibility = 0) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   auto lights__ = lights ? _fbb.CreateVector<flatbuffers::Offset<noodles::LightID>>(*lights) : 0;
   auto tables__ = tables ? _fbb.CreateVector<flatbuffers::Offset<noodles::TableID>>(*tables) : 0;
-  auto instances__ = instances ? _fbb.CreateVectorOfStructs<noodles::Mat4>(*instances) : 0;
   auto tags__ = tags ? _fbb.CreateVector<flatbuffers::Offset<flatbuffers::String>>(*tags) : 0;
   auto methods_list__ = methods_list ? _fbb.CreateVector<flatbuffers::Offset<noodles::MethodID>>(*methods_list) : 0;
   auto signals_list__ = signals_list ? _fbb.CreateVector<flatbuffers::Offset<noodles::SignalID>>(*signals_list) : 0;
@@ -1100,15 +1565,15 @@ inline flatbuffers::Offset<ObjectCreateUpdate> CreateObjectCreateUpdateDirect(
       name__,
       parent,
       transform,
-      material,
-      mesh,
+      definition_type,
+      definition,
       lights__,
       tables__,
-      instances__,
       tags__,
       methods_list__,
       signals_list__,
-      text);
+      influence,
+      visibility);
 }
 
 struct ObjectDelete FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
@@ -1160,6 +1625,323 @@ inline flatbuffers::Offset<ObjectDelete> CreateObjectDelete(
   return builder_.Finish();
 }
 
+struct SimplePlot FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef SimplePlotBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return SimplePlotTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_DEFINITION = 4
+  };
+  const flatbuffers::String *definition() const {
+    return GetPointer<const flatbuffers::String *>(VT_DEFINITION);
+  }
+  flatbuffers::String *mutable_definition() {
+    return GetPointer<flatbuffers::String *>(VT_DEFINITION);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffsetRequired(verifier, VT_DEFINITION) &&
+           verifier.VerifyString(definition()) &&
+           verifier.EndTable();
+  }
+};
+
+struct SimplePlotBuilder {
+  typedef SimplePlot Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_definition(flatbuffers::Offset<flatbuffers::String> definition) {
+    fbb_.AddOffset(SimplePlot::VT_DEFINITION, definition);
+  }
+  explicit SimplePlotBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<SimplePlot> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<SimplePlot>(end);
+    fbb_.Required(o, SimplePlot::VT_DEFINITION);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<SimplePlot> CreateSimplePlot(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<flatbuffers::String> definition = 0) {
+  SimplePlotBuilder builder_(_fbb);
+  builder_.add_definition(definition);
+  return builder_.Finish();
+}
+
+inline flatbuffers::Offset<SimplePlot> CreateSimplePlotDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    const char *definition = nullptr) {
+  auto definition__ = definition ? _fbb.CreateString(definition) : 0;
+  return noodles::CreateSimplePlot(
+      _fbb,
+      definition__);
+}
+
+struct URLPlot FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef URLPlotBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return URLPlotTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_URL = 4
+  };
+  const flatbuffers::String *url() const {
+    return GetPointer<const flatbuffers::String *>(VT_URL);
+  }
+  flatbuffers::String *mutable_url() {
+    return GetPointer<flatbuffers::String *>(VT_URL);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffsetRequired(verifier, VT_URL) &&
+           verifier.VerifyString(url()) &&
+           verifier.EndTable();
+  }
+};
+
+struct URLPlotBuilder {
+  typedef URLPlot Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_url(flatbuffers::Offset<flatbuffers::String> url) {
+    fbb_.AddOffset(URLPlot::VT_URL, url);
+  }
+  explicit URLPlotBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<URLPlot> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<URLPlot>(end);
+    fbb_.Required(o, URLPlot::VT_URL);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<URLPlot> CreateURLPlot(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<flatbuffers::String> url = 0) {
+  URLPlotBuilder builder_(_fbb);
+  builder_.add_url(url);
+  return builder_.Finish();
+}
+
+inline flatbuffers::Offset<URLPlot> CreateURLPlotDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    const char *url = nullptr) {
+  auto url__ = url ? _fbb.CreateString(url) : 0;
+  return noodles::CreateURLPlot(
+      _fbb,
+      url__);
+}
+
+struct PlotCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef PlotCreateUpdateBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return PlotCreateUpdateTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ID = 4,
+    VT_TABLE = 6,
+    VT_TYPE_TYPE = 8,
+    VT_TYPE = 10,
+    VT_METHODS_LIST = 12,
+    VT_SIGNALS_LIST = 14
+  };
+  const noodles::ObjectID *id() const {
+    return GetPointer<const noodles::ObjectID *>(VT_ID);
+  }
+  noodles::ObjectID *mutable_id() {
+    return GetPointer<noodles::ObjectID *>(VT_ID);
+  }
+  const noodles::TableID *table() const {
+    return GetPointer<const noodles::TableID *>(VT_TABLE);
+  }
+  noodles::TableID *mutable_table() {
+    return GetPointer<noodles::TableID *>(VT_TABLE);
+  }
+  noodles::PlotType type_type() const {
+    return static_cast<noodles::PlotType>(GetField<uint8_t>(VT_TYPE_TYPE, 0));
+  }
+  const void *type() const {
+    return GetPointer<const void *>(VT_TYPE);
+  }
+  template<typename T> const T *type_as() const;
+  const noodles::SimplePlot *type_as_SimplePlot() const {
+    return type_type() == noodles::PlotType::SimplePlot ? static_cast<const noodles::SimplePlot *>(type()) : nullptr;
+  }
+  const noodles::URLPlot *type_as_URLPlot() const {
+    return type_type() == noodles::PlotType::URLPlot ? static_cast<const noodles::URLPlot *>(type()) : nullptr;
+  }
+  void *mutable_type() {
+    return GetPointer<void *>(VT_TYPE);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<noodles::MethodID>> *methods_list() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<noodles::MethodID>> *>(VT_METHODS_LIST);
+  }
+  flatbuffers::Vector<flatbuffers::Offset<noodles::MethodID>> *mutable_methods_list() {
+    return GetPointer<flatbuffers::Vector<flatbuffers::Offset<noodles::MethodID>> *>(VT_METHODS_LIST);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>> *signals_list() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>> *>(VT_SIGNALS_LIST);
+  }
+  flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>> *mutable_signals_list() {
+    return GetPointer<flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>> *>(VT_SIGNALS_LIST);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffsetRequired(verifier, VT_ID) &&
+           verifier.VerifyTable(id()) &&
+           VerifyOffset(verifier, VT_TABLE) &&
+           verifier.VerifyTable(table()) &&
+           VerifyField<uint8_t>(verifier, VT_TYPE_TYPE) &&
+           VerifyOffset(verifier, VT_TYPE) &&
+           VerifyPlotType(verifier, type(), type_type()) &&
+           VerifyOffset(verifier, VT_METHODS_LIST) &&
+           verifier.VerifyVector(methods_list()) &&
+           verifier.VerifyVectorOfTables(methods_list()) &&
+           VerifyOffset(verifier, VT_SIGNALS_LIST) &&
+           verifier.VerifyVector(signals_list()) &&
+           verifier.VerifyVectorOfTables(signals_list()) &&
+           verifier.EndTable();
+  }
+};
+
+template<> inline const noodles::SimplePlot *PlotCreateUpdate::type_as<noodles::SimplePlot>() const {
+  return type_as_SimplePlot();
+}
+
+template<> inline const noodles::URLPlot *PlotCreateUpdate::type_as<noodles::URLPlot>() const {
+  return type_as_URLPlot();
+}
+
+struct PlotCreateUpdateBuilder {
+  typedef PlotCreateUpdate Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_id(flatbuffers::Offset<noodles::ObjectID> id) {
+    fbb_.AddOffset(PlotCreateUpdate::VT_ID, id);
+  }
+  void add_table(flatbuffers::Offset<noodles::TableID> table) {
+    fbb_.AddOffset(PlotCreateUpdate::VT_TABLE, table);
+  }
+  void add_type_type(noodles::PlotType type_type) {
+    fbb_.AddElement<uint8_t>(PlotCreateUpdate::VT_TYPE_TYPE, static_cast<uint8_t>(type_type), 0);
+  }
+  void add_type(flatbuffers::Offset<void> type) {
+    fbb_.AddOffset(PlotCreateUpdate::VT_TYPE, type);
+  }
+  void add_methods_list(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::MethodID>>> methods_list) {
+    fbb_.AddOffset(PlotCreateUpdate::VT_METHODS_LIST, methods_list);
+  }
+  void add_signals_list(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>>> signals_list) {
+    fbb_.AddOffset(PlotCreateUpdate::VT_SIGNALS_LIST, signals_list);
+  }
+  explicit PlotCreateUpdateBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<PlotCreateUpdate> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<PlotCreateUpdate>(end);
+    fbb_.Required(o, PlotCreateUpdate::VT_ID);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<PlotCreateUpdate> CreatePlotCreateUpdate(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<noodles::ObjectID> id = 0,
+    flatbuffers::Offset<noodles::TableID> table = 0,
+    noodles::PlotType type_type = noodles::PlotType::NONE,
+    flatbuffers::Offset<void> type = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::MethodID>>> methods_list = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<noodles::SignalID>>> signals_list = 0) {
+  PlotCreateUpdateBuilder builder_(_fbb);
+  builder_.add_signals_list(signals_list);
+  builder_.add_methods_list(methods_list);
+  builder_.add_type(type);
+  builder_.add_table(table);
+  builder_.add_id(id);
+  builder_.add_type_type(type_type);
+  return builder_.Finish();
+}
+
+inline flatbuffers::Offset<PlotCreateUpdate> CreatePlotCreateUpdateDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<noodles::ObjectID> id = 0,
+    flatbuffers::Offset<noodles::TableID> table = 0,
+    noodles::PlotType type_type = noodles::PlotType::NONE,
+    flatbuffers::Offset<void> type = 0,
+    const std::vector<flatbuffers::Offset<noodles::MethodID>> *methods_list = nullptr,
+    const std::vector<flatbuffers::Offset<noodles::SignalID>> *signals_list = nullptr) {
+  auto methods_list__ = methods_list ? _fbb.CreateVector<flatbuffers::Offset<noodles::MethodID>>(*methods_list) : 0;
+  auto signals_list__ = signals_list ? _fbb.CreateVector<flatbuffers::Offset<noodles::SignalID>>(*signals_list) : 0;
+  return noodles::CreatePlotCreateUpdate(
+      _fbb,
+      id,
+      table,
+      type_type,
+      type,
+      methods_list__,
+      signals_list__);
+}
+
+struct PlotDelete FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef PlotDeleteBuilder Builder;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return PlotDeleteTypeTable();
+  }
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ID = 4
+  };
+  const noodles::ObjectID *id() const {
+    return GetPointer<const noodles::ObjectID *>(VT_ID);
+  }
+  noodles::ObjectID *mutable_id() {
+    return GetPointer<noodles::ObjectID *>(VT_ID);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffsetRequired(verifier, VT_ID) &&
+           verifier.VerifyTable(id()) &&
+           verifier.EndTable();
+  }
+};
+
+struct PlotDeleteBuilder {
+  typedef PlotDelete Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_id(flatbuffers::Offset<noodles::ObjectID> id) {
+    fbb_.AddOffset(PlotDelete::VT_ID, id);
+  }
+  explicit PlotDeleteBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  flatbuffers::Offset<PlotDelete> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<PlotDelete>(end);
+    fbb_.Required(o, PlotDelete::VT_ID);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<PlotDelete> CreatePlotDelete(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<noodles::ObjectID> id = 0) {
+  PlotDeleteBuilder builder_(_fbb);
+  builder_.add_id(id);
+  return builder_.Finish();
+}
+
 struct BufferCreate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef BufferCreateBuilder Builder;
   static const flatbuffers::TypeTable *MiniReflectTypeTable() {
@@ -1169,7 +1951,7 @@ struct BufferCreate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID = 4,
     VT_BYTES = 6,
     VT_URL = 8,
-    VT_URL_SIZE = 10
+    VT_SIZE = 10
   };
   const noodles::BufferID *id() const {
     return GetPointer<const noodles::BufferID *>(VT_ID);
@@ -1189,11 +1971,11 @@ struct BufferCreate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   flatbuffers::String *mutable_url() {
     return GetPointer<flatbuffers::String *>(VT_URL);
   }
-  uint64_t url_size() const {
-    return GetField<uint64_t>(VT_URL_SIZE, 0);
+  uint64_t size() const {
+    return GetField<uint64_t>(VT_SIZE, 0);
   }
-  bool mutate_url_size(uint64_t _url_size) {
-    return SetField<uint64_t>(VT_URL_SIZE, _url_size, 0);
+  bool mutate_size(uint64_t _size) {
+    return SetField<uint64_t>(VT_SIZE, _size, 0);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1203,7 +1985,7 @@ struct BufferCreate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.VerifyVector(bytes()) &&
            VerifyOffset(verifier, VT_URL) &&
            verifier.VerifyString(url()) &&
-           VerifyField<uint64_t>(verifier, VT_URL_SIZE) &&
+           VerifyField<uint64_t>(verifier, VT_SIZE) &&
            verifier.EndTable();
   }
 };
@@ -1221,8 +2003,8 @@ struct BufferCreateBuilder {
   void add_url(flatbuffers::Offset<flatbuffers::String> url) {
     fbb_.AddOffset(BufferCreate::VT_URL, url);
   }
-  void add_url_size(uint64_t url_size) {
-    fbb_.AddElement<uint64_t>(BufferCreate::VT_URL_SIZE, url_size, 0);
+  void add_size(uint64_t size) {
+    fbb_.AddElement<uint64_t>(BufferCreate::VT_SIZE, size, 0);
   }
   explicit BufferCreateBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1241,9 +2023,9 @@ inline flatbuffers::Offset<BufferCreate> CreateBufferCreate(
     flatbuffers::Offset<noodles::BufferID> id = 0,
     flatbuffers::Offset<flatbuffers::Vector<int8_t>> bytes = 0,
     flatbuffers::Offset<flatbuffers::String> url = 0,
-    uint64_t url_size = 0) {
+    uint64_t size = 0) {
   BufferCreateBuilder builder_(_fbb);
-  builder_.add_url_size(url_size);
+  builder_.add_size(size);
   builder_.add_url(url);
   builder_.add_bytes(bytes);
   builder_.add_id(id);
@@ -1255,7 +2037,7 @@ inline flatbuffers::Offset<BufferCreate> CreateBufferCreateDirect(
     flatbuffers::Offset<noodles::BufferID> id = 0,
     const std::vector<int8_t> *bytes = nullptr,
     const char *url = nullptr,
-    uint64_t url_size = 0) {
+    uint64_t size = 0) {
   auto bytes__ = bytes ? _fbb.CreateVector<int8_t>(*bytes) : 0;
   auto url__ = url ? _fbb.CreateString(url) : 0;
   return noodles::CreateBufferCreate(
@@ -1263,7 +2045,7 @@ inline flatbuffers::Offset<BufferCreate> CreateBufferCreateDirect(
       id,
       bytes__,
       url__,
-      url_size);
+      size);
 }
 
 struct BufferDelete FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
@@ -1600,7 +2382,8 @@ struct LightCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_ID = 4,
     VT_COLOR = 6,
-    VT_INTENSITY = 8
+    VT_INTENSITY = 8,
+    VT_LIGHT_TYPE = 10
   };
   const noodles::LightID *id() const {
     return GetPointer<const noodles::LightID *>(VT_ID);
@@ -1620,12 +2403,19 @@ struct LightCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   bool mutate_intensity(float _intensity) {
     return SetField<float>(VT_INTENSITY, _intensity, 0.0f);
   }
+  noodles::LightType light_type() const {
+    return static_cast<noodles::LightType>(GetField<int8_t>(VT_LIGHT_TYPE, 0));
+  }
+  bool mutate_light_type(noodles::LightType _light_type) {
+    return SetField<int8_t>(VT_LIGHT_TYPE, static_cast<int8_t>(_light_type), 0);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_ID) &&
            verifier.VerifyTable(id()) &&
            VerifyField<noodles::Vec3>(verifier, VT_COLOR) &&
            VerifyField<float>(verifier, VT_INTENSITY) &&
+           VerifyField<int8_t>(verifier, VT_LIGHT_TYPE) &&
            verifier.EndTable();
   }
 };
@@ -1643,6 +2433,9 @@ struct LightCreateUpdateBuilder {
   void add_intensity(float intensity) {
     fbb_.AddElement<float>(LightCreateUpdate::VT_INTENSITY, intensity, 0.0f);
   }
+  void add_light_type(noodles::LightType light_type) {
+    fbb_.AddElement<int8_t>(LightCreateUpdate::VT_LIGHT_TYPE, static_cast<int8_t>(light_type), 0);
+  }
   explicit LightCreateUpdateBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -1659,11 +2452,13 @@ inline flatbuffers::Offset<LightCreateUpdate> CreateLightCreateUpdate(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<noodles::LightID> id = 0,
     const noodles::Vec3 *color = 0,
-    float intensity = 0.0f) {
+    float intensity = 0.0f,
+    noodles::LightType light_type = noodles::LightType::POINT) {
   LightCreateUpdateBuilder builder_(_fbb);
   builder_.add_intensity(intensity);
   builder_.add_color(color);
   builder_.add_id(id);
+  builder_.add_light_type(light_type);
   return builder_.Finish();
 }
 
@@ -1811,14 +2606,13 @@ struct GeometryCreate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_ID = 4,
-    VT_MIN_EXTENT = 6,
-    VT_MAX_EXTENT = 8,
-    VT_POSITIONS = 10,
-    VT_NORMALS = 12,
-    VT_TEX_COORDS = 14,
-    VT_COLORS = 16,
-    VT_LINES = 18,
-    VT_TRIANGLES = 20
+    VT_EXTENT = 6,
+    VT_POSITIONS = 8,
+    VT_NORMALS = 10,
+    VT_TEX_COORDS = 12,
+    VT_COLORS = 14,
+    VT_LINES = 16,
+    VT_TRIANGLES = 18
   };
   const noodles::GeometryID *id() const {
     return GetPointer<const noodles::GeometryID *>(VT_ID);
@@ -1826,17 +2620,11 @@ struct GeometryCreate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   noodles::GeometryID *mutable_id() {
     return GetPointer<noodles::GeometryID *>(VT_ID);
   }
-  const noodles::Vec3 *min_extent() const {
-    return GetStruct<const noodles::Vec3 *>(VT_MIN_EXTENT);
+  const noodles::BoundingBox *extent() const {
+    return GetStruct<const noodles::BoundingBox *>(VT_EXTENT);
   }
-  noodles::Vec3 *mutable_min_extent() {
-    return GetStruct<noodles::Vec3 *>(VT_MIN_EXTENT);
-  }
-  const noodles::Vec3 *max_extent() const {
-    return GetStruct<const noodles::Vec3 *>(VT_MAX_EXTENT);
-  }
-  noodles::Vec3 *mutable_max_extent() {
-    return GetStruct<noodles::Vec3 *>(VT_MAX_EXTENT);
+  noodles::BoundingBox *mutable_extent() {
+    return GetStruct<noodles::BoundingBox *>(VT_EXTENT);
   }
   const noodles::ComponentRef *positions() const {
     return GetPointer<const noodles::ComponentRef *>(VT_POSITIONS);
@@ -1878,8 +2666,7 @@ struct GeometryCreate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_ID) &&
            verifier.VerifyTable(id()) &&
-           VerifyField<noodles::Vec3>(verifier, VT_MIN_EXTENT) &&
-           VerifyField<noodles::Vec3>(verifier, VT_MAX_EXTENT) &&
+           VerifyField<noodles::BoundingBox>(verifier, VT_EXTENT) &&
            VerifyOffset(verifier, VT_POSITIONS) &&
            verifier.VerifyTable(positions()) &&
            VerifyOffset(verifier, VT_NORMALS) &&
@@ -1903,11 +2690,8 @@ struct GeometryCreateBuilder {
   void add_id(flatbuffers::Offset<noodles::GeometryID> id) {
     fbb_.AddOffset(GeometryCreate::VT_ID, id);
   }
-  void add_min_extent(const noodles::Vec3 *min_extent) {
-    fbb_.AddStruct(GeometryCreate::VT_MIN_EXTENT, min_extent);
-  }
-  void add_max_extent(const noodles::Vec3 *max_extent) {
-    fbb_.AddStruct(GeometryCreate::VT_MAX_EXTENT, max_extent);
+  void add_extent(const noodles::BoundingBox *extent) {
+    fbb_.AddStruct(GeometryCreate::VT_EXTENT, extent);
   }
   void add_positions(flatbuffers::Offset<noodles::ComponentRef> positions) {
     fbb_.AddOffset(GeometryCreate::VT_POSITIONS, positions);
@@ -1942,8 +2726,7 @@ struct GeometryCreateBuilder {
 inline flatbuffers::Offset<GeometryCreate> CreateGeometryCreate(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<noodles::GeometryID> id = 0,
-    const noodles::Vec3 *min_extent = 0,
-    const noodles::Vec3 *max_extent = 0,
+    const noodles::BoundingBox *extent = 0,
     flatbuffers::Offset<noodles::ComponentRef> positions = 0,
     flatbuffers::Offset<noodles::ComponentRef> normals = 0,
     flatbuffers::Offset<noodles::ComponentRef> tex_coords = 0,
@@ -1957,8 +2740,7 @@ inline flatbuffers::Offset<GeometryCreate> CreateGeometryCreate(
   builder_.add_tex_coords(tex_coords);
   builder_.add_normals(normals);
   builder_.add_positions(positions);
-  builder_.add_max_extent(max_extent);
-  builder_.add_min_extent(min_extent);
+  builder_.add_extent(extent);
   builder_.add_id(id);
   return builder_.Finish();
 }
@@ -2851,6 +3633,72 @@ inline flatbuffers::Offset<ServerMessages> CreateServerMessagesDirect(
       messages__);
 }
 
+inline bool VerifyObjectDefinition(flatbuffers::Verifier &verifier, const void *obj, ObjectDefinition type) {
+  switch (type) {
+    case ObjectDefinition::NONE: {
+      return true;
+    }
+    case ObjectDefinition::EmptyDefinition: {
+      auto ptr = reinterpret_cast<const noodles::EmptyDefinition *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case ObjectDefinition::TextDefinition: {
+      auto ptr = reinterpret_cast<const noodles::TextDefinition *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case ObjectDefinition::WebpageDefinition: {
+      auto ptr = reinterpret_cast<const noodles::WebpageDefinition *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case ObjectDefinition::RenderableDefinition: {
+      auto ptr = reinterpret_cast<const noodles::RenderableDefinition *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    default: return true;
+  }
+}
+
+inline bool VerifyObjectDefinitionVector(flatbuffers::Verifier &verifier, const flatbuffers::Vector<flatbuffers::Offset<void>> *values, const flatbuffers::Vector<uint8_t> *types) {
+  if (!values || !types) return !values && !types;
+  if (values->size() != types->size()) return false;
+  for (flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
+    if (!VerifyObjectDefinition(
+        verifier,  values->Get(i), types->GetEnum<ObjectDefinition>(i))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline bool VerifyPlotType(flatbuffers::Verifier &verifier, const void *obj, PlotType type) {
+  switch (type) {
+    case PlotType::NONE: {
+      return true;
+    }
+    case PlotType::SimplePlot: {
+      auto ptr = reinterpret_cast<const noodles::SimplePlot *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case PlotType::URLPlot: {
+      auto ptr = reinterpret_cast<const noodles::URLPlot *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    default: return true;
+  }
+}
+
+inline bool VerifyPlotTypeVector(flatbuffers::Verifier &verifier, const flatbuffers::Vector<flatbuffers::Offset<void>> *values, const flatbuffers::Vector<uint8_t> *types) {
+  if (!values || !types) return !values && !types;
+  if (values->size() != types->size()) return false;
+  for (flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
+    if (!VerifyPlotType(
+        verifier,  values->Get(i), types->GetEnum<PlotType>(i))) {
+      return false;
+    }
+  }
+  return true;
+}
+
 inline bool VerifyServerMessageType(flatbuffers::Verifier &verifier, const void *obj, ServerMessageType type) {
   switch (type) {
     case ServerMessageType::NONE: {
@@ -2958,6 +3806,72 @@ inline bool VerifyServerMessageTypeVector(flatbuffers::Verifier &verifier, const
     }
   }
   return true;
+}
+
+inline const flatbuffers::TypeTable *ObjectDefinitionTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, -1 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 },
+    { flatbuffers::ET_SEQUENCE, 0, 2 },
+    { flatbuffers::ET_SEQUENCE, 0, 3 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    noodles::EmptyDefinitionTypeTable,
+    noodles::TextDefinitionTypeTable,
+    noodles::WebpageDefinitionTypeTable,
+    noodles::RenderableDefinitionTypeTable
+  };
+  static const char * const names[] = {
+    "NONE",
+    "EmptyDefinition",
+    "TextDefinition",
+    "WebpageDefinition",
+    "RenderableDefinition"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_UNION, 5, type_codes, type_refs, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *PlotTypeTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, -1 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    noodles::SimplePlotTypeTable,
+    noodles::URLPlotTypeTable
+  };
+  static const char * const names[] = {
+    "NONE",
+    "SimplePlot",
+    "URLPlot"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_UNION, 3, type_codes, type_refs, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *LightTypeTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_CHAR, 0, 0 },
+    { flatbuffers::ET_CHAR, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    noodles::LightTypeTypeTable
+  };
+  static const char * const names[] = {
+    "POINT",
+    "SUN"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_ENUM, 2, type_codes, type_refs, nullptr, nullptr, names
+  };
+  return &tt;
 }
 
 inline const flatbuffers::TypeTable *ServerMessageTypeTypeTable() {
@@ -3136,6 +4050,19 @@ inline const flatbuffers::TypeTable *SignalDeleteTypeTable() {
   return &tt;
 }
 
+inline const flatbuffers::TypeTable *EmptyDefinitionTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_BOOL, 0, -1 }
+  };
+  static const char * const names[] = {
+    "padding"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
 inline const flatbuffers::TypeTable *TextDefinitionTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_STRING, 0, -1 },
@@ -3147,10 +4074,66 @@ inline const flatbuffers::TypeTable *TextDefinitionTypeTable() {
     "text",
     "font",
     "height",
-    "opt_width"
+    "width"
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_TABLE, 4, type_codes, nullptr, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *WebpageDefinitionTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_STRING, 0, -1 },
+    { flatbuffers::ET_FLOAT, 0, -1 },
+    { flatbuffers::ET_FLOAT, 0, -1 }
+  };
+  static const char * const names[] = {
+    "url",
+    "height",
+    "width"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 3, type_codes, nullptr, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *RenderableDefinitionTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 },
+    { flatbuffers::ET_SEQUENCE, 1, 2 },
+    { flatbuffers::ET_SEQUENCE, 0, 3 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    noodles::MaterialIDTypeTable,
+    noodles::GeometryIDTypeTable,
+    noodles::Mat4TypeTable,
+    noodles::BoundingBoxTypeTable
+  };
+  static const char * const names[] = {
+    "material",
+    "mesh",
+    "instances",
+    "instance_bb"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *ObjectVisibilityTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_BOOL, 0, -1 }
+  };
+  static const int64_t values[] = { 0, 1 };
+  static const char * const names[] = {
+    "visible"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_STRUCT, 1, type_codes, nullptr, nullptr, values, names
   };
   return &tt;
 }
@@ -3161,41 +4144,41 @@ inline const flatbuffers::TypeTable *ObjectCreateUpdateTypeTable() {
     { flatbuffers::ET_STRING, 0, -1 },
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_SEQUENCE, 0, 1 },
+    { flatbuffers::ET_UTYPE, 0, 2 },
     { flatbuffers::ET_SEQUENCE, 0, 2 },
-    { flatbuffers::ET_SEQUENCE, 0, 3 },
+    { flatbuffers::ET_SEQUENCE, 1, 3 },
     { flatbuffers::ET_SEQUENCE, 1, 4 },
-    { flatbuffers::ET_SEQUENCE, 1, 5 },
-    { flatbuffers::ET_SEQUENCE, 1, 1 },
     { flatbuffers::ET_STRING, 1, -1 },
+    { flatbuffers::ET_SEQUENCE, 1, 5 },
     { flatbuffers::ET_SEQUENCE, 1, 6 },
-    { flatbuffers::ET_SEQUENCE, 1, 7 },
+    { flatbuffers::ET_SEQUENCE, 0, 7 },
     { flatbuffers::ET_SEQUENCE, 0, 8 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     noodles::ObjectIDTypeTable,
     noodles::Mat4TypeTable,
-    noodles::MaterialIDTypeTable,
-    noodles::GeometryIDTypeTable,
+    noodles::ObjectDefinitionTypeTable,
     noodles::LightIDTypeTable,
     noodles::TableIDTypeTable,
     noodles::MethodIDTypeTable,
     noodles::SignalIDTypeTable,
-    noodles::TextDefinitionTypeTable
+    noodles::BoundingBoxTypeTable,
+    noodles::ObjectVisibilityTypeTable
   };
   static const char * const names[] = {
     "id",
     "name",
     "parent",
     "transform",
-    "material",
-    "mesh",
+    "definition_type",
+    "definition",
     "lights",
     "tables",
-    "instances",
     "tags",
     "methods_list",
     "signals_list",
-    "text"
+    "influence",
+    "visibility"
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_TABLE, 13, type_codes, type_refs, nullptr, nullptr, names
@@ -3204,6 +4187,78 @@ inline const flatbuffers::TypeTable *ObjectCreateUpdateTypeTable() {
 }
 
 inline const flatbuffers::TypeTable *ObjectDeleteTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    noodles::ObjectIDTypeTable
+  };
+  static const char * const names[] = {
+    "id"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *SimplePlotTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_STRING, 0, -1 }
+  };
+  static const char * const names[] = {
+    "definition"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *URLPlotTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_STRING, 0, -1 }
+  };
+  static const char * const names[] = {
+    "url"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *PlotCreateUpdateTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 },
+    { flatbuffers::ET_UTYPE, 0, 2 },
+    { flatbuffers::ET_SEQUENCE, 0, 2 },
+    { flatbuffers::ET_SEQUENCE, 1, 3 },
+    { flatbuffers::ET_SEQUENCE, 1, 4 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    noodles::ObjectIDTypeTable,
+    noodles::TableIDTypeTable,
+    noodles::PlotTypeTypeTable,
+    noodles::MethodIDTypeTable,
+    noodles::SignalIDTypeTable
+  };
+  static const char * const names[] = {
+    "id",
+    "table",
+    "type_type",
+    "type",
+    "methods_list",
+    "signals_list"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 6, type_codes, type_refs, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *PlotDeleteTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_SEQUENCE, 0, 0 }
   };
@@ -3233,7 +4288,7 @@ inline const flatbuffers::TypeTable *BufferCreateTypeTable() {
     "id",
     "bytes",
     "url",
-    "url_size"
+    "size"
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, nullptr, names
@@ -3340,19 +4395,22 @@ inline const flatbuffers::TypeTable *LightCreateUpdateTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_SEQUENCE, 0, 1 },
-    { flatbuffers::ET_FLOAT, 0, -1 }
+    { flatbuffers::ET_FLOAT, 0, -1 },
+    { flatbuffers::ET_CHAR, 0, 2 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     noodles::LightIDTypeTable,
-    noodles::Vec3TypeTable
+    noodles::Vec3TypeTable,
+    noodles::LightTypeTypeTable
   };
   static const char * const names[] = {
     "id",
     "color",
-    "intensity"
+    "intensity",
+    "light_type"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }
@@ -3399,7 +4457,6 @@ inline const flatbuffers::TypeTable *GeometryCreateTypeTable() {
   static const flatbuffers::TypeCode type_codes[] = {
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_SEQUENCE, 0, 1 },
-    { flatbuffers::ET_SEQUENCE, 0, 1 },
     { flatbuffers::ET_SEQUENCE, 0, 2 },
     { flatbuffers::ET_SEQUENCE, 0, 2 },
     { flatbuffers::ET_SEQUENCE, 0, 2 },
@@ -3409,13 +4466,12 @@ inline const flatbuffers::TypeTable *GeometryCreateTypeTable() {
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     noodles::GeometryIDTypeTable,
-    noodles::Vec3TypeTable,
+    noodles::BoundingBoxTypeTable,
     noodles::ComponentRefTypeTable
   };
   static const char * const names[] = {
     "id",
-    "min_extent",
-    "max_extent",
+    "extent",
     "positions",
     "normals",
     "tex_coords",
@@ -3424,7 +4480,7 @@ inline const flatbuffers::TypeTable *GeometryCreateTypeTable() {
     "triangles"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 9, type_codes, type_refs, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 8, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }

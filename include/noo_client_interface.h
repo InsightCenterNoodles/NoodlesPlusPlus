@@ -530,8 +530,7 @@ struct ComponentRef {
 /// their own functionality. Delegates are instantiated on new meshes from the
 /// server. Mesh delegates can also be updated.
 struct MeshData {
-    glm::vec3 extent_min;
-    glm::vec3 extent_max;
+    noo::BoundingBox extent;
 
     std::optional<ComponentRef> positions;
     std::optional<ComponentRef> normals;
@@ -558,26 +557,43 @@ public:
 
 // =============================================================================
 
-struct ObjectText {
+struct ObjectTextDefinition {
     std::string text;
     std::string font;
     float       height;
     float       width = -1;
 };
 
+struct ObjectWebpageDefinition {
+    QUrl  url;
+    float height;
+    float width;
+};
+
+struct ObjectRenderableDefinition {
+    MaterialDelegate*               material;
+    MeshDelegate*                   mesh;
+    std::span<glm::mat4 const>      instances;
+    std::optional<noo::BoundingBox> instance_bb;
+};
+
+using ObjectDefinition = std::variant<std::monostate,
+                                      ObjectTextDefinition,
+                                      ObjectWebpageDefinition,
+                                      ObjectRenderableDefinition>;
+
 struct ObjectUpdateData {
-    std::optional<std::string_view>              name;
-    std::optional<ObjectDelegate*>               parent;
-    std::optional<glm::mat4>                     transform;
-    std::optional<MaterialDelegate*>             material;
-    std::optional<MeshDelegate*>                 mesh;
-    std::optional<std::vector<LightDelegate*>>   lights;
-    std::optional<std::vector<TableDelegate*>>   tables;
-    std::optional<std::span<glm::mat4 const>>    instances;
-    std::optional<std::vector<std::string_view>> tags;
-    std::optional<std::vector<MethodDelegate*>>  method_list;
-    std::optional<std::vector<SignalDelegate*>>  signal_list;
-    std::optional<ObjectText>                    text;
+    std::optional<std::string_view>                name;
+    std::optional<ObjectDelegate*>                 parent;
+    std::optional<glm::mat4>                       transform;
+    std::optional<ObjectDefinition>                definition;
+    std::optional<std::vector<LightDelegate*>>     lights;
+    std::optional<std::vector<TableDelegate*>>     tables;
+    std::optional<std::vector<std::string_view>>   tags;
+    std::optional<std::vector<MethodDelegate*>>    method_list;
+    std::optional<std::vector<SignalDelegate*>>    signal_list;
+    std::optional<std::optional<noo::BoundingBox>> influence;
+    std::optional<bool>                            visibility;
 };
 
 

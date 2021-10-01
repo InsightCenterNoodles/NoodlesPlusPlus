@@ -20,6 +20,7 @@ struct Vec2;
 struct Vec3;
 struct Vec4;
 struct Mat4;
+struct BoundingBox;
 
 struct TextureID;
 struct BufferID;
@@ -30,6 +31,7 @@ struct GeometryID;
 struct ObjectID;
 struct SignalID;
 struct MethodID;
+struct PlotID;
 
 } // namespace noodles
 
@@ -120,6 +122,10 @@ glm::vec3 convert(::noodles::Vec3 const&);
 glm::vec4 convert(::noodles::Vec4 const&);
 glm::mat4 convert(::noodles::Mat4 const&);
 
+struct BoundingBox;
+::noo::BoundingBox     convert(::noodles::BoundingBox const&);
+::noodles::BoundingBox convert(::noo::BoundingBox const&);
+
 // ====
 
 
@@ -155,6 +161,9 @@ convert_id(SignalID, flatbuffers::FlatBufferBuilder&);
 flatbuffers::Offset<::noodles::MethodID>
 convert_id(MethodID, flatbuffers::FlatBufferBuilder&);
 
+flatbuffers::Offset<::noodles::PlotID>
+convert_id(PlotID, flatbuffers::FlatBufferBuilder&);
+
 template <class T>
 auto convert_id(std::shared_ptr<T> const&       ptr,
                 flatbuffers::FlatBufferBuilder& b) {
@@ -173,6 +182,7 @@ MeshID     convert_id(::noodles::GeometryID const&);
 ObjectID   convert_id(::noodles::ObjectID const&);
 SignalID   convert_id(::noodles::SignalID const&);
 MethodID   convert_id(::noodles::MethodID const&);
+PlotID     convert_id(::noodles::PlotID const&);
 
 TextureID  convert_id(::noodles::TextureID const*);
 BufferID   convert_id(::noodles::BufferID const*);
@@ -183,6 +193,7 @@ MeshID     convert_id(::noodles::GeometryID const*);
 ObjectID   convert_id(::noodles::ObjectID const*);
 SignalID   convert_id(::noodles::SignalID const*);
 MethodID   convert_id(::noodles::MethodID const*);
+PlotID     convert_id(::noodles::PlotID const*);
 
 /// Write an arbitrary iterable container to a flatbuffer.
 template <class Container>

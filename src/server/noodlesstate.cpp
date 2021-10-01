@@ -113,7 +113,7 @@ static TableTPtr get_table(MethodContext const& context) {
 static AnyVar table_subscribe(MethodContext const& context,
                               AnyVarListRef const& /*args*/) {
 
-    qDebug() << Q_FUNC_INFO;
+    // qDebug() << Q_FUNC_INFO;
 
     auto tbl = get_table(context);
 
@@ -245,7 +245,7 @@ static AnyVar table_data_clear(MethodContext const& context) {
 static AnyVar table_update_selection(MethodContext const& context,
                                      std::string_view     selection_id,
                                      SelectionRef         selection_ref) {
-    qDebug() << Q_FUNC_INFO;
+    // qDebug() << Q_FUNC_INFO;
 
     auto tbl = get_table(context);
 
