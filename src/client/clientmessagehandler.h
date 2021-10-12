@@ -74,6 +74,8 @@ class MessageHandler {
     void process_message(noodles::GeometryDelete const&);
     void process_message(noodles::TableCreateUpdate const&);
     void process_message(noodles::TableDelete const&);
+    void process_message(noodles::PlotCreateUpdate const&);
+    void process_message(noodles::PlotDelete const&);
     void process_message(noodles::DocumentUpdate const&);
     void process_message(noodles::DocumentReset const&);
     void process_message(noodles::SignalInvoke const&);

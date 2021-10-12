@@ -5,6 +5,7 @@
 #include "serialize.h"
 #include "src/common/variant_tools.h"
 #include "src/generated/interface_tools.h"
+#include "src/server/plotlist.h"
 
 namespace noo {
 
@@ -22,6 +23,7 @@ public:
     bool definition  = false;
     bool lights      = false;
     bool tables      = false;
+    bool plots       = false;
     bool instances   = false;
     bool tags        = false;
     bool method_list = false;
@@ -122,6 +124,7 @@ void ObjectT::update_common(ObjectTUpdateHelper const& opt, Writer& w) {
 
     std::optional<OffsetList<noodles::LightID>> update_lights;
     std::optional<OffsetList<noodles::TableID>> update_tables;
+    std::optional<OffsetList<noodles::PlotID>>  update_plots;
     std::optional<std::vector<noodles::Mat4>>   update_instances;
     std::optional<std::vector<flatbuffers::Offset<flatbuffers::String>>>
                                                  update_tags;
@@ -170,6 +173,7 @@ void ObjectT::update_common(ObjectTUpdateHelper const& opt, Writer& w) {
 
     if (opt.lights) { update_lights = make_id_list(m_data.lights, w); }
     if (opt.tables) { update_tables = make_id_list(m_data.tables, w); }
+    if (opt.plots) { update_plots = make_id_list(m_data.plots, w); }
     if (opt.tags) {
         auto& ret = update_tags.emplace();
         for (auto const& s : m_data.tags) {
@@ -208,6 +212,7 @@ void ObjectT::update_common(ObjectTUpdateHelper const& opt, Writer& w) {
         update_definition ? *update_definition : 0,
         opt_or(update_lights),
         opt_or(update_tables),
+        opt_or(update_plots),
         opt_or(update_tags),
         opt_or(update_methods_list),
         opt_or(update_signals_list),
@@ -226,6 +231,7 @@ void ObjectT::write_new_to(Writer& w) {
     update_opts.definition  = true;
     update_opts.lights      = true;
     update_opts.tables      = true;
+    update_opts.plots       = true;
     update_opts.tags        = true;
     update_opts.method_list = true;
     update_opts.signal_list = true;

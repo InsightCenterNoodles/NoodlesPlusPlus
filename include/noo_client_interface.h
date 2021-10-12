@@ -24,6 +24,7 @@ class MeshDelegate;
 class ObjectDelegate;
 class SignalDelegate;
 class MethodDelegate;
+class PlotDelegate;
 
 using DocumentDelegatePtr = std::unique_ptr<DocumentDelegate>;
 
@@ -36,13 +37,16 @@ using MeshDelegatePtr     = std::unique_ptr<MeshDelegate>;
 using ObjectDelegatePtr   = std::unique_ptr<ObjectDelegate>;
 using SignalDelegatePtr   = std::unique_ptr<SignalDelegate>;
 using MethodDelegatePtr   = std::unique_ptr<MethodDelegate>;
+using PlotDelegatePtr     = std::unique_ptr<PlotDelegate>;
 
 // Not to be stored by users!
-using MethodContext =
-    std::variant<std::monostate, ObjectDelegate*, TableDelegate*>;
+using MethodContext = std::
+    variant<std::monostate, ObjectDelegate*, TableDelegate*, PlotDelegate*>;
 
-using MethodContextPtr = std::
-    variant<std::monostate, QPointer<ObjectDelegate>, QPointer<TableDelegate>>;
+using MethodContextPtr = std::variant<std::monostate,
+                                      QPointer<ObjectDelegate>,
+                                      QPointer<TableDelegate>,
+                                      QPointer<PlotDelegate>>;
 
 class MessageHandler;
 
@@ -707,6 +711,61 @@ signals:
 
 // =============================================================================
 
+struct PlotSimpleDelegate {
+    QString definition;
+};
+
+struct PlotURLDelegate {
+    QUrl url;
+};
+
+using PlotType = std::variant<PlotSimpleDelegate, PlotURLDelegate>;
+
+struct PlotData {
+    std::optional<noo::PlotID> id;
+
+    std::optional<QPointer<TableDelegate>> table;
+    std::optional<PlotType>                type;
+
+    std::optional<std::vector<MethodDelegate*>> method_list;
+    std::optional<std::vector<SignalDelegate*>> signal_list;
+};
+
+class PlotDelegate : public QObject {
+    Q_OBJECT
+    noo::PlotID m_id;
+
+    PlotType m_type;
+
+    QPointer<TableDelegate> m_table;
+
+    AttachedMethodList m_attached_methods;
+    AttachedSignalList m_attached_signals;
+
+public:
+    PlotDelegate(noo::PlotID, PlotData const&);
+    virtual ~PlotDelegate();
+
+    NOODLES_CAN_UPDATE(true)
+
+    noo::PlotID id() const;
+
+    void update(PlotData const&);
+
+    virtual void on_update(PlotData const&);
+
+    virtual void prepare_delete();
+
+    AttachedMethodList const& attached_methods() const;
+    AttachedSignalList const& attached_signals() const;
+
+signals:
+    void updated();
+};
+
+
+// =============================================================================
+
 struct DocumentData {
     std::vector<MethodDelegate*> method_list;
     std::vector<SignalDelegate*> signal_list;
@@ -765,7 +824,8 @@ struct ClientDelegates {
     std::function<SignalDelegatePtr(noo::SignalID, SignalData const&)>
         sig_maker;
     std::function<MethodDelegatePtr(noo::MethodID, MethodData const&)>
-        method_maker;
+                                                                 method_maker;
+    std::function<PlotDelegatePtr(noo::PlotID, PlotData const&)> plot_maker;
 
     std::function<std::unique_ptr<DocumentDelegate>()> doc_maker;
 };

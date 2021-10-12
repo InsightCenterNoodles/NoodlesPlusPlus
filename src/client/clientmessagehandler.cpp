@@ -353,6 +353,46 @@ void MessageHandler::process_message(noodles::TableDelete const& m) {
 
     m_state.table_list().handle_delete(at);
 }
+
+void MessageHandler::process_message(noodles::PlotCreateUpdate const& m) {
+    auto at = noo::convert_id(m.id());
+
+    PlotData pd;
+
+    if (m.type()) {
+        auto& def = pd.type.emplace();
+
+        switch (m.type_type()) {
+        case noodles::PlotType::SimplePlot: {
+            auto const* as = m.type_as_SimplePlot();
+            def.emplace<PlotSimpleDelegate>().definition = QString::fromUtf8(
+                as->definition()->data(), as->definition()->size());
+        }
+        case noodles::PlotType::URLPlot: {
+            auto const* as = m.type_as_URLPlot();
+            auto str = QString::fromUtf8(as->url()->data(), as->url()->size());
+            def.emplace<PlotURLDelegate>().url = QUrl(str);
+        }
+        default:
+            // nothing?
+            pd.type.reset();
+        }
+    }
+
+    EXIST_EXE(m.table(), { pd.table = lookup(m_state, VALUE); })
+
+
+    EXIST_EXE(m.methods_list(), { pd.method_list = make_v(m_state, VALUE); })
+    EXIST_EXE(m.signals_list(), { pd.signal_list = make_v(m_state, VALUE); })
+
+    m_state.plot_list().handle_new(at, std::move(pd));
+}
+void MessageHandler::process_message(noodles::PlotDelete const& m) {
+    auto at = noo::convert_id(m.id());
+
+    m_state.plot_list().handle_delete(at);
+}
+
 void MessageHandler::process_message(noodles::DocumentUpdate const& m) {
 
     DocumentData dd;

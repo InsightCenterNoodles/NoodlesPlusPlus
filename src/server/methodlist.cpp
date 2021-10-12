@@ -22,7 +22,8 @@ MethodT::MethodT(IDType id, MethodList* host, MethodData const& d)
 }
 
 auto write_to(Arg const& ma, flatbuffers::FlatBufferBuilder& b) {
-    return noodles::CreateMethodArgDirect(b, ma.name.c_str(), ma.doc.c_str());
+    return noodles::CreateMethodArgDirect(
+        b, ma.name.c_str(), ma.documentation.c_str(), ma.hint.c_str());
 }
 
 void MethodT::write_new_to(Writer& w) {
@@ -86,8 +87,9 @@ void SignalT::write_delete_to(Writer& w) {
 }
 
 
-void SignalT::fire(std::variant<std::monostate, TableID, ObjectID> context,
-                   AnyVarList&&                                    v) {
+void SignalT::fire(
+    std::variant<std::monostate, TableID, ObjectID, PlotID> context,
+    AnyVarList&&                                            v) {
 
     std::unique_ptr<Writer> w = [&]() {
         if (std::holds_alternative<TableID>(context)) {
@@ -116,15 +118,22 @@ void SignalT::fire(std::variant<std::monostate, TableID, ObjectID> context,
     auto x = VMATCH(
         context,
         VCASE(std::monostate) {
-            return noodles::CreateSignalInvoke(*w, noodles_id, {}, {}, var);
+            return noodles::CreateSignalInvoke(*w, noodles_id, {}, {}, {}, var);
         },
         VCASE(TableID tid) {
             auto noodles_tbl_id = convert_id(tid, *w);
-            return CreateSignalInvoke(*w, noodles_id, {}, noodles_tbl_id, var);
+            return CreateSignalInvoke(
+                *w, noodles_id, {}, noodles_tbl_id, {}, var);
         },
         VCASE(ObjectID oid) {
             auto noodles_obj_id = convert_id(oid, *w);
-            return CreateSignalInvoke(*w, noodles_id, noodles_obj_id, {}, var);
+            return CreateSignalInvoke(
+                *w, noodles_id, noodles_obj_id, {}, {}, var);
+        },
+        VCASE(PlotID oid) {
+            auto noodles_plt_id = convert_id(oid, *w);
+            return CreateSignalInvoke(
+                *w, noodles_id, {}, {}, noodles_plt_id, var);
         });
 
     w->complete_message(x);

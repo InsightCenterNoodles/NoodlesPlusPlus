@@ -19,7 +19,8 @@ ClientState::ClientState(QWebSocket& s, ClientDelegates& makers)
       m_light_list(makers.light_maker),
       m_material_list(makers.mat_maker),
       m_mesh_list(makers.mesh_maker),
-      m_object_list(makers.object_maker) {
+      m_object_list(makers.object_maker),
+      m_plot_list(makers.plot_maker) {
     connect(&m_socket,
             &QWebSocket::textMessageReceived,
             this,
@@ -92,23 +93,34 @@ void ClientState::on_method_ask_invoke(noo::MethodID          method_id,
 
     flatbuffers::Offset<::noodles::ObjectID> const null_oid;
     flatbuffers::Offset<::noodles::TableID> const  null_tid;
+    flatbuffers::Offset<::noodles::PlotID> const   null_pid;
 
     auto x = VMATCH(
         context,
         VCASE(std::monostate) {
-            return noodles::CreateMethodInvokeMessage(
-                writer, mid, null_oid, null_tid, ident_handle, arg_handle);
+            return noodles::CreateMethodInvokeMessage(writer,
+                                                      mid,
+                                                      null_oid,
+                                                      null_tid,
+                                                      null_pid,
+                                                      ident_handle,
+                                                      arg_handle);
         },
         VCASE(ObjectDelegate * ptr) {
             auto oid = convert_id(ptr->id(), writer);
 
             return noodles::CreateMethodInvokeMessage(
-                writer, mid, oid, null_tid, ident_handle, arg_handle);
+                writer, mid, oid, null_tid, null_pid, ident_handle, arg_handle);
         },
         VCASE(TableDelegate * ptr) {
             auto tid = convert_id(ptr->id(), writer);
             return noodles::CreateMethodInvokeMessage(
-                writer, mid, null_oid, tid, ident_handle, arg_handle);
+                writer, mid, null_oid, tid, null_pid, ident_handle, arg_handle);
+        },
+        VCASE(PlotDelegate * ptr) {
+            auto tid = convert_id(ptr->id(), writer);
+            return noodles::CreateMethodInvokeMessage(
+                writer, mid, null_oid, null_tid, tid, ident_handle, arg_handle);
         });
 
 

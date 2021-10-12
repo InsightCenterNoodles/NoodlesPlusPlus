@@ -46,6 +46,9 @@ using TableTPtr = std::shared_ptr<TableT>;
 class ObjectT;
 using ObjectTPtr = std::shared_ptr<ObjectT>;
 
+class PlotT;
+using PlotTPtr = std::shared_ptr<PlotT>;
+
 // =============================================================================
 
 struct MethodContext;
@@ -166,7 +169,7 @@ public:
 /// method is being called on.
 ///
 struct MethodContext
-    : public std::variant<std::monostate, TableTPtr, ObjectTPtr> {
+    : public std::variant<std::monostate, TableTPtr, ObjectTPtr, PlotTPtr> {
     using variant::variant;
 
     /// Used to track the calling client. Internal ONLY.
@@ -174,11 +177,13 @@ struct MethodContext
 
     TableTPtr  get_table() const;
     ObjectTPtr get_object() const;
+    PlotTPtr   get_plot() const;
 };
 
 struct Arg {
     std::string name;
-    std::string doc;
+    std::string documentation;
+    std::string hint;
 };
 
 ///
@@ -452,6 +457,38 @@ MeshTPtr create_mesh(DocumentTPtrRef, BufferMeshDataRef const&);
 /// Update a mesh
 void update_mesh(MeshT*, MeshData const&);
 
+// Plot ========================================================================
+
+struct SimplePlotDef {
+    QString definition;
+};
+
+struct URLPlotDef {
+    QUrl url;
+};
+
+using PlotDef = std::variant<SimplePlotDef, URLPlotDef>;
+
+struct PlotData {
+    PlotDef                 definition;
+    TableTPtr               table_link;
+    std::vector<MethodTPtr> method_list;
+    std::vector<SignalTPtr> signal_list;
+};
+
+struct PlotUpdateData {
+    std::optional<PlotDef>                 definition;
+    std::optional<TableTPtr>               table_link;
+    std::optional<std::vector<MethodTPtr>> method_list;
+    std::optional<std::vector<SignalTPtr>> signal_list;
+};
+
+/// Create a new plot.
+MeshTPtr create_plot(DocumentTPtrRef, PlotData const&);
+
+/// Update a plot.
+void update_plot(DocumentTPtrRef, PlotUpdateData const&);
+
 // Table =======================================================================
 
 // The table system here is just preliminary
@@ -663,6 +700,7 @@ struct ObjectData {
     ObjectDefinition           definition;
     std::vector<LightTPtr>     lights;
     std::vector<TableTPtr>     tables;
+    std::vector<PlotTPtr>      plots;
     std::vector<std::string>   tags;
     std::vector<MethodTPtr>    method_list;
     std::vector<SignalTPtr>    signal_list;
@@ -679,6 +717,7 @@ struct ObjectUpdateData {
     std::optional<ObjectDefinition>           definition;
     std::optional<std::vector<LightTPtr>>     lights;
     std::optional<std::vector<TableTPtr>>     tables;
+    std::optional<std::vector<PlotTPtr>>      plots;
     std::optional<std::vector<std::string>>   tags;
     std::optional<std::vector<MethodTPtr>>    method_list;
     std::optional<std::vector<SignalTPtr>>    signal_list;

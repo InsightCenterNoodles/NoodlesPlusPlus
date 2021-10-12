@@ -77,7 +77,20 @@ void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
             }
 
             emit m_method->invoke(m_method->id(), p.data(), l, this);
-        });
+        },
+        VCASE(QPointer<PlotDelegate> & p) {
+            if (!p) {
+                MethodException exception {
+                    .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
+                    .message = "Method does not exist on this table anymore",
+                };
+                return complete({}, &exception);
+            }
+
+            emit m_method->invoke(m_method->id(), p.data(), l, this);
+        }
+
+    );
 }
 
 void PendingMethodReply::complete(noo::AnyVarRef   v,
@@ -517,6 +530,39 @@ noo::ObjectID ObjectDelegate::id() const {
 }
 
 void ObjectDelegate::prepare_delete() { }
+
+// =============================================================================
+
+PlotDelegate::PlotDelegate(noo::PlotID i, PlotData const& data)
+    : m_id(i), m_attached_methods(this), m_attached_signals(this) {
+
+    if (data.type) { m_type = *data.type; }
+    if (data.table) { m_table = *data.table; }
+
+    if (data.method_list) m_attached_methods = *data.method_list;
+    if (data.signal_list) m_attached_signals = *data.signal_list;
+}
+PlotDelegate::~PlotDelegate() = default;
+void PlotDelegate::update(PlotData const& data) {
+    if (data.type) { m_type = *data.type; }
+    if (data.table) { m_table = *data.table; }
+    if (data.method_list) m_attached_methods = *data.method_list;
+    if (data.signal_list) m_attached_signals = *data.signal_list;
+
+    this->on_update(data);
+}
+void                      PlotDelegate::on_update(PlotData const&) { }
+AttachedMethodList const& PlotDelegate::attached_methods() const {
+    return m_attached_methods;
+}
+AttachedSignalList const& PlotDelegate::attached_signals() const {
+    return m_attached_signals;
+}
+noo::PlotID PlotDelegate::id() const {
+    return m_id;
+}
+
+void PlotDelegate::prepare_delete() { }
 
 // =============================================================================
 

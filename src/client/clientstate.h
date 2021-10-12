@@ -121,7 +121,8 @@ class ClientState : public QObject {
                                                        m_material_list;
     ComponentList<MeshDelegate, noo::MeshID, MeshData> m_mesh_list;
     ComponentList<ObjectDelegate, noo::ObjectID, ObjectUpdateData>
-        m_object_list;
+                                                       m_object_list;
+    ComponentList<PlotDelegate, noo::PlotID, PlotData> m_plot_list;
 
     size_t m_last_invoke_id = 0;
     std::unordered_map<std::string, QPointer<PendingMethodReply>>
@@ -142,6 +143,7 @@ public:
     auto& material_list() { return m_material_list; }
     auto& mesh_list() { return m_mesh_list; }
     auto& object_list() { return m_object_list; }
+    auto& plot_list() { return m_plot_list; }
 
     auto& inflight_methods() { return m_in_flight_methods; }
 

@@ -52,7 +52,8 @@ public:
     void write_delete_to(Writer&);
 
 
-    void fire(std::variant<std::monostate, TableID, ObjectID> id, AnyVarList&&);
+    void fire(std::variant<std::monostate, TableID, ObjectID, PlotID> id,
+              AnyVarList&&);
 };
 
 // void write_to(NoodlesSignalTPtr const&,

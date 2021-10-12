@@ -23,4 +23,6 @@ PRIVATE
     tablelist.h
     texturelist.cpp
     texturelist.h
+    plotlist.cpp
+    plotlist.h
 )
