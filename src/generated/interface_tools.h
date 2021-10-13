@@ -20,6 +20,7 @@ struct Vec2;
 struct Vec3;
 struct Vec4;
 struct Mat4;
+struct RGB;
 struct BoundingBox;
 
 struct TextureID;
@@ -111,16 +112,21 @@ write_to(glm::vec4 const&, flatbuffers::FlatBufferBuilder&);
 ::flatbuffers::Offset<::noodles::Mat4 const*>
 write_to(glm::mat4 const&, flatbuffers::FlatBufferBuilder&);
 
+::flatbuffers::Offset<::noodles::RGB const*>
+write_to(glm::u8vec3 const&, flatbuffers::FlatBufferBuilder&);
+
 
 ::noodles::Vec2 convert(glm::vec2 const&);
 ::noodles::Vec3 convert(glm::vec3 const&);
 ::noodles::Vec4 convert(glm::vec4 const&);
 ::noodles::Mat4 convert(glm::mat4 const&);
+::noodles::RGB  convert(glm::u8vec3 const&);
 
-glm::vec2 convert(::noodles::Vec2 const&);
-glm::vec3 convert(::noodles::Vec3 const&);
-glm::vec4 convert(::noodles::Vec4 const&);
-glm::mat4 convert(::noodles::Mat4 const&);
+glm::vec2   convert(::noodles::Vec2 const&);
+glm::vec3   convert(::noodles::Vec3 const&);
+glm::vec4   convert(::noodles::Vec4 const&);
+glm::mat4   convert(::noodles::Mat4 const&);
+glm::u8vec3 convert(::noodles::RGB const&);
 
 struct BoundingBox;
 ::noo::BoundingBox     convert(::noodles::BoundingBox const&);

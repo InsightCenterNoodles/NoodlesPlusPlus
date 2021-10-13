@@ -2418,7 +2418,8 @@ struct LightCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID = 4,
     VT_COLOR = 6,
     VT_INTENSITY = 8,
-    VT_LIGHT_TYPE = 10
+    VT_SPATIAL = 10,
+    VT_LIGHT_TYPE = 12
   };
   const noodles::LightID *id() const {
     return GetPointer<const noodles::LightID *>(VT_ID);
@@ -2426,17 +2427,23 @@ struct LightCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   noodles::LightID *mutable_id() {
     return GetPointer<noodles::LightID *>(VT_ID);
   }
-  const noodles::Vec3 *color() const {
-    return GetStruct<const noodles::Vec3 *>(VT_COLOR);
+  const noodles::RGB *color() const {
+    return GetStruct<const noodles::RGB *>(VT_COLOR);
   }
-  noodles::Vec3 *mutable_color() {
-    return GetStruct<noodles::Vec3 *>(VT_COLOR);
+  noodles::RGB *mutable_color() {
+    return GetStruct<noodles::RGB *>(VT_COLOR);
   }
   float intensity() const {
     return GetField<float>(VT_INTENSITY, 0.0f);
   }
   bool mutate_intensity(float _intensity) {
     return SetField<float>(VT_INTENSITY, _intensity, 0.0f);
+  }
+  const noodles::Vec4 *spatial() const {
+    return GetStruct<const noodles::Vec4 *>(VT_SPATIAL);
+  }
+  noodles::Vec4 *mutable_spatial() {
+    return GetStruct<noodles::Vec4 *>(VT_SPATIAL);
   }
   noodles::LightType light_type() const {
     return static_cast<noodles::LightType>(GetField<int8_t>(VT_LIGHT_TYPE, 0));
@@ -2448,8 +2455,9 @@ struct LightCreateUpdate FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_ID) &&
            verifier.VerifyTable(id()) &&
-           VerifyField<noodles::Vec3>(verifier, VT_COLOR) &&
+           VerifyField<noodles::RGB>(verifier, VT_COLOR) &&
            VerifyField<float>(verifier, VT_INTENSITY) &&
+           VerifyField<noodles::Vec4>(verifier, VT_SPATIAL) &&
            VerifyField<int8_t>(verifier, VT_LIGHT_TYPE) &&
            verifier.EndTable();
   }
@@ -2462,11 +2470,14 @@ struct LightCreateUpdateBuilder {
   void add_id(flatbuffers::Offset<noodles::LightID> id) {
     fbb_.AddOffset(LightCreateUpdate::VT_ID, id);
   }
-  void add_color(const noodles::Vec3 *color) {
+  void add_color(const noodles::RGB *color) {
     fbb_.AddStruct(LightCreateUpdate::VT_COLOR, color);
   }
   void add_intensity(float intensity) {
     fbb_.AddElement<float>(LightCreateUpdate::VT_INTENSITY, intensity, 0.0f);
+  }
+  void add_spatial(const noodles::Vec4 *spatial) {
+    fbb_.AddStruct(LightCreateUpdate::VT_SPATIAL, spatial);
   }
   void add_light_type(noodles::LightType light_type) {
     fbb_.AddElement<int8_t>(LightCreateUpdate::VT_LIGHT_TYPE, static_cast<int8_t>(light_type), 0);
@@ -2486,10 +2497,12 @@ struct LightCreateUpdateBuilder {
 inline flatbuffers::Offset<LightCreateUpdate> CreateLightCreateUpdate(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<noodles::LightID> id = 0,
-    const noodles::Vec3 *color = 0,
+    const noodles::RGB *color = 0,
     float intensity = 0.0f,
+    const noodles::Vec4 *spatial = 0,
     noodles::LightType light_type = noodles::LightType::POINT) {
   LightCreateUpdateBuilder builder_(_fbb);
+  builder_.add_spatial(spatial);
   builder_.add_intensity(intensity);
   builder_.add_color(color);
   builder_.add_id(id);
@@ -4450,21 +4463,24 @@ inline const flatbuffers::TypeTable *LightCreateUpdateTypeTable() {
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_SEQUENCE, 0, 1 },
     { flatbuffers::ET_FLOAT, 0, -1 },
-    { flatbuffers::ET_CHAR, 0, 2 }
+    { flatbuffers::ET_SEQUENCE, 0, 2 },
+    { flatbuffers::ET_CHAR, 0, 3 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     noodles::LightIDTypeTable,
-    noodles::Vec3TypeTable,
+    noodles::RGBTypeTable,
+    noodles::Vec4TypeTable,
     noodles::LightTypeTypeTable
   };
   static const char * const names[] = {
     "id",
     "color",
     "intensity",
+    "spatial",
     "light_type"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, nullptr, names
+    flatbuffers::ST_TABLE, 5, type_codes, type_refs, nullptr, nullptr, names
   };
   return &tt;
 }

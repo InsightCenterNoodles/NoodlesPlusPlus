@@ -48,7 +48,7 @@ ClientState::ClientState(QWebSocket& s, ClientDelegates& makers)
     auto cname_std = cname.toStdString();
 
     auto x =
-        noodles::CreateIntroductionMessageDirect(writer, cname_std.c_str());
+        noodles::CreateIntroductionMessageDirect(writer, cname_std.c_str(), 0);
 
     writer.complete_message(x);
     qDebug() << Q_FUNC_INFO;

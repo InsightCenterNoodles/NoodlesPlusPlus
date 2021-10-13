@@ -392,12 +392,25 @@ void update_material(MaterialTPtr, MaterialData const&);
 
 // Light =======================================================================
 
+enum class LightType : uint8_t {
+    POINT,
+    SUN,
+};
+
 ///
 /// \brief The LightData struct defines a new light
 ///
 struct LightData {
-    glm::vec3 color     = { 1, 1, 1 };
-    float     intensity = 0;
+    glm::u8vec3 color     = { 1, 1, 1 };
+    float       intensity = 0;
+    glm::vec4   spatial;
+    LightType   type = LightType::POINT;
+};
+
+struct LightUpdateData {
+    std::optional<glm::u8vec3> color;
+    std::optional<float>       intensity;
+    std::optional<glm::vec4>   spatial;
 };
 
 class LightT;
@@ -407,7 +420,7 @@ using LightTPtr = std::shared_ptr<LightT>;
 LightTPtr create_light(DocumentTPtrRef, LightData const&);
 
 /// Update a light
-void update_light(LightTPtr const&, LightData const&);
+void update_light(LightTPtr const&, LightUpdateData const&);
 
 // Mesh ========================================================================
 

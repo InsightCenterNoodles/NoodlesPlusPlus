@@ -205,6 +205,9 @@ write_to(glm::mat4 const& m, flatbuffers::FlatBufferBuilder& b) {
 
     return ret;
 }
+::noodles::RGB convert(glm::u8vec3 const& c) {
+    return { c.r, c.g, c.b };
+}
 
 glm::vec2 convert(::noodles::Vec2 const& v) {
     return { v.x(), v.y() };
@@ -217,7 +220,6 @@ glm::vec3 convert(::noodles::Vec3 const& v) {
 glm::vec4 convert(::noodles::Vec4 const& v) {
     return { v.x(), v.y(), v.z(), v.w() };
 }
-
 glm::mat4 convert(::noodles::Mat4 const& m) {
     static_assert(sizeof(glm::mat4) == sizeof(::noodles::Mat4));
     glm::mat4 ret;
@@ -225,6 +227,9 @@ glm::mat4 convert(::noodles::Mat4 const& m) {
     memcpy(&ret, &m, sizeof(glm::mat4));
 
     return ret;
+}
+glm::u8vec3 convert(::noodles::RGB const& m) {
+    return { m.r(), m.g(), m.b() };
 }
 
 ::noo::BoundingBox convert(::noodles::BoundingBox const& bb) {

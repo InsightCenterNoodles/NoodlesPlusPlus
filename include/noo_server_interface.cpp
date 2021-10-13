@@ -314,7 +314,7 @@ LightTPtr create_light(DocumentTPtrRef doc, LightData const& data) {
     return doc->light_list().provision_next(data);
 }
 
-void update_light(LightTPtr const& item, LightData const& data) {
+void update_light(LightTPtr const& item, LightUpdateData const& data) {
     item->update(data);
 }
 

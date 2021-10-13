@@ -73,19 +73,33 @@ void LightT::write_new_to(Writer& w) {
     auto lid = convert_id(id(), w);
 
     auto ncol = convert(m_data.color);
+    auto sp   = convert(m_data.spatial);
 
-    auto x = noodles::CreateLightCreateUpdate(w, lid, &ncol, m_data.intensity);
+    auto x = noodles::CreateLightCreateUpdate(
+        w, lid, &ncol, m_data.intensity, &sp, (noodles::LightType)m_data.type);
 
     w.complete_message(x);
 }
 
-void LightT::update(LightData const& d, Writer& w) {
-    m_data = d;
+void LightT::update(LightUpdateData const& d, Writer& w) {
 
-    write_new_to(w);
+    auto lid = convert_id(id(), w);
+
+    if (d.color) { m_data.color = *d.color; }
+    if (d.intensity) { m_data.intensity = *d.intensity; }
+    if (d.spatial) { m_data.spatial = *d.spatial; }
+
+
+    auto ncol = convert(m_data.color);
+    auto sp   = convert(m_data.spatial);
+
+    auto x = noodles::CreateLightCreateUpdate(
+        w, lid, d.color ? &ncol : nullptr, m_data.intensity, &sp);
+
+    w.complete_message(x);
 }
 
-void LightT::update(LightData const& d) {
+void LightT::update(LightUpdateData const& d) {
     auto w = m_parent_list->new_bcast();
 
     update(d, *w);

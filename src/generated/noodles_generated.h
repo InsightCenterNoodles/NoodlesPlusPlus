@@ -84,6 +84,8 @@ struct BoundingBox;
 struct BufferRef;
 struct BufferRefBuilder;
 
+struct RGB;
+
 inline const flatbuffers::TypeTable *ObjectIDTypeTable();
 
 inline const flatbuffers::TypeTable *PlotIDTypeTable();
@@ -137,6 +139,8 @@ inline const flatbuffers::TypeTable *Mat4TypeTable();
 inline const flatbuffers::TypeTable *BoundingBoxTypeTable();
 
 inline const flatbuffers::TypeTable *BufferRefTypeTable();
+
+inline const flatbuffers::TypeTable *RGBTypeTable();
 
 enum class AnyIDType : uint8_t {
   NONE = 0,
@@ -536,6 +540,47 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) BoundingBox FLATBUFFERS_FINAL_CLASS {
   }
 };
 FLATBUFFERS_STRUCT_END(BoundingBox, 24);
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(1) RGB FLATBUFFERS_FINAL_CLASS {
+ private:
+  uint8_t r_;
+  uint8_t g_;
+  uint8_t b_;
+
+ public:
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return RGBTypeTable();
+  }
+  RGB()
+      : r_(0),
+        g_(0),
+        b_(0) {
+  }
+  RGB(uint8_t _r, uint8_t _g, uint8_t _b)
+      : r_(flatbuffers::EndianScalar(_r)),
+        g_(flatbuffers::EndianScalar(_g)),
+        b_(flatbuffers::EndianScalar(_b)) {
+  }
+  uint8_t r() const {
+    return flatbuffers::EndianScalar(r_);
+  }
+  void mutate_r(uint8_t _r) {
+    flatbuffers::WriteScalar(&r_, _r);
+  }
+  uint8_t g() const {
+    return flatbuffers::EndianScalar(g_);
+  }
+  void mutate_g(uint8_t _g) {
+    flatbuffers::WriteScalar(&g_, _g);
+  }
+  uint8_t b() const {
+    return flatbuffers::EndianScalar(b_);
+  }
+  void mutate_b(uint8_t _b) {
+    flatbuffers::WriteScalar(&b_, _b);
+  }
+};
+FLATBUFFERS_STRUCT_END(RGB, 3);
 
 struct ObjectID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef ObjectIDBuilder Builder;
@@ -2598,6 +2643,24 @@ inline const flatbuffers::TypeTable *BufferRefTypeTable() {
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *RGBTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_UCHAR, 0, -1 },
+    { flatbuffers::ET_UCHAR, 0, -1 },
+    { flatbuffers::ET_UCHAR, 0, -1 }
+  };
+  static const int64_t values[] = { 0, 1, 2, 3 };
+  static const char * const names[] = {
+    "r",
+    "g",
+    "b"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_STRUCT, 3, type_codes, nullptr, nullptr, values, names
   };
   return &tt;
 }

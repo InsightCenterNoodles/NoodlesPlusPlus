@@ -494,9 +494,16 @@ signals:
 
 // =============================================================================
 
+enum class LightType : uint8_t {
+    POINT,
+    SUN,
+};
+
 struct LightData {
-    glm::vec3 color     = { 1, 1, 1 };
-    float     intensity = 0;
+    std::optional<glm::u8vec3> color;
+    std::optional<float>       intensity = 0;
+    std::optional<glm::vec4>   spatial;
+    std::optional<LightType>   type = LightType::POINT;
 };
 
 /// The base light class for buffers. Users can inherit from this to add

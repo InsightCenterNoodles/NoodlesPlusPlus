@@ -45,8 +45,8 @@ public:
     LightT(IDType, LightList*, LightData const&);
 
     void write_new_to(Writer&);
-    void update(LightData const&, Writer&);
-    void update(LightData const&);
+    void update(LightUpdateData const&, Writer&);
+    void update(LightUpdateData const&);
     void write_delete_to(Writer&);
 };
 
