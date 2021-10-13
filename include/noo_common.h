@@ -52,6 +52,28 @@ NOO_STRING(mthd_, noo_client_view);
 
 NOO_STRING(tag_, noo_user_hidden);
 
+
+NOO_STRING(hint_, any);
+NOO_STRING(hint_, text);
+NOO_STRING(hint_, integer);
+NOO_STRING(hint_, integerlist);
+NOO_STRING(hint_, real);
+NOO_STRING(hint_, reallist);
+NOO_STRING(hint_, data);
+NOO_STRING(hint_, list);
+NOO_STRING(hint_, map);
+NOO_STRING(hint_, anyid);
+NOO_STRING(hint_, objectid);
+NOO_STRING(hint_, tableid);
+NOO_STRING(hint_, signalid);
+NOO_STRING(hint_, methodid);
+NOO_STRING(hint_, materialid);
+NOO_STRING(hint_, geometryid);
+NOO_STRING(hint_, lightid);
+NOO_STRING(hint_, textureid);
+NOO_STRING(hint_, bufferid);
+NOO_STRING(hint_, plotid);
+
 #undef NOO_STRING
 } // namespace names
 
