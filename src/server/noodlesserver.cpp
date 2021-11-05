@@ -30,9 +30,20 @@ QString message_to_json(void* table, std::string const& table_name) {
 
     parser.opts.output_default_scalars_in_json = true;
 
+    qDebug() << "S Table";
+
+    for (auto const& [k, _] : parser.structs_.dict) {
+        qDebug() << " - " << k.c_str();
+    }
+
     std::string text;
 
-    flatbuffers::GenerateTextFromTable(parser, table, table_name, &text);
+    ok = flatbuffers::GenerateTextFromTable(parser, table, table_name, &text);
+
+    if (!ok) {
+        qCritical() << "Internal error: Cannot generate text!";
+        return QString();
+    }
 
     return QString::fromStdString(text);
 }
@@ -81,6 +92,8 @@ public:
     IncomingMessage(QString text) {
         qDebug() << Q_FUNC_INFO << text.size();
 
+        m_data_ref = text.toUtf8();
+
         m_parser = std::make_unique<flatbuffers::Parser>();
 
         bool ok = m_parser->Deserialize(noodles::noodles_bfbs,
@@ -98,9 +111,7 @@ public:
             return;
         }
 
-        auto utf8_text = text.toUtf8();
-
-        ok = m_parser->ParseJson(utf8_text.data());
+        ok = m_parser->ParseJson(m_data_ref.data());
 
         if (!ok) {
             qCritical() << "Unable to parse message from client!"
