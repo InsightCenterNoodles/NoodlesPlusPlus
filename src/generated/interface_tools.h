@@ -88,6 +88,11 @@ struct IDConvType<noodles::BufferID> {
     using type = BufferID;
 };
 
+template <>
+struct IDConvType<noodles::PlotID> {
+    using type = PlotID;
+};
+
 class AnyVar;
 using AnyVarList = std::vector<AnyVar>;
 

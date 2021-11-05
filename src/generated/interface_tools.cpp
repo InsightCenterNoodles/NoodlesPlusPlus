@@ -373,6 +373,9 @@ void read_to(::noodles::AnyID const* n_any_id, AnyID& any_id) {
     case noodles::AnyIDType::BufferID:
         any_id = read_to_helper(n_any_id->id_as_BufferID());
         break;
+    case noodles::AnyIDType::PlotID:
+        any_id = read_to_helper(n_any_id->id_as_PlotID());
+        break;
     }
 }
 
