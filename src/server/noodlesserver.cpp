@@ -29,12 +29,7 @@ QString message_to_json(void const* table, std::string const& table_name) {
     }
 
     parser.opts.output_default_scalars_in_json = true;
-
-    //    qDebug() << "S Table";
-
-    //    for (auto const& [k, _] : parser.structs_.dict) {
-    //        qDebug() << " - " << k.c_str();
-    //    }
+    parser.opts.indent_step                    = 0;
 
     std::string text;
 
@@ -273,8 +268,7 @@ void ServerT::on_new_connection() {
 
     ClientT* client = new ClientT(socket, this);
 
-    // qDebug() << Q_FUNC_INFO << client;
-    qInfo() << "New client:" << socket->origin();
+    qInfo() << "New client: " << socket->origin();
 
     connect(client, &ClientT::finished, this, &ServerT::on_client_done);
     connect(client, &ClientT::message_recvd, this, &ServerT::on_client_message);
