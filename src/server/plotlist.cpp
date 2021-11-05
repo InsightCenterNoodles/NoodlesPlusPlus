@@ -3,7 +3,7 @@
 #include "noodlesserver.h"
 #include "src/common/variant_tools.h"
 #include "src/generated/interface_tools.h"
-#include "src/generated/noodles_server_generated.h"
+#include "src/generated/noodles_generated.h"
 #include "src/server/tablelist.h"
 
 namespace noo {

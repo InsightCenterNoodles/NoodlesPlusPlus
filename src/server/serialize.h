@@ -3,7 +3,7 @@
 
 #include "include/noo_id.h"
 #include "include/noo_server_interface.h"
-#include "src/generated/noodles_server_generated.h"
+#include "src/generated/noodles_generated.h"
 
 #include <flatbuffers/flatbuffers.h>
 

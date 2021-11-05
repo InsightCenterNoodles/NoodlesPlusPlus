@@ -5,7 +5,7 @@
 #include "noodlesstate.h"
 #include "serialize.h"
 #include "src/common/variant_tools.h"
-#include "src/generated/noodles_server_generated.h"
+#include "src/generated/noodles_generated.h"
 
 #include <QDebug>
 

@@ -1,8 +1,7 @@
 #ifndef CLIENTMESSAGEHANDLER_H
 #define CLIENTMESSAGEHANDLER_H
 
-#include "src/generated/noodles_client_generated.h"
-#include "src/generated/noodles_server_generated.h"
+#include "src/generated/noodles_generated.h"
 
 #include <QWebSocket>
 

@@ -2,7 +2,11 @@
 
 #include "noodlesstate.h"
 #include "serialize.h"
-#include "src/generated/noodles_client_generated.h"
+#include "src/generated/noodles_bfbs.h"
+#include "src/generated/noodles_generated.h"
+
+#include <flatbuffers/idl.h>
+#include <flatbuffers/minireflect.h>
 
 #include <QDebug>
 #include <QFile>
@@ -14,11 +18,13 @@ namespace noo {
 class IncomingMessage {
     QByteArray m_data_ref;
 
+    std::unique_ptr<flatbuffers::Parser> m_parser;
+
     noodles::ClientMessages const* m_messages = nullptr;
 
 public:
-    IncomingMessage(QByteArray bytes, bool debug) {
-        if (debug) qDebug() << Q_FUNC_INFO << bytes.size();
+    IncomingMessage(QByteArray bytes) {
+        qDebug() << Q_FUNC_INFO << bytes.size();
 
         // need to hold onto where our data is coming from
         // as the reader uses refs to it.
@@ -27,14 +33,50 @@ public:
         {
             flatbuffers::Verifier v((uint8_t*)bytes.data(), bytes.size());
 
-            if (!noodles::VerifyClientMessagesBuffer(v)) {
+            if (!v.VerifyBuffer<noodles::ClientMessages>(nullptr)) {
                 qCritical() << "Unable to verify message from client!";
                 return;
             }
-            if (debug) qDebug() << "Message verified";
+
+            qDebug() << "Message verified";
         }
 
-        m_messages = noodles::GetClientMessages(m_data_ref.data());
+        m_messages =
+            flatbuffers::GetRoot<noodles::ClientMessages>(m_data_ref.data());
+    }
+
+    IncomingMessage(QString text) {
+        qDebug() << Q_FUNC_INFO << text.size();
+
+        m_parser = std::make_unique<flatbuffers::Parser>();
+
+        bool ok = m_parser->Deserialize(noodles::noodles_bfbs,
+                                        noodles::noodles_bfbs_len);
+
+        if (!ok) {
+            qCritical() << "Internal error: Cannot load schema.";
+            return;
+        }
+
+        ok = m_parser->SetRootType("ServerMessages");
+
+        if (!ok) {
+            qCritical() << "Internal error: Cannot override root type.";
+            return;
+        }
+
+        auto utf8_text = text.toUtf8();
+
+        ok = m_parser->ParseJson(utf8_text.data());
+
+        if (!ok) {
+            qCritical() << "Unable to parse message from client!"
+                        << m_parser->error_.c_str();
+            return;
+        }
+
+        m_messages = flatbuffers::GetRoot<noodles::ClientMessages>(
+            m_parser->builder_.GetBufferPointer());
     }
 
     ~IncomingMessage() noexcept { }
@@ -44,8 +86,128 @@ public:
 
 // =============================================================================
 
-ClientT::ClientT(QWebSocket* socket, QObject* parent, bool debug)
-    : QObject(parent), m_socket(socket), m_debug(debug) {
+// This visitor is copied from the flatbuffer visitor, but modified to use
+// QString natively
+struct ToQStringVisitor : public flatbuffers::IterationVisitor {
+    QString s;
+    QString d;
+    bool    q;
+    QString in;
+    size_t  indent_level;
+    bool    vector_delimited;
+    ToQStringVisitor(QString delimiter,
+                     bool    quotes,
+                     QString indent,
+                     bool    vdelimited = true)
+        : d(delimiter),
+          q(quotes),
+          in(indent),
+          indent_level(0),
+          vector_delimited(vdelimited) { }
+
+    void append_indent() {
+        for (size_t i = 0; i < indent_level; i++) {
+            s += in;
+        }
+    }
+
+    void StartSequence() {
+        s += "{";
+        s += d;
+        indent_level++;
+    }
+    void EndSequence() {
+        s += d;
+        indent_level--;
+        append_indent();
+        s += "}";
+    }
+    void Field(size_t /*field_idx*/,
+               size_t set_idx,
+               flatbuffers::ElementaryType /*type*/,
+               bool /*is_vector*/,
+               const flatbuffers::TypeTable* /*type_table*/,
+               const char*    name,
+               const uint8_t* val) {
+        if (!val) return;
+        if (set_idx) {
+            s += ",";
+            s += d;
+        }
+        append_indent();
+        if (name) {
+            if (q) s += "\"";
+            s += name;
+            if (q) s += "\"";
+            s += ": ";
+        }
+    }
+    template <typename T>
+    void Named(T x, const char* name) {
+        if (name) {
+            if (q) s += "\"";
+            s += name;
+            if (q) s += "\"";
+        } else {
+            s += QString::number(x); //  flatbuffers::NumToString(x);
+        }
+    }
+    void UType(uint8_t x, const char* name) { Named(x, name); }
+    void Bool(bool x) { s += x ? "true" : "false"; }
+    void Char(int8_t x, const char* name) { Named(x, name); }
+    void UChar(uint8_t x, const char* name) { Named(x, name); }
+    void Short(int16_t x, const char* name) { Named(x, name); }
+    void UShort(uint16_t x, const char* name) { Named(x, name); }
+    void Int(int32_t x, const char* name) { Named(x, name); }
+    void UInt(uint32_t x, const char* name) { Named(x, name); }
+    void Long(int64_t x) { s += QString::number(x); }
+    void ULong(uint64_t x) { s += QString::number(x); }
+    void Float(float x) { s += QString::number(x); }
+    void Double(double x) { s += QString::number(x); }
+    void String(const struct flatbuffers::String* str) {
+        s += QString::fromUtf8(str->c_str(), str->size());
+    }
+    void Unknown(const uint8_t*) { s += "(?)"; }
+    void StartVector() {
+        s += "[";
+        if (vector_delimited) {
+            s += d;
+            indent_level++;
+            append_indent();
+        } else {
+            s += " ";
+        }
+    }
+    void EndVector() {
+        if (vector_delimited) {
+            s += d;
+            indent_level--;
+            append_indent();
+        } else {
+            s += " ";
+        }
+        s += "]";
+    }
+    void Element(size_t i,
+                 flatbuffers::ElementaryType /*type*/,
+                 const flatbuffers::TypeTable* /*type_table*/,
+                 const uint8_t* /*val*/) {
+        if (i) {
+            s += ",";
+            if (vector_delimited) {
+                s += d;
+                append_indent();
+            } else {
+                s += " ";
+            }
+        }
+    }
+};
+
+// =============================================================================
+
+ClientT::ClientT(QWebSocket* socket, QObject* parent)
+    : QObject(parent), m_socket(socket) {
     socket->setParent(this);
     connect(socket, &QWebSocket::disconnected, this, &ClientT::finished);
 
@@ -60,12 +222,9 @@ ClientT::~ClientT() {
 }
 
 void ClientT::on_text(QString text) {
-    qWarning() << "Text not supported!" << text;
-}
+    m_use_binary = false;
 
-void ClientT::on_binary(QByteArray array) {
-
-    auto ptr = std::make_shared<IncomingMessage>(array, m_debug);
+    auto ptr = std::make_shared<IncomingMessage>(text);
 
     if (!ptr->get_root()) {
         qCritical() << "Bad message from ClientT" << this;
@@ -73,14 +232,26 @@ void ClientT::on_binary(QByteArray array) {
         return;
     }
 
+    emit message_recvd(ptr);
+}
+
+void ClientT::on_binary(QByteArray array) {
+    m_use_binary = true;
+
+    auto ptr = std::make_shared<IncomingMessage>(array);
+
+    if (!ptr->get_root()) {
+        qCritical() << "Bad message from ClientT" << this;
+        kill();
+        return;
+    }
 
     emit message_recvd(ptr);
 }
 
 void ClientT::set_name(std::string const& s) {
     m_name = QString::fromStdString(s);
-    if (m_debug)
-        qDebug() << "Identifying ClientT" << m_socket << "as" << m_name;
+    qDebug() << "Identifying ClientT" << m_socket << "as" << m_name;
 }
 
 void ClientT::kill() {
@@ -92,16 +263,26 @@ void ClientT::send(QByteArray data) {
     m_bytes_counter += data.size();
     if (data.isEmpty()) return;
 
-    m_socket->sendBinaryMessage(data);
+    if (m_use_binary) {
+        m_socket->sendBinaryMessage(data);
+    } else {
+
+        ToQStringVisitor visitor(" ", true, "");
+
+        flatbuffers::IterateFlatBuffer((uint8_t*)data.data(),
+                                       noodles::ServerMessagesTypeTable(),
+                                       &visitor);
+
+        m_socket->sendTextMessage(visitor.s);
+    }
 }
 
 // =============================================================================
 
 
-ServerT::ServerT(quint16 port, bool debug, QObject* parent)
-    : QObject(parent), m_debug(debug) {
+ServerT::ServerT(quint16 port, QObject* parent) : QObject(parent) {
 
-    m_state = new NoodlesState(this, debug);
+    m_state = new NoodlesState(this);
 
     m_socket_server = new QWebSocketServer(QStringLiteral("Noodles Server"),
                                            QWebSocketServer::NonSecureMode,
@@ -119,10 +300,6 @@ ServerT::ServerT(quint16 port, bool debug, QObject* parent)
 
 NoodlesState* ServerT::state() {
     return m_state;
-}
-
-bool ServerT::debug_mode() const {
-    return m_debug;
 }
 
 std::unique_ptr<Writer> ServerT::get_broadcast_writer() {
@@ -159,7 +336,7 @@ void ServerT::broadcast(QByteArray ptr) {
 void ServerT::on_new_connection() {
     QWebSocket* socket = m_socket_server->nextPendingConnection();
 
-    ClientT* client = new ClientT(socket, this, m_debug);
+    ClientT* client = new ClientT(socket, this);
 
     // qDebug() << Q_FUNC_INFO << client;
     qInfo() << "New client:" << socket->origin();
@@ -207,7 +384,7 @@ class MessageHandler {
 
     void handle_introduction(noodles::IntroductionMessage const* m) {
         if (!m) return;
-        if (on_debug()) qDebug() << Q_FUNC_INFO;
+        qDebug() << Q_FUNC_INFO;
 
         m_client.set_name(m->client_name()->str());
 
@@ -298,14 +475,14 @@ class MessageHandler {
 
     void handle_invoke(noodles::MethodInvokeMessage const* message) {
         if (!message) return;
-        if (on_debug()) qDebug() << Q_FUNC_INFO;
+        qDebug() << Q_FUNC_INFO;
 
         MethodContext             context;
         AttachedMethodList const* target_list = nullptr;
         bool                      is_table    = false;
 
         if (message->on_object()) {
-            if (on_debug()) qDebug() << "INVOKE on obj";
+            qDebug() << "INVOKE on obj";
 
             ObjectID source = convert_id(*message->on_object());
 
@@ -317,7 +494,7 @@ class MessageHandler {
             }
 
         } else if (message->on_table()) {
-            if (on_debug()) qDebug() << "INVOKE on table";
+            qDebug() << "INVOKE on table";
 
             TableID source = convert_id(*message->on_table());
 
@@ -330,7 +507,7 @@ class MessageHandler {
             }
 
         } else {
-            if (on_debug()) qDebug() << "INVOKE on doc";
+            qDebug() << "INVOKE on doc";
             target_list = &(get_document().att_method_list());
         }
 
@@ -367,9 +544,7 @@ class MessageHandler {
             return;
         }
 
-        if (on_debug()) {
-            qDebug() << "METHOD ID" << method_id.id_slot << method_id.id_gen;
-        }
+        qDebug() << "METHOD ID" << method_id.id_slot << method_id.id_gen;
 
         auto* method = target_list->find(method_id);
 
@@ -404,9 +579,9 @@ class MessageHandler {
             vars = AnyVarListRef(message->method_args());
         }
 
-        if (on_debug()) {
-            auto arg_str = vars.dump_string();
-            qDebug() << "Method arguments:" << arg_str.c_str();
+        {
+            qDebug() << "Method arguments:"
+                     << QString::fromStdString(vars.dump_string());
         }
 
         AnyVar                    ret_data;
@@ -425,10 +600,8 @@ class MessageHandler {
             estate.message = "An internal error occured";
         }
 
-        if (on_debug()) {
-            qDebug() << "Method Done" << ret_data.dump_string().c_str()
-                     << (err_state ? "ERROR" : "OK");
-        }
+        qDebug() << "Method Done" << ret_data.dump_string().c_str()
+                 << (err_state ? "ERROR" : "OK");
 
         if (is_table) {
             auto this_tbl = context.get_table();
@@ -452,7 +625,7 @@ class MessageHandler {
 
     void handle_refresh(::noodles::AssetRefreshMessage const* message) {
         if (!message) return;
-        if (on_debug()) { qDebug() << Q_FUNC_INFO; }
+        qDebug() << Q_FUNC_INFO;
 
         auto buffer_list = message->for_buffers();
 
@@ -475,8 +648,6 @@ class MessageHandler {
 
 public:
     MessageHandler(ServerT* s, ClientT& c) : m_server(s), m_client(c) { }
-
-    bool on_debug() const { return m_server->debug_mode(); }
 
     void handle(IncomingMessage& message) {
         try {
@@ -520,7 +691,7 @@ void ServerT::on_client_message(std::shared_ptr<IncomingMessage> ptr) {
 
     ClientT* c = qobject_cast<ClientT*>(sender());
 
-    if (debug_mode()) qDebug() << Q_FUNC_INFO << c;
+    qDebug() << Q_FUNC_INFO << c;
 
     if (!c) return;
 

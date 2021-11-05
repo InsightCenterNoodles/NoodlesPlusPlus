@@ -567,13 +567,16 @@ void MessageHandler::process() {
     flatbuffers::Verifier v((uint8_t const*)m_bin_message.data(),
                             m_bin_message.size());
 
-    if (!noodles::VerifyServerMessagesBuffer(v)) {
+
+    if (!v.VerifyBuffer<noodles::ServerMessages>(nullptr)) {
         qCritical() << "Malformed message from server, disconnecting!";
         m_socket.close();
         return;
     }
 
-    auto* server_messages = noodles::GetServerMessages(m_bin_message.data());
+
+    auto* server_messages =
+        flatbuffers::GetRoot<noodles::ServerMessages>(m_bin_message.data());
 
     if (!server_messages) return;
 

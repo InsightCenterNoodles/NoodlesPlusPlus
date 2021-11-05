@@ -239,8 +239,7 @@ SignalTPtr create_signal(DocumentT*, SignalData const&);
 // Server ======================================================================
 
 struct ServerOptions {
-    uint16_t port         = 50000;
-    bool     stdout_trace = false;
+    uint16_t port = 50000;
 };
 
 /// Create a new server, which uses a WebSocket to listen on the given port.

@@ -4,7 +4,7 @@
 #include "noodlesserver.h"
 #include "serialize.h"
 #include "src/generated/interface_tools.h"
-#include "src/generated/noodles_server_generated.h"
+#include "src/generated/noodles_generated.h"
 
 #include <QDebug>
 namespace noo {

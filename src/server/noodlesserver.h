@@ -27,12 +27,12 @@ class ClientT : public QObject {
 
     QString     m_name;
     QWebSocket* m_socket;
-    bool        m_debug;
+    bool        m_use_binary = true;
 
     size_t m_bytes_counter = 0;
 
 public:
-    ClientT(QWebSocket*, QObject*, bool debug);
+    ClientT(QWebSocket*, QObject*);
     ~ClientT();
 
     void set_name(std::string const&);
@@ -57,7 +57,6 @@ class ServerT : public QObject {
     Q_OBJECT
 
     NoodlesState* m_state;
-    bool          m_debug;
 
     QWebSocketServer* m_socket_server;
 
@@ -65,11 +64,9 @@ class ServerT : public QObject {
 
 
 public:
-    explicit ServerT(quint16 port, bool debug, QObject* parent = nullptr);
+    explicit ServerT(quint16 port, QObject* parent = nullptr);
 
     NoodlesState* state();
-
-    bool debug_mode() const;
 
     std::unique_ptr<Writer> get_broadcast_writer();
     std::unique_ptr<Writer> get_single_client_writer(ClientT&);

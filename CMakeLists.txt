@@ -29,7 +29,7 @@ CPMAddPackage(
   OPTIONS
     "FLATBUFFERS_CODE_COVERAGE OFF"
     "FLATBUFFERS_BUILD_TESTS OFF"
-    "FLATBUFFERS_BUILD_FLATLIB OFF"
+    "FLATBUFFERS_BUILD_FLATLIB ON"
     "FLATBUFFERS_BUILD_FLATC OFF"
     "FLATBUFFERS_BUILD_FLATHASH OFF"
     "FLATBUFFERS_LIBCXX_WITH_CLANG ON"
@@ -71,6 +71,14 @@ target_include_directories(noodles PUBLIC
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
 )
 
+message(${flatbuffers_SOURCE_DIR}/src/idl_parser.cpp)
+
+#we also have to add specific files from flatbuffers, because they want to make things hard
+target_sources(noodles PRIVATE
+    ${flatbuffers_SOURCE_DIR}/src/util.cpp
+    ${flatbuffers_SOURCE_DIR}/src/idl_parser.cpp
+    ${flatbuffers_SOURCE_DIR}/src/idl_gen_text.cpp
+    )
 
 # Because packagers like having fun
 target_link_libraries(noodles PRIVATE glm)
