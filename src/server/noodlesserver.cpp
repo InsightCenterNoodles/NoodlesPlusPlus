@@ -17,123 +17,25 @@ namespace noo {
 
 // =============================================================================
 
-// This visitor is copied from the flatbuffer visitor, but modified to use
-// QString natively
-struct ToQStringVisitor : public flatbuffers::IterationVisitor {
-    QString s;
-    QString d;
-    bool    q;
-    QString in;
-    size_t  indent_level;
-    bool    vector_delimited;
-    ToQStringVisitor(QString delimiter,
-                     bool    quotes,
-                     QString indent,
-                     bool    vdelimited = true)
-        : d(delimiter),
-          q(quotes),
-          in(indent),
-          indent_level(0),
-          vector_delimited(vdelimited) { }
+QString message_to_json(void* table, std::string const& table_name) {
 
-    void append_indent() {
-        for (size_t i = 0; i < indent_level; i++) {
-            s += in;
-        }
+    flatbuffers::Parser parser;
+    bool                ok =
+        parser.Deserialize(noodles::noodles_bfbs, noodles::noodles_bfbs_len);
+
+    if (!ok) {
+        qCritical() << "Internal error: Cannot load schema.";
+        return QString();
     }
 
-    void StartSequence() {
-        s += "{";
-        s += d;
-        indent_level++;
-    }
-    void EndSequence() {
-        s += d;
-        indent_level--;
-        append_indent();
-        s += "}";
-    }
-    void Field(size_t /*field_idx*/,
-               size_t set_idx,
-               flatbuffers::ElementaryType /*type*/,
-               bool /*is_vector*/,
-               const flatbuffers::TypeTable* /*type_table*/,
-               const char*    name,
-               const uint8_t* val) {
-        if (!val) return;
-        if (set_idx) {
-            s += ",";
-            s += d;
-        }
-        append_indent();
-        if (name) {
-            if (q) s += "\"";
-            s += name;
-            if (q) s += "\"";
-            s += ": ";
-        }
-    }
-    template <typename T>
-    void Named(T x, const char* name) {
-        if (name) {
-            if (q) s += "\"";
-            s += name;
-            if (q) s += "\"";
-        } else {
-            s += QString::number(x); //  flatbuffers::NumToString(x);
-        }
-    }
-    void UType(uint8_t x, const char* name) { Named(x, name); }
-    void Bool(bool x) { s += x ? "true" : "false"; }
-    void Char(int8_t x, const char* name) { Named(x, name); }
-    void UChar(uint8_t x, const char* name) { Named(x, name); }
-    void Short(int16_t x, const char* name) { Named(x, name); }
-    void UShort(uint16_t x, const char* name) { Named(x, name); }
-    void Int(int32_t x, const char* name) { Named(x, name); }
-    void UInt(uint32_t x, const char* name) { Named(x, name); }
-    void Long(int64_t x) { s += QString::number(x); }
-    void ULong(uint64_t x) { s += QString::number(x); }
-    void Float(float x) { s += QString::number(x); }
-    void Double(double x) { s += QString::number(x); }
-    void String(const struct flatbuffers::String* str) {
-        s += QString::fromUtf8(str->c_str(), str->size());
-    }
-    void Unknown(const uint8_t*) { s += "(?)"; }
-    void StartVector() {
-        s += "[";
-        if (vector_delimited) {
-            s += d;
-            indent_level++;
-            append_indent();
-        } else {
-            s += " ";
-        }
-    }
-    void EndVector() {
-        if (vector_delimited) {
-            s += d;
-            indent_level--;
-            append_indent();
-        } else {
-            s += " ";
-        }
-        s += "]";
-    }
-    void Element(size_t i,
-                 flatbuffers::ElementaryType /*type*/,
-                 const flatbuffers::TypeTable* /*type_table*/,
-                 const uint8_t* /*val*/) {
-        if (i) {
-            s += ",";
-            if (vector_delimited) {
-                s += d;
-                append_indent();
-            } else {
-                s += " ";
-            }
-        }
-    }
-};
+    parser.opts.output_default_scalars_in_json = true;
+
+    std::string text;
+
+    flatbuffers::GenerateTextFromTable(parser, table, table_name, &text);
+
+    return QString::fromStdString(text);
+}
 
 // =============================================================================
 
@@ -165,12 +67,10 @@ public:
 
 #ifndef NDEBUG
         {
-            ToQStringVisitor visitor(" ", true, "");
+            QString message =
+                message_to_json(bytes.data(), "noodles.ClientMessages");
 
-            flatbuffers::IterateFlatBuffer((uint8_t*)bytes.data(),
-                                           noodles::ServerMessagesTypeTable(),
-                                           &visitor);
-            qDebug() << "=> Decoded Message:" << visitor.s;
+            qDebug() << "=> Decoded Message:" << message;
         }
 #endif
 
@@ -191,7 +91,7 @@ public:
             return;
         }
 
-        ok = m_parser->SetRootType("ServerMessages");
+        ok = m_parser->SetRootType("noodles.ServerMessages");
 
         if (!ok) {
             qCritical() << "Internal error: Cannot override root type.";
@@ -282,25 +182,19 @@ void ClientT::send(QByteArray data) {
 
 #ifndef NDEBUG
         {
-            ToQStringVisitor visitor(" ", true, "");
+            QString message =
+                message_to_json(data.data(), "noodles.ServerMessages");
 
-            flatbuffers::IterateFlatBuffer((uint8_t*)data.data(),
-                                           noodles::ServerMessagesTypeTable(),
-                                           &visitor);
-
-            qDebug() << "<= " << visitor.s;
+            qDebug() << "<= " << message;
         }
 #endif
 
     } else {
 
-        ToQStringVisitor visitor(" ", true, "");
+        QString message =
+            message_to_json(data.data(), "noodles.ServerMessages");
 
-        flatbuffers::IterateFlatBuffer((uint8_t*)data.data(),
-                                       noodles::ServerMessagesTypeTable(),
-                                       &visitor);
-
-        m_socket->sendTextMessage(visitor.s);
+        m_socket->sendTextMessage(message);
     }
 }
 

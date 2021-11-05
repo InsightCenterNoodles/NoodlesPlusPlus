@@ -1209,16 +1209,16 @@ struct ObjectID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1233,10 +1233,10 @@ struct ObjectIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(ObjectID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(ObjectID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(ObjectID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(ObjectID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit ObjectIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1251,8 +1251,8 @@ struct ObjectIDBuilder {
 
 inline flatbuffers::Offset<ObjectID> CreateObjectID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   ObjectIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1269,16 +1269,16 @@ struct PlotID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1293,10 +1293,10 @@ struct PlotIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(PlotID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(PlotID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(PlotID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(PlotID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit PlotIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1311,8 +1311,8 @@ struct PlotIDBuilder {
 
 inline flatbuffers::Offset<PlotID> CreatePlotID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   PlotIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1329,16 +1329,16 @@ struct TableID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1353,10 +1353,10 @@ struct TableIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(TableID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(TableID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(TableID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(TableID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit TableIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1371,8 +1371,8 @@ struct TableIDBuilder {
 
 inline flatbuffers::Offset<TableID> CreateTableID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   TableIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1389,16 +1389,16 @@ struct SignalID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1413,10 +1413,10 @@ struct SignalIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(SignalID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(SignalID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(SignalID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(SignalID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit SignalIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1431,8 +1431,8 @@ struct SignalIDBuilder {
 
 inline flatbuffers::Offset<SignalID> CreateSignalID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   SignalIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1449,16 +1449,16 @@ struct MethodID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1473,10 +1473,10 @@ struct MethodIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(MethodID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(MethodID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(MethodID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(MethodID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit MethodIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1491,8 +1491,8 @@ struct MethodIDBuilder {
 
 inline flatbuffers::Offset<MethodID> CreateMethodID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   MethodIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1509,16 +1509,16 @@ struct MaterialID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1533,10 +1533,10 @@ struct MaterialIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(MaterialID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(MaterialID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(MaterialID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(MaterialID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit MaterialIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1551,8 +1551,8 @@ struct MaterialIDBuilder {
 
 inline flatbuffers::Offset<MaterialID> CreateMaterialID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   MaterialIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1569,16 +1569,16 @@ struct GeometryID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1593,10 +1593,10 @@ struct GeometryIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(GeometryID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(GeometryID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(GeometryID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(GeometryID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit GeometryIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1611,8 +1611,8 @@ struct GeometryIDBuilder {
 
 inline flatbuffers::Offset<GeometryID> CreateGeometryID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   GeometryIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1629,16 +1629,16 @@ struct LightID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1653,10 +1653,10 @@ struct LightIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(LightID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(LightID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(LightID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(LightID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit LightIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1671,8 +1671,8 @@ struct LightIDBuilder {
 
 inline flatbuffers::Offset<LightID> CreateLightID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   LightIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1689,16 +1689,16 @@ struct TextureID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1713,10 +1713,10 @@ struct TextureIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(TextureID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(TextureID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(TextureID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(TextureID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit TextureIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1731,8 +1731,8 @@ struct TextureIDBuilder {
 
 inline flatbuffers::Offset<TextureID> CreateTextureID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   TextureIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
@@ -1749,16 +1749,16 @@ struct BufferID FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ID_GEN = 6
   };
   uint32_t id_slot() const {
-    return GetField<uint32_t>(VT_ID_SLOT, 0);
+    return GetField<uint32_t>(VT_ID_SLOT, 4294967295);
   }
   bool mutate_id_slot(uint32_t _id_slot) {
-    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 0);
+    return SetField<uint32_t>(VT_ID_SLOT, _id_slot, 4294967295);
   }
   uint32_t id_gen() const {
-    return GetField<uint32_t>(VT_ID_GEN, 0);
+    return GetField<uint32_t>(VT_ID_GEN, 4294967295);
   }
   bool mutate_id_gen(uint32_t _id_gen) {
-    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 0);
+    return SetField<uint32_t>(VT_ID_GEN, _id_gen, 4294967295);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1773,10 +1773,10 @@ struct BufferIDBuilder {
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
   void add_id_slot(uint32_t id_slot) {
-    fbb_.AddElement<uint32_t>(BufferID::VT_ID_SLOT, id_slot, 0);
+    fbb_.AddElement<uint32_t>(BufferID::VT_ID_SLOT, id_slot, 4294967295);
   }
   void add_id_gen(uint32_t id_gen) {
-    fbb_.AddElement<uint32_t>(BufferID::VT_ID_GEN, id_gen, 0);
+    fbb_.AddElement<uint32_t>(BufferID::VT_ID_GEN, id_gen, 4294967295);
   }
   explicit BufferIDBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1791,8 +1791,8 @@ struct BufferIDBuilder {
 
 inline flatbuffers::Offset<BufferID> CreateBufferID(
     flatbuffers::FlatBufferBuilder &_fbb,
-    uint32_t id_slot = 0,
-    uint32_t id_gen = 0) {
+    uint32_t id_slot = 4294967295,
+    uint32_t id_gen = 4294967295) {
   BufferIDBuilder builder_(_fbb);
   builder_.add_id_gen(id_gen);
   builder_.add_id_slot(id_slot);
