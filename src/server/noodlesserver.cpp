@@ -17,7 +17,7 @@ namespace noo {
 
 // =============================================================================
 
-QString message_to_json(void* table, std::string const& table_name) {
+QString message_to_json(void const* table, std::string const& table_name) {
 
     flatbuffers::Parser parser;
     bool                ok =
@@ -30,11 +30,11 @@ QString message_to_json(void* table, std::string const& table_name) {
 
     parser.opts.output_default_scalars_in_json = true;
 
-    qDebug() << "S Table";
+    //    qDebug() << "S Table";
 
-    for (auto const& [k, _] : parser.structs_.dict) {
-        qDebug() << " - " << k.c_str();
-    }
+    //    for (auto const& [k, _] : parser.structs_.dict) {
+    //        qDebug() << " - " << k.c_str();
+    //    }
 
     std::string text;
 
@@ -76,17 +76,17 @@ public:
             qDebug() << "Message verified";
         }
 
+        m_messages =
+            flatbuffers::GetRoot<noodles::ClientMessages>(m_data_ref.data());
+
 #ifndef NDEBUG
         {
             QString message =
-                message_to_json(bytes.data(), "noodles.ClientMessages");
+                message_to_json(m_messages, "noodles.ClientMessages");
 
             qDebug() << "=> Decoded Message:" << message;
         }
 #endif
-
-        m_messages =
-            flatbuffers::GetRoot<noodles::ClientMessages>(m_data_ref.data());
     }
 
     IncomingMessage(QString text) {
@@ -193,8 +193,11 @@ void ClientT::send(QByteArray data) {
 
 #ifndef NDEBUG
         {
-            QString message =
-                message_to_json(data.data(), "noodles.ServerMessages");
+
+            auto const* t =
+                flatbuffers::GetRoot<noodles::ServerMessages>(data.data());
+
+            QString message = message_to_json(t, "noodles.ServerMessages");
 
             qDebug() << "<= " << message;
         }
