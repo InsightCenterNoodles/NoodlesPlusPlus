@@ -15,75 +15,6 @@
 
 namespace noo {
 
-class IncomingMessage {
-    QByteArray m_data_ref;
-
-    std::unique_ptr<flatbuffers::Parser> m_parser;
-
-    noodles::ClientMessages const* m_messages = nullptr;
-
-public:
-    IncomingMessage(QByteArray bytes) {
-        qDebug() << Q_FUNC_INFO << bytes.size();
-
-        // need to hold onto where our data is coming from
-        // as the reader uses refs to it.
-        m_data_ref = bytes;
-
-        {
-            flatbuffers::Verifier v((uint8_t*)bytes.data(), bytes.size());
-
-            if (!v.VerifyBuffer<noodles::ClientMessages>(nullptr)) {
-                qCritical() << "Unable to verify message from client!";
-                return;
-            }
-
-            qDebug() << "Message verified";
-        }
-
-        m_messages =
-            flatbuffers::GetRoot<noodles::ClientMessages>(m_data_ref.data());
-    }
-
-    IncomingMessage(QString text) {
-        qDebug() << Q_FUNC_INFO << text.size();
-
-        m_parser = std::make_unique<flatbuffers::Parser>();
-
-        bool ok = m_parser->Deserialize(noodles::noodles_bfbs,
-                                        noodles::noodles_bfbs_len);
-
-        if (!ok) {
-            qCritical() << "Internal error: Cannot load schema.";
-            return;
-        }
-
-        ok = m_parser->SetRootType("ServerMessages");
-
-        if (!ok) {
-            qCritical() << "Internal error: Cannot override root type.";
-            return;
-        }
-
-        auto utf8_text = text.toUtf8();
-
-        ok = m_parser->ParseJson(utf8_text.data());
-
-        if (!ok) {
-            qCritical() << "Unable to parse message from client!"
-                        << m_parser->error_.c_str();
-            return;
-        }
-
-        m_messages = flatbuffers::GetRoot<noodles::ClientMessages>(
-            m_parser->builder_.GetBufferPointer());
-    }
-
-    ~IncomingMessage() noexcept { }
-
-    noodles::ClientMessages const* get_root() { return m_messages; }
-};
-
 // =============================================================================
 
 // This visitor is copied from the flatbuffer visitor, but modified to use
@@ -206,6 +137,89 @@ struct ToQStringVisitor : public flatbuffers::IterationVisitor {
 
 // =============================================================================
 
+class IncomingMessage {
+    QByteArray m_data_ref;
+
+    std::unique_ptr<flatbuffers::Parser> m_parser;
+
+    noodles::ClientMessages const* m_messages = nullptr;
+
+public:
+    IncomingMessage(QByteArray bytes) {
+        qDebug() << Q_FUNC_INFO << bytes.size();
+
+        // need to hold onto where our data is coming from
+        // as the reader uses refs to it.
+        m_data_ref = bytes;
+
+        {
+            flatbuffers::Verifier v((uint8_t*)bytes.data(), bytes.size());
+
+            if (!v.VerifyBuffer<noodles::ClientMessages>(nullptr)) {
+                qCritical() << "Unable to verify message from client!";
+                return;
+            }
+
+            qDebug() << "Message verified";
+        }
+
+#ifndef NDEBUG
+        {
+            ToQStringVisitor visitor(" ", true, "");
+
+            flatbuffers::IterateFlatBuffer((uint8_t*)bytes.data(),
+                                           noodles::ServerMessagesTypeTable(),
+                                           &visitor);
+            qDebug() << "=> Decoded Message:" << visitor.s;
+        }
+#endif
+
+        m_messages =
+            flatbuffers::GetRoot<noodles::ClientMessages>(m_data_ref.data());
+    }
+
+    IncomingMessage(QString text) {
+        qDebug() << Q_FUNC_INFO << text.size();
+
+        m_parser = std::make_unique<flatbuffers::Parser>();
+
+        bool ok = m_parser->Deserialize(noodles::noodles_bfbs,
+                                        noodles::noodles_bfbs_len);
+
+        if (!ok) {
+            qCritical() << "Internal error: Cannot load schema.";
+            return;
+        }
+
+        ok = m_parser->SetRootType("ServerMessages");
+
+        if (!ok) {
+            qCritical() << "Internal error: Cannot override root type.";
+            return;
+        }
+
+        auto utf8_text = text.toUtf8();
+
+        ok = m_parser->ParseJson(utf8_text.data());
+
+        if (!ok) {
+            qCritical() << "Unable to parse message from client!"
+                        << m_parser->error_.c_str();
+            return;
+        }
+
+        m_messages = flatbuffers::GetRoot<noodles::ClientMessages>(
+            m_parser->builder_.GetBufferPointer());
+    }
+
+    ~IncomingMessage() noexcept { }
+
+    noodles::ClientMessages const* get_root() { return m_messages; }
+};
+
+
+// =============================================================================
+
 ClientT::ClientT(QWebSocket* socket, QObject* parent)
     : QObject(parent), m_socket(socket) {
     socket->setParent(this);
@@ -265,6 +279,19 @@ void ClientT::send(QByteArray data) {
 
     if (m_use_binary) {
         m_socket->sendBinaryMessage(data);
+
+#ifndef NDEBUG
+        {
+            ToQStringVisitor visitor(" ", true, "");
+
+            flatbuffers::IterateFlatBuffer((uint8_t*)data.data(),
+                                           noodles::ClientMessagesTypeTable(),
+                                           &visitor);
+
+            qDebug() << "<= " << visitor.s;
+        }
+#endif
+
     } else {
 
         ToQStringVisitor visitor(" ", true, "");
