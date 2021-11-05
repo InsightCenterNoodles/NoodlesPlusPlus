@@ -285,7 +285,7 @@ void ClientT::send(QByteArray data) {
             ToQStringVisitor visitor(" ", true, "");
 
             flatbuffers::IterateFlatBuffer((uint8_t*)data.data(),
-                                           noodles::ClientMessagesTypeTable(),
+                                           noodles::ServerMessagesTypeTable(),
                                            &visitor);
 
             qDebug() << "<= " << visitor.s;
