@@ -7,22 +7,20 @@
 
 namespace noo {
 
-class MeshList : public ComponentListBase<MeshList, MeshID, MeshT> {
+class MeshList : public ComponentListBase<MeshList, GeometryID, MeshT> {
 public:
     MeshList(ServerT*);
     ~MeshList();
 };
 
 
-class MeshT : public ComponentMixin<MeshT, MeshList, MeshID> {
+class MeshT : public ComponentMixin<MeshT, MeshList, GeometryID> {
     MeshData m_data;
 
 public:
     MeshT(IDType, MeshList*, MeshData const&);
 
     void write_new_to(Writer&);
-    void update(MeshData const&, Writer&);
-    void update(MeshData const&);
     void write_delete_to(Writer&);
 };
 

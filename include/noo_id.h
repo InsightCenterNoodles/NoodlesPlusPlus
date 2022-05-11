@@ -59,31 +59,37 @@ struct ID {
     }
 };
 
-struct ObjectIDTag;
+struct EntityIDTag;
 struct MeshIDTag;
 struct MaterialIDTag;
 struct TableIDTag;
 struct LightIDTag;
+struct SamplerIDTag;
 struct TextureIDTag;
+struct ImageIDTag;
 struct BufferIDTag;
+struct BufferViewIDTag;
 struct MethodIDTag;
 struct SignalIDTag;
 struct PlotIDTag;
 
 // Typedefs for used ID types
-using TextureID  = ID<TextureIDTag>;
-using BufferID   = ID<BufferIDTag>;
-using TableID    = ID<TableIDTag>;
-using LightID    = ID<LightIDTag>;
-using MaterialID = ID<MaterialIDTag>;
-using MeshID     = ID<MeshIDTag>;
-using ObjectID   = ID<ObjectIDTag>;
-using SignalID   = ID<SignalIDTag>;
-using MethodID   = ID<MethodIDTag>;
-using PlotID     = ID<PlotIDTag>;
+using EntityID     = ID<EntityIDTag>;
+using PlotID       = ID<PlotIDTag>;
+using TableID      = ID<TableIDTag>;
+using SignalID     = ID<SignalIDTag>;
+using MethodID     = ID<MethodIDTag>;
+using MaterialID   = ID<MaterialIDTag>;
+using GeometryID   = ID<MeshIDTag>;
+using LightID      = ID<LightIDTag>;
+using ImageID      = ID<ImageIDTag>;
+using SamplerID    = ID<SamplerIDTag>;
+using TextureID    = ID<TextureIDTag>;
+using BufferID     = ID<BufferIDTag>;
+using BufferViewID = ID<BufferViewIDTag>;
 
 template <>
-struct TagToString<ObjectIDTag> {
+struct TagToString<EntityIDTag> {
     static constexpr const char* str = "Object";
 };
 template <>
@@ -128,15 +134,18 @@ struct TagToString<PlotIDTag> {
 /// \brief The AnyID struct models the NOODLES Any type
 ///
 struct AnyID : public std::variant<std::monostate,
-                                   TextureID,
-                                   BufferID,
-                                   LightID,
+                                   EntityID,
                                    TableID,
-                                   MaterialID,
-                                   MeshID,
-                                   ObjectID,
                                    SignalID,
                                    MethodID,
+                                   MaterialID,
+                                   GeometryID,
+                                   LightID,
+                                   ImageID,
+                                   TextureID,
+                                   SamplerID,
+                                   BufferID,
+                                   BufferViewID,
                                    PlotID> {
     using variant::variant;
 };

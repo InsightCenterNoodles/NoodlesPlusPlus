@@ -52,7 +52,7 @@ public:
     void write_delete_to(Writer&);
 
 
-    void fire(std::variant<std::monostate, TableID, ObjectID, PlotID> id,
+    void fire(std::variant<std::monostate, TableID, EntityID, PlotID> id,
               AnyVarList&&);
 };
 

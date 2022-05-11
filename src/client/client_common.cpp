@@ -8,7 +8,7 @@ namespace nooc {
 
 void SubscribeInitReply::interpret() {
 
-    auto arg_map = m_var.to_map();
+    auto arg_map = m_var.toMap();
 
     if (arg_map.size() < 4) {
         qDebug() << "Malformed subscribe reply";
@@ -16,10 +16,10 @@ void SubscribeInitReply::interpret() {
         return;
     }
 
-    auto names = arg_map["columns"].to_vector();
-    auto keys  = arg_map["keys"];
-    auto cols  = arg_map["data"].to_vector();
-    auto sels  = arg_map["selections"].to_vector();
+    auto names = arg_map[QStringLiteral("columns")].toArray();
+    auto keys  = arg_map[QStringLiteral("keys")];
+    auto cols  = arg_map[QStringLiteral("data")].toArray();
+    auto sels  = arg_map[QStringLiteral("selections")].toArray();
 
     emit recv(names, keys, cols, sels);
 }

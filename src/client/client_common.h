@@ -14,10 +14,8 @@ public:
     void interpret() override;
 
 signals:
-    void recv(noo::AnyVarListRef const&,
-              noo::AnyVarRef,
-              noo::AnyVarListRef const&,
-              noo::AnyVarListRef const&);
+    void
+    recv(QCborArray const&, QCborValue, QCborArray const&, QCborArray const&);
 };
 
 } // namespace nooc

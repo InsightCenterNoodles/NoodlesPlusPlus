@@ -5,6 +5,7 @@
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
+#include <QColor>
 #include <QObject>
 #include <QUrl>
 
@@ -18,9 +19,6 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
-
-// We mirror a lot of the noodles objects in order to hide deps.
-// We can revisit this later.
 
 namespace noo {
 
@@ -54,38 +52,42 @@ using PlotTPtr = std::shared_ptr<PlotT>;
 struct MethodContext;
 
 template <class T>
-T _any_call_getter(AnyVarListRef const& source, size_t& loc) {
+T _any_call_getter(QCborArray const& source, size_t& loc) {
     auto at_i = source[loc];
     loc++;
 
-    if constexpr (std::is_same_v<T, int64_t>) {
-        return at_i.to_int();
-    } else if constexpr (std::is_same_v<T, double>) {
-        return at_i.to_real();
-    } else if constexpr (std::is_same_v<T, std::string_view>) {
-        return at_i.to_string();
-    } else if constexpr (std::is_same_v<T, AnyVarListRef>) {
-        return at_i.to_vector();
-    } else if constexpr (std::is_same_v<T, std::span<std::byte const>>) {
-        return at_i.to_data();
-    } else if constexpr (std::is_same_v<T, AnyVarMapRef>) {
-        return at_i.to_map();
-    } else if constexpr (std::is_same_v<T, std::span<double const>>) {
-        return at_i.to_real_list();
-    } else if constexpr (std::is_same_v<T, std::span<int64_t const>>) {
-        return at_i.to_int_list();
-    } else if constexpr (std::is_same_v<T, AnyID>) {
-        return at_i.to_id();
-    } else if constexpr (std::is_same_v<T, AnyVarRef>) {
-        return at_i;
-    } else {
-        return T(at_i);
-    }
+    T ret;
+    convert_from_cbor(at_i, ret);
+    return ret;
+
+    //    if constexpr (std::is_same_v<T, int64_t>) {
+    //        return at_i.to_int();
+    //    } else if constexpr (std::is_same_v<T, double>) {
+    //        return at_i.to_real();
+    //    } else if constexpr (std::is_same_v<T, std::string_view>) {
+    //        return at_i.to_string();
+    //    } else if constexpr (std::is_same_v<T, QCborArray>) {
+    //        return at_i.to_vector();
+    //    } else if constexpr (std::is_same_v<T, std::span<std::byte const>>) {
+    //        return at_i.to_data();
+    //    } else if constexpr (std::is_same_v<T, QCborValueMapRef>) {
+    //        return at_i.to_map();
+    //    } else if constexpr (std::is_same_v<T, std::span<double const>>) {
+    //        return at_i.to_real_list();
+    //    } else if constexpr (std::is_same_v<T, std::span<int64_t const>>) {
+    //        return at_i.to_int_list();
+    //    } else if constexpr (std::is_same_v<T, AnyID>) {
+    //        return at_i.to_id();
+    //    } else if constexpr (std::is_same_v<T, QCborValue>) {
+    //        return at_i;
+    //    } else {
+    //        return T(at_i);
+    //    }
 }
 
 
 template <class Func, class... Args>
-auto _call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+auto _call(Func&& f, MethodContext const& c, QCborArray const& source) {
     size_t i = 0;
     return f(c, std::move(_any_call_getter<Args>(source, i))...);
 }
@@ -97,7 +99,7 @@ template <class R, class... Args>
 struct AnyCallHelper<R(MethodContext const&, Args...)> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -106,7 +108,7 @@ template <class R, class... Args>
 struct AnyCallHelper<R (*)(MethodContext const&, Args...)> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -115,7 +117,7 @@ template <class R, class C, class... Args>
 struct AnyCallHelper<R (C::*)(MethodContext const&, Args...)> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -124,7 +126,7 @@ template <class R, class C, class... Args>
 struct AnyCallHelper<R (C::*)(MethodContext const&, Args...) const> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -136,7 +138,7 @@ struct AnyCallHelper<R (C::*)(MethodContext const&, Args...) const> {
 template <class Func>
 auto any_call_helper(Func&&               f,
                      MethodContext const& c,
-                     AnyVarListRef const& source) {
+                     QCborArray const&    source) {
     using FType = std::remove_cvref_t<Func>;
     return AnyCallHelper<FType>::call(f, c, source);
 }
@@ -148,14 +150,14 @@ auto any_call_helper(Func&&               f,
 struct MethodException : public std::exception {
     int         m_code;
     std::string m_reason;
-    AnyVar      m_data;
+    QCborValue  m_data;
 
 public:
-    MethodException(int code, std::string_view message, AnyVar data = {});
+    MethodException(int code, std::string_view message, QCborValue data = {});
 
-    int              code() const { return m_code; }
-    std::string_view reason() const { return m_reason; }
-    AnyVar const&    data() const { return m_data; }
+    int               code() const { return m_code; }
+    std::string_view  reason() const { return m_reason; }
+    QCborValue const& data() const { return m_data; }
 
     char const* what() const noexcept override;
 
@@ -184,6 +186,7 @@ struct Arg {
     std::string name;
     std::string documentation;
     std::string hint;
+    std::string editor_hint;
 };
 
 ///
@@ -195,7 +198,7 @@ struct MethodData {
     std::string      return_documentation;
     std::vector<Arg> argument_documentation;
 
-    std::function<AnyVar(MethodContext const&, AnyVarListRef const&)> code;
+    std::function<QCborValue(MethodContext const&, QCborArray const&)> code;
 
     /// Set the code to be called when the method is invoked. The function f can
     /// be any function and the parameters will be decoded. See noo::RealListArg
@@ -204,7 +207,7 @@ struct MethodData {
     template <class Function>
     void set_code(Function&& f) {
         code = [lf = std::move(f)](MethodContext const& c,
-                                   AnyVarListRef const& v) {
+                                   QCborArray const&    v) {
             return any_call_helper(lf, c, v);
         };
     }
@@ -261,10 +264,317 @@ struct DocumentData {
 /// Update the document with new methods and signals
 void update_document(DocumentTPtrRef, DocumentData const&);
 
-void issue_signal_direct(DocumentT*, SignalT*, AnyVarList);
-void issue_signal_direct(DocumentT*, std::string const&, AnyVarList);
+/// Issue a signal (by name or by object), on this document.
+void issue_signal_direct(DocumentT*, SignalT*, QCborArray);
+void issue_signal_direct(DocumentT*, std::string const&, QCborArray);
 
 // Buffer ======================================================================
+
+/// Instruct the buffer system to own the given bytes
+struct BufferOwningSource {
+    QByteArray to_move;
+};
+
+/// Instruct the buffer system to reference the URL for a buffer
+struct BufferURLSource {
+    QUrl   url_source;
+    size_t source_byte_size;
+};
+
+struct BufferData {
+
+    std::string name;
+
+    bool force_inline = false;
+
+    std::variant<BufferOwningSource, BufferURLSource> source;
+};
+
+class BufferT;
+using BufferTPtr = std::shared_ptr<BufferT>;
+
+/// Create a new buffer
+BufferTPtr create_buffer(DocumentTPtrRef, BufferData const&);
+
+// Buffer ======================================================================
+
+enum class ViewType : uint8_t {
+    UNKNOWN,
+    GEOMETRY_INFO,
+    IMAGE_INFO,
+};
+
+struct BufferViewData {
+    std::string name;
+
+    BufferTPtr source_buffer;
+
+    ViewType type   = ViewType::UNKNOWN;
+    uint64_t offset = 0;
+    uint64_t length = 0;
+};
+
+class BufferViewT;
+using BufferViewTPtr = std::shared_ptr<BufferViewT>;
+
+/// Create a new view
+BufferViewTPtr create_bufferview(DocumentTPtrRef, BufferViewData const&);
+
+// Image =======================================================================
+
+struct ImageData {
+    std::string name;
+
+    std::variant<QUrl, BufferViewTPtr> source;
+};
+
+class ImageT;
+using ImageTPtr = std::shared_ptr<ImageT>;
+
+/// Create a new view
+ImageTPtr create_image(DocumentTPtrRef, ImageData const&);
+
+// Sampler =====================================================================
+
+enum class MagFilter : uint8_t {
+    NEAREST,
+    LINEAR,
+};
+
+enum class MinFilter : uint8_t {
+    NEAREST,
+    LINEAR,
+    NEAREST_MIPMAP_NEAREST,
+    LINEAR_MIPMAP_NEAREST,
+    NEAREST_MIPMAP_LINEAR,
+    LINEAR_MIPMAP_LINEAR,
+};
+
+enum class SamplerMode : uint8_t {
+    CLAMP_TO_EDGE,
+    MIRRORED_REPEAT,
+    REPEAT,
+};
+
+struct SamplerData {
+    std::string name;
+
+    MagFilter mag_filter;
+    MinFilter min_filter;
+
+    SamplerMode wrap_s = SamplerMode::REPEAT;
+    SamplerMode wrap_t = SamplerMode::REPEAT;
+};
+
+class SamplerT;
+using SamplerTPtr = std::shared_ptr<SamplerT>;
+
+/// Create a new view
+SamplerTPtr create_sampler(DocumentTPtrRef, SamplerData const&);
+
+// Texture =====================================================================
+
+///
+/// \brief The TextureData struct describes a new texture as a byte range of a
+/// given buffer.
+///
+struct TextureData {
+    std::string name;
+    ImageTPtr   image;   // may not be blank.
+    SamplerTPtr sampler; // may be blank.
+};
+
+class TextureT;
+using TextureTPtr = std::shared_ptr<TextureT>;
+
+/// Create a new texture.
+TextureTPtr create_texture(DocumentTPtrRef, TextureData const&);
+
+/// Create a new texture from a span of bytes. Bytes should be the disk
+/// representation of an image, A new buffer will be automatically created.
+TextureTPtr create_texture_from_file(DocumentTPtrRef, std::span<std::byte>);
+
+/// Update a texture with a new byte range.
+void update_texture(TextureTPtr, TextureData const&);
+
+
+// Material ====================================================================
+
+struct TextureRef {
+    TextureTPtr source;
+    glm::mat3   transform          = glm::mat3(1);
+    uint8_t     texture_coord_slot = 0;
+};
+
+struct PBRInfo {
+    QColor                    base_color;
+    std::optional<TextureRef> base_color_texture;
+
+    float                     metallic  = 1.0;
+    float                     roughness = 1.0;
+    std::optional<TextureRef> metal_rough_texture;
+};
+
+///
+/// \brief The MaterialData struct defines a new material.
+///
+struct MaterialData {
+    std::string               name;
+    std::optional<PBRInfo>    pbr_info;
+    std::optional<TextureRef> normal_texture;
+
+    std::optional<TextureRef> occlusion_texture;
+    std::optional<float>      occlusion_texture_factor = 1.0;
+
+    std::optional<TextureRef> emissive_texture;
+    std::optional<glm::vec3>  emissive_factor;
+
+    std::optional<bool>  use_alpha    = false;
+    std::optional<float> alpha_cutoff = .5;
+
+    std::optional<bool> double_sided = false;
+};
+
+class MaterialT;
+using MaterialTPtr = std::shared_ptr<MaterialT>;
+
+/// Create a new material
+MaterialTPtr create_material(DocumentTPtrRef, MaterialData const&);
+
+/// Update a material
+void update_material(MaterialTPtr, MaterialData const&);
+
+// Light =======================================================================
+
+struct PointLight {
+    float range = -1;
+};
+
+struct SpotLight {
+    float range                = -1;
+    float inner_cone_angle_rad = 0;
+    float outer_cone_angle_rad = M_PI / 4.0;
+};
+
+struct DirectionLight {
+    float range = -1;
+};
+
+
+///
+/// \brief The LightData struct defines a new light
+///
+struct LightData {
+    std::string name;
+    QColor      color     = Qt::white;
+    float       intensity = 1;
+
+    std::variant<PointLight, SpotLight, DirectionLight> type;
+};
+
+struct LightUpdateData {
+    // todo, add more
+    std::optional<QColor> color;
+    std::optional<float>  intensity;
+};
+
+class LightT;
+using LightTPtr = std::shared_ptr<LightT>;
+
+/// Create a new light
+LightTPtr create_light(DocumentTPtrRef, LightData const&);
+
+/// Update a light
+void update_light(LightTPtr const&, LightUpdateData const&);
+
+// Mesh ========================================================================
+
+enum class Format : uint8_t {
+    U8,
+    U16,
+    U32,
+
+    U8VEC4,
+
+    U16VEC2,
+
+    VEC2,
+    VEC3,
+    VEC4,
+
+    MAT3,
+    MAT4,
+};
+
+enum class PrimitiveType : uint8_t {
+    POINTS,
+    LINES,
+    LINE_LOOP,
+    LINE_STRIP,
+    TRIANGLES,
+    TRIANGLE_STRIP,
+    TRIANGLE_FAN // Not recommended, some hardware support is lacking
+};
+
+enum class AttributeSemantic : uint8_t {
+    POSITION, // for the moment, must be a vec3.
+    NORMAL,   // for the moment, must be a vec3.
+    TANGENT,  // for the moment, must be a vec3.
+    TEXTURE,  // for the moment, is either a vec2, or normalized u16vec2
+    COLOR,    // normalized u8vec4, or vec4
+};
+
+struct Attribute {
+    BufferViewTPtr    view;
+    AttributeSemantic semantic;
+    uint8_t           channel = 0;
+
+    uint64_t stride = 0;
+    Format   format;
+
+    glm::vec4 minimum_value;
+    glm::vec4 maximum_value;
+
+    bool normalized = false;
+};
+
+struct Index {
+    BufferViewTPtr view;
+
+    uint64_t stride = 0;
+    Format   format;
+};
+
+struct MeshPatch {
+    std::vector<Attribute> attributes;
+
+    Index indicies;
+
+    PrimitiveType type;
+
+    MaterialTPtr material;
+};
+
+///
+/// \brief The MeshData struct defines a new mesh as a series of optional vertex
+/// components
+///
+struct MeshData {
+    std::string name;
+
+    std::vector<MeshPatch> patches;
+};
+
+class MeshT;
+using MeshTPtr = std::shared_ptr<MeshT>;
+
+/// Create a new mesh.
+MeshTPtr create_mesh(DocumentTPtrRef, MeshData const&);
+
+/// Update a mesh
+void update_mesh(MeshT*, MeshData const&);
+
+// Geometry Construction =======================================================
 
 ///
 /// \brief The BufferMeshDataRef struct is a helper type to define mesh
@@ -320,168 +630,12 @@ PackedMeshDataResult::Ref
 pack_image_to_vector(std::filesystem::path const& path,
                      std::vector<std::byte>&);
 
-/// Instruct the buffer system to copy the given bytes
-struct BufferCopySource {
-    std::span<std::byte const> to_copy;
-};
-
-/// Instruct the buffer system to reference the URL for a buffer
-struct BufferURLSource {
-    QUrl   url_source;
-    size_t source_byte_size;
-};
-
-struct BufferData : std::variant<BufferCopySource, BufferURLSource> {
-    using variant::variant;
-};
-
-class BufferT;
-using BufferTPtr = std::shared_ptr<BufferT>;
-
-/// Create a new buffer
-BufferTPtr create_buffer(DocumentTPtrRef, BufferData);
-
-// Texture =====================================================================
-
-///
-/// \brief The TextureData struct describes a new texture as a byte range of a
-/// given buffer.
-///
-struct TextureData {
-    BufferTPtr buffer;
-    size_t     start;
-    size_t     size;
-};
-
-class TextureT;
-using TextureTPtr = std::shared_ptr<TextureT>;
-
-/// Create a new texture.
-TextureTPtr create_texture(DocumentTPtrRef, TextureData const&);
-
-/// Create a new texture from a span of bytes. Bytes should be the disk
-/// representation of an image, A new buffer will be automatically created.
-TextureTPtr create_texture_from_file(DocumentTPtrRef, std::span<std::byte>);
-
-/// Update a texture with a new byte range.
-void update_texture(TextureTPtr, TextureData const&);
-
-
-// Material ====================================================================
-
-///
-/// \brief The MaterialData struct defines a new material.
-///
-struct MaterialData {
-    glm::vec4   color        = { 1, 1, 1, 1 };
-    float       metallic     = 0;
-    float       roughness    = 1;
-    bool        use_blending = false;
-    TextureTPtr texture;
-};
-
-class MaterialT;
-using MaterialTPtr = std::shared_ptr<MaterialT>;
-
-/// Create a new material
-MaterialTPtr create_material(DocumentTPtrRef, MaterialData const&);
-
-/// Update a material
-void update_material(MaterialTPtr, MaterialData const&);
-
-// Light =======================================================================
-
-enum class LightType : uint8_t {
-    POINT,
-    SUN,
-};
-
-///
-/// \brief The LightData struct defines a new light
-///
-struct LightData {
-    glm::u8vec3 color     = { 1, 1, 1 };
-    float       intensity = 0;
-    glm::vec4   spatial;
-    LightType   type = LightType::POINT;
-};
-
-struct LightUpdateData {
-    std::optional<glm::u8vec3> color;
-    std::optional<float>       intensity;
-    std::optional<glm::vec4>   spatial;
-};
-
-class LightT;
-using LightTPtr = std::shared_ptr<LightT>;
-
-/// Create a new light
-LightTPtr create_light(DocumentTPtrRef, LightData const&);
-
-/// Update a light
-void update_light(LightTPtr const&, LightUpdateData const&);
-
-// Mesh ========================================================================
-
-///
-/// \brief The ComponentRef struct models a vertex component as a range of
-/// bytes, as well as a stride between those components.
-///
-struct ComponentRef {
-    BufferTPtr buffer;
-    size_t     start  = 0;
-    size_t     size   = 0;
-    size_t     stride = 0;
-};
-
-///
-/// \brief The MeshData struct defines a new mesh as a series of optional vertex
-/// components
-///
-struct MeshData {
-    BoundingBox bounding_box;
-
-    ComponentRef                positions;
-    std::optional<ComponentRef> normals;
-    std::optional<ComponentRef> textures;
-    std::optional<ComponentRef> colors;
-
-    std::optional<ComponentRef> lines;
-    std::optional<ComponentRef> triangles;
-
-    MeshData() = default;
-
-    /// Construct new data using a packed mesh result and assuming that all the
-    /// data resides in the given buffer.
-    MeshData(PackedMeshDataResult const&, BufferTPtr);
-};
-
-class MeshT;
-using MeshTPtr = std::shared_ptr<MeshT>;
-
-/// Create a new mesh.
-MeshTPtr create_mesh(DocumentTPtrRef, MeshData const&);
-
-/// Create a new mesh from a user-supplied list of raw components. A new buffer
-/// is created under the hood.
-MeshTPtr create_mesh(DocumentTPtrRef, BufferMeshDataRef const&);
-
-/// Update a mesh
-void update_mesh(MeshT*, MeshData const&);
-
 // Plot ========================================================================
 
-struct SimplePlotDef {
-    QString definition;
-};
-
-struct URLPlotDef {
-    QUrl url;
-};
-
-using PlotDef = std::variant<SimplePlotDef, URLPlotDef>;
+using PlotDef = std::variant<std::string, QUrl>;
 
 struct PlotData {
+    std::string             name;
     PlotDef                 definition;
     TableTPtr               table_link;
     std::vector<MethodTPtr> method_list;
@@ -535,12 +689,12 @@ public:
     std::span<std::string const> as_string() const;
 
     void append(std::span<double const>);
-    void append(AnyVarListRef const&);
+    void append(QCborArray const&);
     void append(double);
     void append(std::string_view);
 
     void set(size_t row, double);
-    void set(size_t row, AnyVarRef);
+    void set(size_t row, QCborValue);
     void set(size_t row, std::string_view);
 
     void erase(size_t row);
@@ -566,10 +720,10 @@ protected:
     std::unordered_map<std::string, Selection> m_selections;
 
 protected:
-    virtual TableQueryPtr handle_insert(AnyVarListRef const& cols);
-    virtual TableQueryPtr handle_update(AnyVarRef const&     keys,
-                                        AnyVarListRef const& cols);
-    virtual TableQueryPtr handle_deletion(AnyVarRef const& keys);
+    virtual TableQueryPtr handle_insert(QCborArray const& cols);
+    virtual TableQueryPtr handle_update(QCborValue const& keys,
+                                        QCborArray const& cols);
+    virtual TableQueryPtr handle_deletion(QCborValue const& keys);
     virtual bool          handle_reset();
     virtual bool handle_set_selection(std::string_view, SelectionRef const&);
 
@@ -586,10 +740,10 @@ public:
     auto const& get_row_to_key_map() const { return m_row_to_key_map; }
 
 
-    bool ask_insert(AnyVarListRef const&); // list of lists
-    bool ask_update(AnyVarRef const& keys,
-                    AnyVarListRef const&); // list of lists
-    bool ask_delete(AnyVarRef const& keys);
+    bool ask_insert(QCborArray const&); // list of lists
+    bool ask_update(QCborValue const& keys,
+                    QCborArray const&); // list of lists
+    bool ask_delete(QCborValue const& keys);
     bool ask_clear();
     bool ask_update_selection(std::string_view, SelectionRef const&);
 
@@ -613,7 +767,7 @@ struct TableData {
 /// Create a new table
 TableTPtr create_table(DocumentTPtrRef, TableData const&);
 
-void issue_signal_direct(TableT*, SignalT*, AnyVarList);
+void issue_signal_direct(TableT*, SignalT*, QCborArray);
 
 // Object ======================================================================
 
@@ -743,8 +897,8 @@ void             update_object(ObjectT*, ObjectUpdateData&);
 void             update_object(ObjectTPtr, ObjectUpdateData&);
 ObjectCallbacks* get_callbacks_from(ObjectT*);
 
-void issue_signal_direct(ObjectT*, SignalT*, AnyVarList);
-void issue_signal_direct(ObjectT*, std::string const&, AnyVarList);
+void issue_signal_direct(ObjectT*, SignalT*, QCborArray);
+void issue_signal_direct(ObjectT*, std::string const&, QCborArray);
 
 // Other =======================================================================
 

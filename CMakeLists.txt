@@ -23,19 +23,6 @@ CPMAddPackage(
 CPMAddPackage("gh:TheLartians/PackageProject.cmake@1.6.0")
 
 CPMAddPackage(
-  NAME flatbuffers
-  URL https://github.com/google/flatbuffers/archive/v2.0.0.zip
-  VERSION 2.0.0
-  OPTIONS
-    "FLATBUFFERS_CODE_COVERAGE OFF"
-    "FLATBUFFERS_BUILD_TESTS OFF"
-    "FLATBUFFERS_BUILD_FLATLIB ON"
-    "FLATBUFFERS_BUILD_FLATC OFF"
-    "FLATBUFFERS_BUILD_FLATHASH OFF"
-    "FLATBUFFERS_LIBCXX_WITH_CLANG ON"
-)
-
-CPMAddPackage(
     NAME glm
     URL  https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.7z
     VERSION 0.9.9.8
@@ -71,21 +58,9 @@ target_include_directories(noodles PUBLIC
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
 )
 
-message(${flatbuffers_SOURCE_DIR}/src/idl_parser.cpp)
-
-#we also have to add specific files from flatbuffers, because they want to make things hard
-target_sources(noodles PRIVATE
-    ${flatbuffers_SOURCE_DIR}/src/util.cpp
-    ${flatbuffers_SOURCE_DIR}/src/idl_parser.cpp
-    ${flatbuffers_SOURCE_DIR}/src/idl_gen_text.cpp
-    )
-
 # Because packagers like having fun
 target_link_libraries(noodles PRIVATE glm)
-target_include_directories(noodles PRIVATE ${flatbuffers_SOURCE_DIR}/include)
-target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets)
-
-target_compile_definitions(noodles PRIVATE -DFLATBUFFERS_DEBUG_VERIFICATION_FAILURE)
+target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
 
 add_subdirectory(src)
 

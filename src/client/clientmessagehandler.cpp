@@ -6,12 +6,10 @@
 namespace nooc {
 
 void ClientWriter::finished_writing_and_export() {
-    auto* ptr  = m_builder.GetBufferPointer();
-    auto  size = m_builder.GetSize();
 
-    QByteArray array(reinterpret_cast<char*>(ptr), size);
+    auto byte_array = m_message_list.toCborValue().toCbor();
 
-    m_socket.sendBinaryMessage(array);
+    m_socket.sendBinaryMessage(byte_array);
 
     m_written = true;
 }
@@ -19,6 +17,12 @@ void ClientWriter::finished_writing_and_export() {
 ClientWriter::ClientWriter(QWebSocket& s) : m_socket(s) { }
 ClientWriter::~ClientWriter() {
     if (!m_written) { qWarning() << "Message should have been written!"; }
+}
+
+void ClientWriter::complete_message(QCborValue message, unsigned message_id) {
+    m_message_list << QCborArray({ message_id, message });
+
+    finished_writing_and_export();
 }
 
 
@@ -54,8 +58,8 @@ static MeshDelegate* lookup(ClientState&                 state,
                             ::noodles::GeometryID const& ptr) {
     return state.mesh_list().comp_at(noo::convert_id(ptr));
 }
-static ObjectDelegate* lookup(ClientState&               state,
-                              ::noodles::ObjectID const& ptr) {
+static EntityDelegate* lookup(ClientState&               state,
+                              ::noodles::EntityID const& ptr) {
     return state.object_list().comp_at(noo::convert_id(ptr));
 }
 
@@ -74,10 +78,15 @@ auto make_v(ClientState& state, U const& arr) {
     return ret;
 };
 
+struct MessageState {
+    QWebSocket&  m_socket;
+    ClientState& m_state;
+};
+
 void MessageHandler::process_message(noodles::MethodCreate const& c) {
     auto at = noo::convert_id(c.id());
 
-    MethodData md;
+    MethodInit md;
     md.method_name          = c.name()->string_view();
     md.documentation        = c.documentation()->string_view();
     md.return_documentation = c.return_doc()->string_view();
@@ -116,7 +125,7 @@ void MessageHandler::process_message(noodles::SignalCreate const& m) {
             { d->name()->string_view(), d->doc()->string_view() });
     }
 
-    SignalData sd { .signal_name            = m.name()->string_view(),
+    SignalInit sd { .signal_name            = m.name()->string_view(),
                     .documentation          = m.documentation()->string_view(),
                     .argument_documentation = arg_docs };
 
@@ -138,7 +147,7 @@ void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
     qDebug() << Q_FUNC_INFO << at.to_qstring();
 
-    ObjectUpdateData od;
+    EntityUpdateData od;
 
     EXIST_EXE(m.name(), { od.name = VALUE.string_view(); })
     EXIST_EXE(m.parent(), { od.parent = lookup(m_state, VALUE); })
@@ -153,7 +162,7 @@ void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
             break;
         case noodles::ObjectDefinition::TextDefinition: {
             auto* v  = m.definition_as_TextDefinition();
-            auto& ot = def.emplace<ObjectTextDefinition>();
+            auto& ot = def.emplace<EntityTextDefinition>();
 
             ot.text   = v->text()->c_str();
             ot.font   = v->font()->c_str();
@@ -163,7 +172,7 @@ void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
         }
         case noodles::ObjectDefinition::WebpageDefinition: {
             auto* v  = m.definition_as_WebpageDefinition();
-            auto& ot = def.emplace<ObjectWebpageDefinition>();
+            auto& ot = def.emplace<EntityWebpageDefinition>();
 
             ot.url    = QUrl(v->url()->c_str());
             ot.height = v->height();
@@ -173,7 +182,7 @@ void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
         }
         case noodles::ObjectDefinition::RenderableDefinition: {
             auto* v  = m.definition_as_RenderableDefinition();
-            auto& ot = def.emplace<ObjectRenderableDefinition>();
+            auto& ot = def.emplace<EntityRenderableDefinition>();
 
             ot.material = lookup(m_state, *(v->material()));
             ot.mesh     = lookup(m_state, *(v->mesh()));
@@ -235,7 +244,7 @@ void MessageHandler::process_message(noodles::ObjectDelete const& m) {
 void MessageHandler::process_message(noodles::BufferCreate const& m) {
     auto at = noo::convert_id(m.id());
 
-    BufferData bd;
+    BufferInit bd;
 
     if (m.bytes()) {
         bd.data = { (std::byte const*)m.bytes()->data(), m.bytes()->size() };
@@ -255,7 +264,7 @@ void MessageHandler::process_message(noodles::BufferDelete const& m) {
 void MessageHandler::process_message(noodles::MaterialCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
 
-    MaterialData md;
+    MaterialInit md;
 
     EXIST_EXE(m.color(), { md.color = noo::convert(VALUE); })
 
@@ -274,7 +283,7 @@ void MessageHandler::process_message(noodles::MaterialDelete const& m) {
 void MessageHandler::process_message(noodles::TextureCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
 
-    TextureData td;
+    TextureInit td;
 
     if (!m.reference()) {
         m_state.texture_list().handle_new(at, std::move(td));
@@ -426,8 +435,8 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
         return;
     }
 
-    noo::AnyVarListRef av;
-    if (m.signal_data()) { av = noo::AnyVarListRef(m.signal_data()); }
+    QCborValueListRef av;
+    if (m.signal_data()) { av = QCborValueListRef(m.signal_data()); }
 
     MethodContext   ctx;
     AttachedSignal* attached = nullptr;
@@ -478,11 +487,11 @@ void MessageHandler::process_message(noodles::MethodReply const& m) {
 
     Q_ASSERT(reply_ptr);
 
-    noo::AnyVarRef av;
+    QCborValueRef av;
 
     std::optional<MethodException> err;
 
-    if (m.method_data()) { av = noo::AnyVarRef(m.method_data()); }
+    if (m.method_data()) { av = QCborValueRef(m.method_data()); }
 
     if (m.method_exception()) {
         err.emplace();
@@ -495,7 +504,7 @@ void MessageHandler::process_message(noodles::MethodReply const& m) {
             err->message = QString::fromUtf8(excp->message()->c_str());
         }
 
-        if (excp->data()) { err->additional = noo::AnyVarRef(excp->data()); }
+        if (excp->data()) { err->additional = QCborValueRef(excp->data()); }
     }
 
     qDebug() << "Completing reply...";
@@ -508,9 +517,18 @@ void MessageHandler::process_message(noodles::MethodReply const& m) {
 }
 
 
-void MessageHandler::process_message(noodles::ServerMessage const& message) {
-    qDebug() << Q_FUNC_INFO
-             << noodles::EnumNameServerMessageType(message.message_type());
+static void process_server_message(MessageState const& ms,
+                                   QCborValue const&   value) {
+    qDebug() << Q_FUNC_INFO << value.toDiagnosticNotation();
+
+    auto array = value.toArray();
+
+    for (auto const& v : array) {
+        auto pack    = v.toArray();
+        auto id      = pack.at(0).toInteger(-1);
+        auto content = pack.at(1);
+    }
+
     switch (message.message_type()) {
     case noodles::ServerMessageType::NONE: return;
     case noodles::ServerMessageType::MethodCreate:
@@ -560,35 +578,19 @@ void MessageHandler::process_message(noodles::ServerMessage const& message) {
     }
 }
 
-MessageHandler::MessageHandler(QWebSocket& s, ClientState& state, QByteArray m)
-    : m_socket(s), m_state(state), m_bin_message(m) { }
 
-void MessageHandler::process() {
-    flatbuffers::Verifier v((uint8_t const*)m_bin_message.data(),
-                            m_bin_message.size());
+void process_message(QWebSocket& s, ClientState& state, QByteArray m) {
+    MessageState ms { .m_socket = s, .m_state = state };
 
+    QCborParserError error;
+    auto             value = QCborValue::fromCbor(m, &error);
 
-    if (!v.VerifyBuffer<noodles::ServerMessages>(nullptr)) {
-        qCritical() << "Malformed message from server, disconnecting!";
-        m_socket.close();
+    if (error.error != QCborError::NoError) {
+        qWarning() << "Bad message from server:" << error.errorString();
         return;
     }
 
-
-    auto* server_messages =
-        flatbuffers::GetRoot<noodles::ServerMessages>(m_bin_message.data());
-
-    if (!server_messages) return;
-
-    auto* message_list = server_messages->messages();
-
-    if (!message_list) return;
-
-    for (auto* message : *message_list) {
-        if (!message) continue;
-        process_message(*message);
-    }
-    qDebug() << Q_FUNC_INFO << "Done";
+    process_server_message(m, value);
 }
 
 } // namespace nooc

@@ -43,26 +43,41 @@ public:
         auto& slot = m_list[at.id_slot];
 
         if (slot) {
-            if (slot->id() != at) {
-                qDebug() << "Server attempted to update an entity that does "
-                            "not exist!";
-                return nullptr;
-            }
-
-            if constexpr (Delegate::CAN_UPDATE) {
-                // this is an update
-                slot->update(nd);
-                emit slot->updated();
-                return slot.get();
-            } else {
-                qDebug() << "Server attempted to update non-updatable entity";
-                return nullptr;
-            }
+            qDebug()
+                << "Server attempted to create an entity that already exists!";
+            return nullptr;
         }
 
         slot = m_maker(at, std::move(nd));
 
         return slot.get();
+    }
+    template <class UpdateData>
+    bool handle_update(IDType at, UpdateData const& ud) {
+        if constexpr (Delegate::CAN_UPDATE) {
+            qWarning() << "Server attempted to update non-updatable object!";
+            return false;
+        }
+
+        if (!at.valid()) return false;
+        if (at.id_slot >= m_list.size()) return false;
+
+        auto& slot = m_list[at.id_slot];
+
+        if (!slot) {
+            qWarning()
+                << "Server is trying to update an object that does not exist!";
+            return false;
+        }
+
+        if (slot->id() != at) {
+            qWarning()
+                << "Server is trying to update an object that does not exist!";
+            return false;
+        }
+
+        slot->update(ud);
+        emit slot->updated();
     }
     bool handle_delete(IDType at) {
         if (!at.valid()) {
@@ -109,20 +124,22 @@ class ClientState : public QObject {
 
     std::shared_ptr<DocumentDelegate> m_document;
 
-    ComponentList<MethodDelegate, noo::MethodID, MethodData> m_method_list;
-    ComponentList<SignalDelegate, noo::SignalID, SignalData> m_signal_list;
+    ComponentList<MethodDelegate, noo::MethodID, MethodInit> m_method_list;
+    ComponentList<SignalDelegate, noo::SignalID, SignalInit> m_signal_list;
 
-    ComponentList<BufferDelegate, noo::BufferID, BufferData> m_buffer_list;
+    ComponentList<BufferDelegate, noo::BufferID, BufferInit> m_buffer_list;
 
     ComponentList<TableDelegate, noo::TableID, TableData>       m_table_list;
-    ComponentList<TextureDelegate, noo::TextureID, TextureData> m_texture_list;
-    ComponentList<LightDelegate, noo::LightID, LightData>       m_light_list;
-    ComponentList<MaterialDelegate, noo::MaterialID, MaterialData>
-                                                       m_material_list;
-    ComponentList<MeshDelegate, noo::MeshID, MeshData> m_mesh_list;
-    ComponentList<ObjectDelegate, noo::ObjectID, ObjectUpdateData>
-                                                       m_object_list;
-    ComponentList<PlotDelegate, noo::PlotID, PlotData> m_plot_list;
+    ComponentList<TextureDelegate, noo::TextureID, TextureInit> m_texture_list;
+    ComponentList<LightDelegate, noo::LightID, LightInit>       m_light_list;
+    ComponentList<MaterialDelegate, noo::MaterialID, MaterialInit>
+                                                           m_material_list;
+    ComponentList<MeshDelegate, noo::GeometryID, MeshInit> m_mesh_list;
+    ComponentList<EntityDelegate, noo::EntityID, EntityUpdateData>
+                                                                m_object_list;
+    ComponentList<PlotDelegate, noo::PlotID, PlotData>          m_plot_list;
+    ComponentList<SamplerDelegate, noo::SamplerID, SamplerInit> m_sampler_list;
+    ComponentList<ImageDelegate, noo::ImageID, ImageInit>       m_image_list;
 
     size_t m_last_invoke_id = 0;
     std::unordered_map<std::string, QPointer<PendingMethodReply>>
@@ -144,6 +161,8 @@ public:
     auto& mesh_list() { return m_mesh_list; }
     auto& object_list() { return m_object_list; }
     auto& plot_list() { return m_plot_list; }
+    auto& sampler_list() { return m_sampler_list; }
+    auto& image_list() { return m_image_list; }
 
     auto& inflight_methods() { return m_in_flight_methods; }
 
@@ -153,8 +172,8 @@ public slots:
 
     // Takes ownership of the reply!
     void on_method_ask_invoke(noo::MethodID,
-                              MethodContext,
-                              noo::AnyVarList const&,
+                              MethodContextPtr,
+                              QCborValueList const&,
                               PendingMethodReply*);
 };
 

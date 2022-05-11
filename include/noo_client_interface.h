@@ -1,12 +1,13 @@
 #ifndef CLIENT_INTERFACE_H
 #define CLIENT_INTERFACE_H
 
-#include "noo_anyref.h"
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
 #include <span>
 
+#include <QCborValue>
+#include <QImage>
 #include <QObject>
 #include <QPointer>
 #include <QUrl>
@@ -21,10 +22,12 @@ class TableDelegate;
 class LightDelegate;
 class MaterialDelegate;
 class MeshDelegate;
-class ObjectDelegate;
+class EntityDelegate;
 class SignalDelegate;
 class MethodDelegate;
 class PlotDelegate;
+class ImageDelegate;
+class SamplerDelegate;
 
 using DocumentDelegatePtr = std::unique_ptr<DocumentDelegate>;
 
@@ -34,17 +37,16 @@ using TableDelegatePtr    = std::unique_ptr<TableDelegate>;
 using LightDelegatePtr    = std::unique_ptr<LightDelegate>;
 using MaterialDelegatePtr = std::unique_ptr<MaterialDelegate>;
 using MeshDelegatePtr     = std::unique_ptr<MeshDelegate>;
-using ObjectDelegatePtr   = std::unique_ptr<ObjectDelegate>;
+using EntityDelegatePtr   = std::unique_ptr<EntityDelegate>;
 using SignalDelegatePtr   = std::unique_ptr<SignalDelegate>;
 using MethodDelegatePtr   = std::unique_ptr<MethodDelegate>;
 using PlotDelegatePtr     = std::unique_ptr<PlotDelegate>;
+using ImageDelegatePtr    = std::unique_ptr<ImageDelegate>;
+using SamplerDelegatePtr  = std::unique_ptr<SamplerDelegate>;
 
-// Not to be stored by users!
-using MethodContext = std::
-    variant<std::monostate, ObjectDelegate*, TableDelegate*, PlotDelegate*>;
 
 using MethodContextPtr = std::variant<std::monostate,
-                                      QPointer<ObjectDelegate>,
+                                      QPointer<EntityDelegate>,
                                       QPointer<TableDelegate>,
                                       QPointer<PlotDelegate>>;
 
@@ -52,9 +54,9 @@ class MessageHandler;
 
 /// Represents exception information as provided by the server
 struct MethodException {
-    int            code;
-    QString        message;
-    noo::AnyVarRef additional;
+    int        code;
+    QString    message;
+    QCborValue additional;
 };
 
 QString to_string(MethodException const&);
@@ -80,29 +82,31 @@ class PendingMethodReply : public QObject {
 
 
 protected:
-    noo::AnyVarRef m_var;
-    virtual void   interpret();
+    QCborValue   m_var;
+    virtual void interpret();
 
 public:
-    PendingMethodReply(MethodDelegate*, MethodContext);
+    PendingMethodReply(MethodDelegate*, MethodContextPtr);
 
     /// \brief Call this method directly, ie, you have marshalled the arguments
     /// to the Any type manually.
-    void call_direct(noo::AnyVarList&&);
+    void call_direct(QCborArray);
 
     /// \brief Call this method, with automatic marshalling of arguments.
     template <class... Args>
     void call(Args&&... args) {
-        call_direct(noo::marshall_to_any(std::forward<Args>(args)...));
+        QCborArray arr;
+        (arr.push_back(convert_to_cbor(std::forward<Args>(args))), ...);
+        call_direct(arr);
     }
 
 private slots:
     /// Internal use
-    void complete(noo::AnyVarRef, MethodException*);
+    void complete(QCborValue, MethodException*);
 
 signals:
     /// Issued when a non-error reply has been received
-    void recv_data(noo::AnyVarRef);
+    void recv_data(QCborValue);
 
     /// Issued when the method raised an exception on the server side.
     void recv_fail(QString);
@@ -159,7 +163,7 @@ public:
 
     void interpret() override;
 signals:
-    void recv(noo::PossiblyOwnedView<double const> const&);
+    void recv(QVector<double> const&);
 };
 
 } // namespace replies
@@ -167,30 +171,10 @@ signals:
 
 // Helper machinery to turn an any list into arguments required by a function.
 template <class T>
-T _any_call_getter(noo::AnyVar& source) {
-    if constexpr (!noo::is_in_variant<T, noo::AnyVarBase>::value) {
-
-        if constexpr (noo::is_vector<T>::value) {
-            // extract a vector
-            auto nv = source.steal_vector();
-
-            T ret;
-
-            for (auto& local_a : nv) {
-                ret.emplace_back(std::move(local_a));
-            }
-
-            return ret;
-
-        } else {
-            return T(std::move(source));
-        }
-
-    } else {
-        T* c = std::get_if<T>(&source);
-        if (c) return std::move(*c);
-        return T();
-    }
+T _any_call_getter(QCborValue& source) {
+    T ret;
+    noo::convert_from_cbor(source, ret);
+    return ret;
 }
 
 template <class Lambda>
@@ -199,7 +183,7 @@ struct ReplyCallHelper : ReplyCallHelper<decltype(&Lambda::operator())> { };
 template <class R, class Arg>
 struct ReplyCallHelper<R(Arg)> {
     template <class Func>
-    static auto call(Func&& f, noo::AnyVar& source) {
+    static auto call(Func&& f, QCborValue& source) {
         return f(std::move(_any_call_getter<Arg>(source)));
     }
 };
@@ -207,7 +191,7 @@ struct ReplyCallHelper<R(Arg)> {
 template <class R, class Arg>
 struct ReplyCallHelper<R (*)(Arg)> {
     template <class Func>
-    static auto call(Func&& f, noo::AnyVar& source) {
+    static auto call(Func&& f, QCborValue& source) {
         return f(std::move(_any_call_getter<Arg>(source)));
     }
 };
@@ -215,7 +199,7 @@ struct ReplyCallHelper<R (*)(Arg)> {
 template <class R, class C, class Arg>
 struct ReplyCallHelper<R (C::*)(Arg)> {
     template <class Func>
-    static auto call(Func&& f, noo::AnyVar& source) {
+    static auto call(Func&& f, QCborValue& source) {
         return f(std::move(_any_call_getter<Arg>(source)));
     }
 };
@@ -223,7 +207,7 @@ struct ReplyCallHelper<R (C::*)(Arg)> {
 template <class R, class C, class Arg>
 struct ReplyCallHelper<R (C::*)(Arg) const> {
     template <class Func>
-    static auto call(Func&& f, noo::AnyVar& source) {
+    static auto call(Func&& f, QCborValue& source) {
         return f(std::move(_any_call_getter<Arg>(source)));
     }
 };
@@ -231,7 +215,7 @@ struct ReplyCallHelper<R (C::*)(Arg) const> {
 /// Call a function with any vars, automatically translated to the parameter
 /// type
 template <class Func>
-auto reply_call_helper(Func&& f, noo::AnyVar& source) {
+auto reply_call_helper(Func&& f, QCborValue& source) {
     using FType = std::remove_cvref_t<Func>;
 
     return ReplyCallHelper<FType>::call(f, source);
@@ -242,7 +226,7 @@ auto reply_call_helper(Func&& f, noo::AnyVar& source) {
 
 /// Contains methods attached to an object/table/document.
 class AttachedMethodList {
-    MethodContext                m_context;
+    MethodContextPtr             m_context;
     std::vector<MethodDelegate*> m_list;
 
     MethodDelegate* find_direct_by_name(std::string_view) const;
@@ -250,7 +234,7 @@ class AttachedMethodList {
 
 public:
     /// Internal use only
-    AttachedMethodList(MethodContext);
+    AttachedMethodList(MethodContextPtr);
 
     /// Internal use only
     AttachedMethodList& operator=(std::vector<MethodDelegate*> const& l) {
@@ -311,17 +295,17 @@ public:
     SignalDelegate* delegate() const;
 
 signals:
-    void fired(noo::AnyVarListRef const&);
+    void fired(QCborArray const&);
 };
 
 /// Contains signals attached to an object/table/document.
 class AttachedSignalList {
-    MethodContext                                m_context;
+    MethodContextPtr                             m_context;
     std::vector<std::unique_ptr<AttachedSignal>> m_list;
 
 public:
     // Internal use
-    AttachedSignalList(MethodContext);
+    AttachedSignalList(MethodContextPtr);
 
     // Internal use
     AttachedSignalList& operator=(std::vector<SignalDelegate*> const& l);
@@ -338,16 +322,19 @@ public:
 
 /// Represents an argument name/documentation pair for a method/signal.
 struct ArgDoc {
-    std::string_view name;
-    std::string_view doc;
+    QString name;
+    QString doc;
+    QString editor_hint;
 };
 
 /// Describes a noodles method
-struct MethodData {
-    std::string_view  method_name;
-    std::string_view  documentation;
-    std::string_view  return_documentation;
-    std::span<ArgDoc> argument_documentation;
+struct MethodInit {
+    QString         method_name;
+    QString         documentation;
+    QString         return_documentation;
+    QVector<ArgDoc> argument_documentation;
+
+    MethodInit(QCborValue);
 };
 
 /// The base delegate class for methods. Users can inherit from this to add
@@ -356,29 +343,29 @@ struct MethodData {
 class MethodDelegate : public QObject {
     Q_OBJECT
     noo::MethodID m_id;
-    std::string   m_method_name;
+    QString       m_method_name;
 
 public:
-    MethodDelegate(noo::MethodID, MethodData const&);
+    MethodDelegate(noo::MethodID, MethodInit const&);
     virtual ~MethodDelegate();
 
     NOODLES_CAN_UPDATE(false)
 
-    noo::MethodID    id() const;
-    std::string_view name() const;
+    noo::MethodID id() const;
+    QString       name() const;
 
 signals:
     // private
     void invoke(noo::MethodID,
-                MethodContext,
-                noo::AnyVarList const&,
+                MethodContextPtr,
+                QCborArray const&,
                 PendingMethodReply*);
 };
 
 // =============================================================================
 
-struct SignalData {
-    std::string_view  signal_name;
+struct SignalInit {
+    QString           name;
     std::string_view  documentation;
     std::span<ArgDoc> argument_documentation;
 };
@@ -389,28 +376,28 @@ struct SignalData {
 class SignalDelegate : public QObject {
     Q_OBJECT
     noo::SignalID m_id;
-    std::string   m_signal_name;
+    SignalInit    m_data;
 
 public:
-    SignalDelegate(noo::SignalID, SignalData const&);
+    SignalDelegate(noo::SignalID, SignalInit const&);
     virtual ~SignalDelegate();
 
     NOODLES_CAN_UPDATE(false)
 
-    noo::SignalID    id() const;
-    std::string_view name() const;
+    noo::SignalID id() const;
+    QString       name() const;
 
 signals:
     /// Issued when this signal has been recv'ed.
-    void fired(MethodContext, noo::AnyVarListRef const&);
+    void fired(MethodContextPtr, QCborArray const&);
 };
 
 // =============================================================================
 
-struct BufferData {
-    std::span<std::byte const> data;
-    QUrl                       url;
-    size_t                     url_size;
+struct BufferInit {
+    QString name;
+    QUrl    url;
+    size_t  url_size;
 };
 
 /// The base delegate class for buffers. Users can inherit from this to add
@@ -419,22 +406,145 @@ struct BufferData {
 class BufferDelegate : public QObject {
     Q_OBJECT
     noo::BufferID m_id;
+    BufferInit    m_data;
+
+    QByteArray m_buffer_bytes;
 
 public:
-    BufferDelegate(noo::BufferID, BufferData const&);
+    BufferDelegate(noo::BufferID, BufferInit const&);
     virtual ~BufferDelegate();
 
     NOODLES_CAN_UPDATE(false)
 
     noo::BufferID id() const;
+
+private slots:
+    void store_data(QByteArray);
+
+signals:
+    void data_ready(QByteArray);
 };
 
 // =============================================================================
 
-struct TextureData {
-    std::optional<BufferDelegate*> buffer;
-    std::optional<size_t>          start;
-    std::optional<size_t>          size;
+struct BufferViewInit {
+    enum ViewType : uint8_t {
+        UNKNOWN,
+        GEOMETRY_INFO,
+        IMAGE_INFO,
+    };
+
+    QString name;
+
+    QPointer<BufferDelegate> source_buffer;
+    ViewType                 type;
+    uint64_t                 offset;
+    uint64_t                 length;
+};
+
+/// The base delegate class for buffers. Users can inherit from this to add
+/// their own functionality. Delegates are instantiated on new buffers from the
+/// server.
+class BufferViewDelegate : public QObject {
+    Q_OBJECT
+    noo::BufferViewID m_id;
+    BufferViewInit    m_init;
+
+public:
+    BufferViewDelegate(noo::BufferViewID, BufferViewInit const&);
+    virtual ~BufferViewDelegate();
+
+    NOODLES_CAN_UPDATE(false)
+
+    noo::BufferID id() const;
+
+signals:
+    void data_ready(QByteArray);
+};
+
+// =============================================================================
+
+struct ImageInit {
+    QString name;
+
+    QPointer<BufferViewDelegate> local_image;
+    QUrl                         remote_image;
+};
+
+struct Image : public QObject {
+    Q_OBJECT
+    noo::ImageID m_id;
+    ImageInit    m_init;
+
+    QImage m_image;
+
+public:
+    Image(noo::ImageID, ImageInit const&);
+    virtual ~Image();
+
+    NOODLES_CAN_UPDATE(false)
+
+    noo::ImageID id() const;
+
+private slots:
+    void store_data(QByteArray);
+
+signals:
+    void data_ready(QImage);
+};
+
+// =============================================================================
+
+enum class MagFilter : uint8_t {
+    NEAREST,
+    LINEAR,
+};
+
+enum class MinFilter : uint8_t {
+    NEAREST,
+    LINEAR,
+    NEAREST_MIPMAP_NEAREST,
+    LINEAR_MIPMAP_NEAREST,
+    NEAREST_MIPMAP_LINEAR,
+    LINEAR_MIPMAP_LINEAR,
+};
+
+enum class SamplerMode : uint8_t {
+    CLAMP_TO_EDGE,
+    MIRRORED_REPEAT,
+    REPEAT,
+};
+
+struct SamplerInit {
+    QString name;
+
+    MagFilter mag_filter = MagFilter::LINEAR;
+    MinFilter min_filter = MinFilter::LINEAR_MIPMAP_LINEAR;
+
+    SamplerMode wrap_s = SamplerMode::REPEAT;
+    SamplerMode wrap_t = SamplerMode::REPEAT;
+};
+
+struct Sampler : public QObject {
+    Q_OBJECT
+    noo::SamplerID m_id;
+    SamplerInit    m_init;
+
+public:
+    Sampler(noo::SamplerID, SamplerInit const&);
+    virtual ~Sampler();
+
+    NOODLES_CAN_UPDATE(false)
+
+    noo::SamplerID id() const;
+};
+
+// =============================================================================
+
+struct TextureInit {
+    QString                   name;
+    QPointer<ImageDelegate>   image;
+    QPointer<SamplerDelegate> sampler;
 };
 
 
@@ -444,30 +554,49 @@ struct TextureData {
 class TextureDelegate : public QObject {
     Q_OBJECT
     noo::TextureID m_id;
+    TextureInit    m_init;
 
 public:
-    TextureDelegate(noo::TextureID, TextureData const&);
+    TextureDelegate(noo::TextureID, TextureInit const&);
     virtual ~TextureDelegate();
 
-    NOODLES_CAN_UPDATE(true)
+    NOODLES_CAN_UPDATE(false)
+
     noo::TextureID id() const;
-
-
-    void         update(TextureData const&);
-    virtual void on_update(TextureData const&);
-
-signals:
-    void updated();
 };
 
 // =============================================================================
 
-struct MaterialData {
-    std::optional<glm::vec4>        color;
-    std::optional<float>            metallic;
-    std::optional<float>            roughness;
-    std::optional<bool>             use_blending;
-    std::optional<TextureDelegate*> texture;
+struct TextureRef {
+    QPointer<TextureDelegate> texture;
+    glm::mat3                 transform          = glm::mat3(1);
+    uint8_t                   texture_coord_slot = 0;
+};
+
+struct PBRInfo {
+    QColor                    base_color;
+    std::optional<TextureRef> base_color_texture;
+
+    float                     metallic  = 1.0;
+    float                     roughness = 1.0;
+    std::optional<TextureRef> metal_rough_texture;
+};
+
+struct MaterialInit {
+    std::optional<QString> name;
+
+    std::optional<PBRInfo>    pbr_info;
+    std::optional<TextureRef> normal_texture;
+
+    std::optional<TextureRef> occlusion_texture;
+    std::optional<float>      occlusion_texture_factor;
+
+    std::optional<TextureRef> emissive_texture;
+    std::optional<glm::vec3>  emissive_factor;
+
+    std::optional<bool>  use_alpha;
+    std::optional<float> alpha_cutoff;
+    std::optional<bool>  double_sided;
 };
 
 /// The base delegate class for materials. Users can inherit from this to add
@@ -476,17 +605,18 @@ struct MaterialData {
 class MaterialDelegate : public QObject {
     Q_OBJECT
     noo::MaterialID m_id;
+    MaterialInit    m_init;
 
 public:
-    MaterialDelegate(noo::MaterialID, MaterialData const&);
+    MaterialDelegate(noo::MaterialID, MaterialInit const&);
     virtual ~MaterialDelegate();
 
     NOODLES_CAN_UPDATE(true)
 
     noo::MaterialID id() const;
 
-    void         update(MaterialData const&);
-    virtual void on_update(MaterialData const&);
+    void         update(MaterialInit const&);
+    virtual void on_update(MaterialInit const&);
 
 signals:
     void updated();
@@ -494,16 +624,29 @@ signals:
 
 // =============================================================================
 
-enum class LightType : uint8_t {
-    POINT,
-    SUN,
+struct PointLight {
+    float range = -1;
 };
 
-struct LightData {
-    std::optional<glm::u8vec3> color;
-    std::optional<float>       intensity = 0;
-    std::optional<glm::vec4>   spatial;
-    std::optional<LightType>   type = LightType::POINT;
+struct SpotLight {
+    float range                = -1;
+    float inner_cone_angle_rad = 0;
+    float outer_cone_angle_rad = M_PI / 4.0;
+};
+
+struct DirectionLight {
+    float range = -1;
+};
+
+
+struct LightInit {
+    using LT = std::variant<PointLight, SpotLight, DirectionLight>;
+
+    QString                  name;
+    LT                       type;
+    std::optional<QColor>    color;
+    std::optional<float>     intensity;
+    std::optional<glm::vec4> spatial;
 };
 
 /// The base light class for buffers. Users can inherit from this to add
@@ -512,17 +655,18 @@ struct LightData {
 class LightDelegate : public QObject {
     Q_OBJECT
     noo::LightID m_id;
+    LightInit    m_init;
 
 public:
-    LightDelegate(noo::LightID, LightData const&);
+    LightDelegate(noo::LightID, LightInit const&);
     virtual ~LightDelegate();
 
     NOODLES_CAN_UPDATE(true)
 
     noo::LightID id() const;
 
-    void         update(LightData const&);
-    virtual void on_update(LightData const&);
+    void         update(LightInit const&);
+    virtual void on_update(LightInit const&);
 
 signals:
     void updated();
@@ -530,77 +674,128 @@ signals:
 
 // =============================================================================
 
-struct ComponentRef {
-    BufferDelegate* buffer;
-    size_t          start  = 0;
-    size_t          size   = 0;
-    size_t          stride = 0;
+enum class Format : uint8_t {
+    U8,
+    U16,
+    U32,
+
+    U8VEC4,
+
+    U16VEC2,
+
+    VEC2,
+    VEC3,
+    VEC4,
+
+    MAT3,
+    MAT4,
 };
 
-/// The base delegate class for meshes. Users can inherit from this to add
-/// their own functionality. Delegates are instantiated on new meshes from the
-/// server. Mesh delegates can also be updated.
-struct MeshData {
-    noo::BoundingBox extent;
+enum class PrimitiveType : uint8_t {
+    POINTS,
+    LINES,
+    LINE_LOOP,
+    LINE_STRIP,
+    TRIANGLES,
+    TRIANGLE_STRIP,
+    TRIANGLE_FAN // Not recommended, some hardware support is lacking
+};
 
-    std::optional<ComponentRef> positions;
-    std::optional<ComponentRef> normals;
-    std::optional<ComponentRef> textures;
-    std::optional<ComponentRef> colors;
-    std::optional<ComponentRef> lines;
-    std::optional<ComponentRef> triangles;
+enum class AttributeSemantic : uint8_t {
+    POSITION, // for the moment, must be a vec3.
+    NORMAL,   // for the moment, must be a vec3.
+    TANGENT,  // for the moment, must be a vec3.
+    TEXTURE,  // for the moment, is either a vec2, or normalized u16vec2
+    COLOR,    // normalized u8vec4, or vec4
+};
+
+struct Attribute {
+    QPointer<BufferViewDelegate> view;
+    AttributeSemantic            semantic;
+    uint8_t                      channel = 0;
+
+    uint64_t stride = 0;
+    Format   format;
+
+    glm::vec4 minimum_value;
+    glm::vec4 maximum_value;
+
+    bool normalized = false;
+};
+
+struct Index {
+    QPointer<BufferViewDelegate> view;
+
+    uint64_t stride = 0;
+    Format   format;
+};
+
+struct MeshPatch {
+    std::vector<Attribute> attributes;
+
+    Index indicies;
+
+    PrimitiveType type;
+
+    QPointer<MaterialDelegate> material;
+};
+
+struct MeshInit {
+    QString                               name;
+    std::optional<std::vector<MeshPatch>> patches;
 };
 
 class MeshDelegate : public QObject {
     Q_OBJECT
-    noo::MeshID m_id;
+    noo::GeometryID m_id;
+    MeshInit        m_init;
 
 public:
-    MeshDelegate(noo::MeshID, MeshData const&);
+    MeshDelegate(noo::GeometryID, MeshInit const&);
     virtual ~MeshDelegate();
 
     NOODLES_CAN_UPDATE(false)
 
-    noo::MeshID id() const;
+    noo::GeometryID id() const;
 
     virtual void prepare_delete();
 };
 
 // =============================================================================
 
-struct ObjectTextDefinition {
+struct EntityTextDefinition {
     std::string text;
     std::string font;
-    float       height;
-    float       width = -1;
+    float       height = .25;
+    float       width  = -1;
 };
 
-struct ObjectWebpageDefinition {
+struct EntityWebpageDefinition {
     QUrl  url;
-    float height;
-    float width;
+    float height = .5;
+    float width  = .5;
 };
 
-struct ObjectRenderableDefinition {
-    MaterialDelegate*               material;
-    MeshDelegate*                   mesh;
+struct EntityRenderableDefinition {
+    QPointer<MeshDelegate>          mesh;
     std::span<glm::mat4 const>      instances;
     std::optional<noo::BoundingBox> instance_bb;
 };
 
-using ObjectDefinition = std::variant<std::monostate,
-                                      ObjectTextDefinition,
-                                      ObjectWebpageDefinition,
-                                      ObjectRenderableDefinition>;
+using EntityDefinition = std::variant<std::monostate,
+                                      EntityTextDefinition,
+                                      EntityWebpageDefinition,
+                                      EntityRenderableDefinition>;
 
-struct ObjectUpdateData {
-    std::optional<std::string_view>                name;
-    std::optional<ObjectDelegate*>                 parent;
+struct EntityUpdateData {
+    std::optional<QString>                         name;
+    std::optional<EntityDelegate*>                 parent;
     std::optional<glm::mat4>                       transform;
-    std::optional<ObjectDefinition>                definition;
+    std::optional<EntityDefinition>                definition;
     std::optional<std::vector<LightDelegate*>>     lights;
     std::optional<std::vector<TableDelegate*>>     tables;
-    std::optional<std::vector<std::string_view>>   tags;
+    std::optional<std::vector<PlotDelegate*>>      plots;
+    std::optional<std::vector<QString>>            tags;
     std::optional<std::vector<MethodDelegate*>>    method_list;
     std::optional<std::vector<SignalDelegate*>>    signal_list;
     std::optional<std::optional<noo::BoundingBox>> influence;
@@ -611,26 +806,25 @@ struct ObjectUpdateData {
 /// The base delegate class for objects. Users can inherit from this to add
 /// their own functionality. Delegates are instantiated on new objects from the
 /// server. Object delegates can also be updated.
-class ObjectDelegate : public QObject {
+class EntityDelegate : public QObject {
     Q_OBJECT
-    noo::ObjectID            m_id;
-    std::string              m_name;
-    QPointer<ObjectDelegate> m_parent;
+    noo::EntityID    m_id;
+    EntityUpdateData m_data;
 
     AttachedMethodList m_attached_methods;
     AttachedSignalList m_attached_signals;
 
 public:
-    ObjectDelegate(noo::ObjectID, ObjectUpdateData const&);
-    virtual ~ObjectDelegate();
+    EntityDelegate(noo::EntityID, EntityUpdateData const&);
+    virtual ~EntityDelegate();
 
     NOODLES_CAN_UPDATE(true)
 
-    noo::ObjectID id() const;
+    noo::EntityID id() const;
 
-    void update(ObjectUpdateData const&);
+    void update(EntityUpdateData const&);
 
-    virtual void on_update(ObjectUpdateData const&);
+    virtual void on_update(EntityUpdateData const&);
 
     virtual void prepare_delete();
 
@@ -644,7 +838,7 @@ signals:
 // =============================================================================
 
 struct TableData {
-    std::optional<std::string_view>             name;
+    std::optional<QString>                      name;
     std::optional<std::vector<MethodDelegate*>> method_list;
     std::optional<std::vector<SignalDelegate*>> signal_list;
 };
@@ -678,26 +872,25 @@ public:
     AttachedSignalList const& attached_signals() const;
 
 public slots:
-    virtual void on_table_initialize(noo::AnyVarListRef const& names,
-                                     noo::AnyVarRef            keys,
-                                     noo::AnyVarListRef const& data_cols,
-                                     noo::AnyVarListRef const& selections);
+    virtual void on_table_initialize(QCborArray const& names,
+                                     QCborValue        keys,
+                                     QCborArray const& data_cols,
+                                     QCborArray const& selections);
 
     virtual void on_table_reset();
-    virtual void on_table_updated(noo::AnyVarRef keys, noo::AnyVarRef columns);
-    virtual void on_table_rows_removed(noo::AnyVarRef keys);
+    virtual void on_table_updated(QCborValue keys, QCborValue columns);
+    virtual void on_table_rows_removed(QCborValue keys);
     virtual void on_table_selection_updated(std::string_view,
                                             noo::SelectionRef const&);
 
 public:
     PendingMethodReply* subscribe() const;
-    PendingMethodReply* request_row_insert(noo::AnyVarList&& row) const;
-    PendingMethodReply* request_rows_insert(noo::AnyVarList&& columns) const;
+    PendingMethodReply* request_row_insert(QCborArray&& row) const;
+    PendingMethodReply* request_rows_insert(QCborArray&& columns) const;
 
-    PendingMethodReply* request_row_update(int64_t           key,
-                                           noo::AnyVarList&& row) const;
+    PendingMethodReply* request_row_update(int64_t key, QCborArray&& row) const;
     PendingMethodReply* request_rows_update(std::vector<int64_t>&& keys,
-                                            noo::AnyVarList&& columns) const;
+                                            QCborArray&& columns) const;
 
     PendingMethodReply* request_deletion(std::span<int64_t> keys) const;
 
@@ -706,10 +899,10 @@ public:
                                                  noo::Selection) const;
 
 private slots:
-    void interp_table_reset(noo::AnyVarListRef const&);
-    void interp_table_update(noo::AnyVarListRef const&);
-    void interp_table_remove(noo::AnyVarListRef const&);
-    void interp_table_sel_update(noo::AnyVarListRef const&);
+    void interp_table_reset(QCborArray const&);
+    void interp_table_update(QCborArray const&);
+    void interp_table_remove(QCborArray const&);
+    void interp_table_sel_update(QCborArray const&);
 
 signals:
     void updated();
@@ -817,22 +1010,21 @@ signals:
 struct ClientDelegates {
     QString client_name;
 
-    std::function<TextureDelegatePtr(noo::TextureID, TextureData const&)>
-        tex_maker;
-    std::function<BufferDelegatePtr(noo::BufferID, BufferData const&)>
-        buffer_maker;
-    std::function<TableDelegatePtr(noo::TableID, TableData const&)> table_maker;
-    std::function<LightDelegatePtr(noo::LightID, LightData const&)> light_maker;
-    std::function<MaterialDelegatePtr(noo::MaterialID, MaterialData const&)>
-                                                                 mat_maker;
-    std::function<MeshDelegatePtr(noo::MeshID, MeshData const&)> mesh_maker;
-    std::function<ObjectDelegatePtr(noo::ObjectID, ObjectUpdateData const&)>
-        object_maker;
-    std::function<SignalDelegatePtr(noo::SignalID, SignalData const&)>
-        sig_maker;
-    std::function<MethodDelegatePtr(noo::MethodID, MethodData const&)>
-                                                                 method_maker;
-    std::function<PlotDelegatePtr(noo::PlotID, PlotData const&)> plot_maker;
+    template <class T, class ID, class Init>
+    using DispatchFn = std::function<std::unique_ptr<T>(ID, Init const&)>;
+
+    DispatchFn<TextureDelegate, noo::TextureID, TextureInit>    tex_maker;
+    DispatchFn<BufferDelegate, noo::BufferID, BufferInit>       buffer_maker;
+    DispatchFn<TableDelegate, noo::TableID, TableData>          table_maker;
+    DispatchFn<LightDelegate, noo::LightID, LightInit>          light_maker;
+    DispatchFn<MaterialDelegate, noo::MaterialID, MaterialInit> mat_maker;
+    DispatchFn<MeshDelegate, noo::GeometryID, MeshInit>         mesh_maker;
+    DispatchFn<EntityDelegate, noo::EntityID, EntityUpdateData> object_maker;
+    DispatchFn<SignalDelegate, noo::SignalID, SignalInit>       sig_maker;
+    DispatchFn<MethodDelegate, noo::MethodID, MethodInit>       method_maker;
+    DispatchFn<PlotDelegate, noo::PlotID, PlotData>             plot_maker;
+    DispatchFn<ImageDelegate, noo::ImageID, ImageInit>          image_maker;
+    DispatchFn<SamplerDelegate, noo::SamplerID, SamplerInit>    sampler_maker;
 
     std::function<std::unique_ptr<DocumentDelegate>()> doc_maker;
 };
@@ -862,8 +1054,8 @@ public:
     TableDelegate*    get(noo::TableID);
     LightDelegate*    get(noo::LightID);
     MaterialDelegate* get(noo::MaterialID);
-    MeshDelegate*     get(noo::MeshID);
-    ObjectDelegate*   get(noo::ObjectID);
+    MeshDelegate*     get(noo::GeometryID);
+    EntityDelegate*   get(noo::EntityID);
     SignalDelegate*   get(noo::SignalID);
     MethodDelegate*   get(noo::MethodID);
 

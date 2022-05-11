@@ -9,6 +9,7 @@
 
 #include <cstring>
 
+#include <QColor>
 #include <QDebug>
 
 namespace noo {
@@ -32,12 +33,23 @@ write_to(AnyID const& anyid, flatbuffers::FlatBufferBuilder& b) {
         VCASE(std::monostate) {
             return flatbuffers::Offset<::noodles::AnyID>();
         },
+        VCASE(SamplerID id) {
+            return set_from<noodles::SamplerID>(
+                noodles::CreateSamplerID, id, b);
+        },
         VCASE(TextureID id) {
             return set_from<noodles::TextureID>(
                 noodles::CreateTextureID, id, b);
         },
+        VCASE(ImageID id) {
+            return set_from<noodles::ImageID>(noodles::CreateImageID, id, b);
+        },
         VCASE(BufferID id) {
             return set_from<noodles::BufferID>(noodles::CreateBufferID, id, b);
+        },
+        VCASE(BufferViewID id) {
+            return set_from<noodles::BufferViewID>(
+                noodles::CreateBufferID, id, b);
         },
         VCASE(TableID id) {
             return set_from<noodles::TableID>(noodles::CreateTableID, id, b);
@@ -49,12 +61,12 @@ write_to(AnyID const& anyid, flatbuffers::FlatBufferBuilder& b) {
             return set_from<noodles::MaterialID>(
                 noodles::CreateMaterialID, id, b);
         },
-        VCASE(MeshID id) {
+        VCASE(GeometryID id) {
             return set_from<noodles::GeometryID>(
                 noodles::CreateGeometryID, id, b);
         },
-        VCASE(ObjectID id) {
-            return set_from<noodles::ObjectID>(noodles::CreateObjectID, id, b);
+        VCASE(EntityID id) {
+            return set_from<noodles::EntityID>(noodles::CreateEntityID, id, b);
         },
         VCASE(SignalID id) {
             return set_from<noodles::SignalID>(noodles::CreateSignalID, id, b);
@@ -70,7 +82,7 @@ write_to(AnyID const& anyid, flatbuffers::FlatBufferBuilder& b) {
 }
 
 flatbuffers::Offset<::noodles::AnyList>
-write_to(noo::AnyVarList const& list, flatbuffers::FlatBufferBuilder& b) {
+write_to(QCborValueList const& list, flatbuffers::FlatBufferBuilder& b) {
     auto v = write_array_to(list, b);
     return ::noodles::CreateAnyList(b, v);
 }
@@ -156,6 +168,19 @@ write_to(AnyVar const& any, flatbuffers::FlatBufferBuilder& b) {
             auto l = ::noodles::CreateIntegerList(b, v);
 
             return write_any_helper(l, b);
+        },
+        VCASE(glm::vec2 const& vector) {
+            auto v = noodles::CreateAVec2(b, vector.x, vector.y);
+            return write_any_helper(v, b);
+        },
+        VCASE(glm::vec3 const& vector) {
+            auto v = noodles::CreateAVec3(b, vector.x, vector.y, vector.z);
+            return write_any_helper(v, b);
+        },
+        VCASE(glm::vec4 const& vector) {
+            auto v =
+                noodles::CreateAVec4(b, vector.x, vector.y, vector.z, vector.w);
+            return write_any_helper(v, b);
         });
 
     return x;
@@ -205,8 +230,8 @@ write_to(glm::mat4 const& m, flatbuffers::FlatBufferBuilder& b) {
 
     return ret;
 }
-::noodles::RGB convert(glm::u8vec3 const& c) {
-    return { c.r, c.g, c.b };
+::noodles::RGB convert(QColor const& c) {
+    return { (uint8_t)c.red(), (uint8_t)c.green(), (uint8_t)c.blue() };
 }
 
 glm::vec2 convert(::noodles::Vec2 const& v) {
@@ -228,8 +253,8 @@ glm::mat4 convert(::noodles::Mat4 const& m) {
 
     return ret;
 }
-glm::u8vec3 convert(::noodles::RGB const& m) {
-    return { m.r(), m.g(), m.b() };
+QColor convert(::noodles::RGB const& m) {
+    return QColor { m.r(), m.g(), m.b() };
 }
 
 ::noo::BoundingBox convert(::noodles::BoundingBox const& bb) {
@@ -323,6 +348,18 @@ void read_to(::noodles::Any const* n_any, AnyVar& any) {
         AnyID a_id;
         read_to(n_any->any_as_AnyID(), a_id);
         any = a_id;
+    } break;
+    case noodles::AnyType::AVec2: {
+        auto sv = n_any->any_as_AVec2();
+        any     = glm::vec2(sv->x(), sv->y());
+    } break;
+    case noodles::AnyType::AVec3: {
+        auto sv = n_any->any_as_AVec3();
+        any     = glm::vec3(sv->x(), sv->y(), sv->z());
+    } break;
+    case noodles::AnyType::AVec4: {
+        auto sv = n_any->any_as_AVec4();
+        any     = glm::vec4(sv->x(), sv->y(), sv->z(), sv->w());
     }
     }
 }
@@ -346,8 +383,8 @@ void read_to(::noodles::AnyID const* n_any_id, AnyID& any_id) {
 
     switch (n_any_id->id_type()) {
     case noodles::AnyIDType::NONE: any_id = AnyID(); break;
-    case noodles::AnyIDType::ObjectID:
-        any_id = read_to_helper(n_any_id->id_as_ObjectID());
+    case noodles::AnyIDType::EntityID:
+        any_id = read_to_helper(n_any_id->id_as_EntityID());
         break;
     case noodles::AnyIDType::TableID:
         any_id = read_to_helper(n_any_id->id_as_TableID());
@@ -367,11 +404,20 @@ void read_to(::noodles::AnyID const* n_any_id, AnyID& any_id) {
     case noodles::AnyIDType::LightID:
         any_id = read_to_helper(n_any_id->id_as_LightID());
         break;
+    case noodles::AnyIDType::ImageID:
+        any_id = read_to_helper(n_any_id->id_as_ImageID());
+        break;
     case noodles::AnyIDType::TextureID:
         any_id = read_to_helper(n_any_id->id_as_TextureID());
         break;
+    case noodles::AnyIDType::SamplerID:
+        any_id = read_to_helper(n_any_id->id_as_SamplerID());
+        break;
     case noodles::AnyIDType::BufferID:
         any_id = read_to_helper(n_any_id->id_as_BufferID());
+        break;
+    case noodles::AnyIDType::BufferViewID:
+        any_id = read_to_helper(n_any_id->id_as_BufferViewID());
         break;
     case noodles::AnyIDType::PlotID:
         any_id = read_to_helper(n_any_id->id_as_PlotID());
@@ -414,12 +460,12 @@ convert_id(MaterialID id, flatbuffers::FlatBufferBuilder& b) {
     return noodles::CreateMaterialID(b, id.id_slot, id.id_gen);
 }
 flatbuffers::Offset<::noodles::GeometryID>
-convert_id(MeshID id, flatbuffers::FlatBufferBuilder& b) {
+convert_id(GeometryID id, flatbuffers::FlatBufferBuilder& b) {
     return noodles::CreateGeometryID(b, id.id_slot, id.id_gen);
 }
-flatbuffers::Offset<::noodles::ObjectID>
-convert_id(ObjectID id, flatbuffers::FlatBufferBuilder& b) {
-    return noodles::CreateObjectID(b, id.id_slot, id.id_gen);
+flatbuffers::Offset<::noodles::EntityID>
+convert_id(EntityID id, flatbuffers::FlatBufferBuilder& b) {
+    return noodles::CreateEntityID(b, id.id_slot, id.id_gen);
 }
 flatbuffers::Offset<::noodles::SignalID>
 convert_id(SignalID id, flatbuffers::FlatBufferBuilder& b) {
@@ -450,10 +496,10 @@ LightID convert_id(::noodles::LightID const& id) {
 MaterialID convert_id(::noodles::MaterialID const& id) {
     return { id.id_slot(), id.id_gen() };
 }
-MeshID convert_id(::noodles::GeometryID const& id) {
+GeometryID convert_id(::noodles::GeometryID const& id) {
     return { id.id_slot(), id.id_gen() };
 }
-ObjectID convert_id(::noodles::ObjectID const& id) {
+EntityID convert_id(::noodles::EntityID const& id) {
     return { id.id_slot(), id.id_gen() };
 }
 SignalID convert_id(::noodles::SignalID const& id) {
@@ -486,11 +532,11 @@ MaterialID convert_id(::noodles::MaterialID const* p) {
     if (p) return convert_id(*p);
     return {};
 }
-MeshID convert_id(::noodles::GeometryID const* p) {
+GeometryID convert_id(::noodles::GeometryID const* p) {
     if (p) return convert_id(*p);
     return {};
 }
-ObjectID convert_id(::noodles::ObjectID const* p) {
+EntityID convert_id(::noodles::EntityID const* p) {
     if (p) return convert_id(*p);
     return {};
 }

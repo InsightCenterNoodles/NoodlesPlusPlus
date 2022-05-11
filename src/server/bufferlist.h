@@ -16,9 +16,7 @@ public:
 
 
 class BufferT : public ComponentMixin<BufferT, BufferList, BufferID> {
-    QByteArray m_bytes;
-
-    std::optional<BufferURLSource> m_url_source;
+    BufferData m_data;
 
 public:
     BufferT(IDType, BufferList*, BufferData const&);
@@ -26,10 +24,32 @@ public:
     void write_new_to(Writer&);
 
     void write_delete_to(Writer&);
-
-    void write_refresh_to(Writer&);
 };
 
+
+// =============================================================================
+
+class BufferViewList
+    : public ComponentListBase<BufferViewList, BufferViewID, BufferViewT> {
+public:
+    BufferViewList(ServerT*);
+    ~BufferViewList();
+};
+
+
+class BufferViewT
+    : public ComponentMixin<BufferViewT, BufferViewList, BufferViewID> {
+    BufferViewData m_data;
+
+public:
+    BufferViewT(IDType, BufferViewList*, BufferViewData const&);
+
+    void write_new_to(Writer&);
+
+    void write_delete_to(Writer&);
+};
+
+// =============================================================================
 
 class LightList : public ComponentListBase<LightList, LightID, LightT> {
 public:

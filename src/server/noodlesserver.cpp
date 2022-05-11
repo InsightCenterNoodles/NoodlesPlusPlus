@@ -413,7 +413,7 @@ class MessageHandler {
         if (message->on_object()) {
             qDebug() << "INVOKE on obj";
 
-            ObjectID source = convert_id(*message->on_object());
+            EntityID source = convert_id(*message->on_object());
 
             auto const& obj_ptr = get_document().obj_list().get_at(source);
 

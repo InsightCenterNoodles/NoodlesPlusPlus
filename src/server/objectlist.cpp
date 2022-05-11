@@ -116,7 +116,7 @@ void ObjectT::update_common(ObjectTUpdateHelper const& opt, Writer& w) {
     auto lid = convert_id(id(), w);
 
 
-    std::optional<flatbuffers::Offset<noodles::ObjectID>> update_parent;
+    std::optional<flatbuffers::Offset<noodles::EntityID>> update_parent;
     std::optional<noodles::Mat4>                          update_transform;
 
     std::optional<flatbuffers::Offset<void>> update_definition;

@@ -37,6 +37,24 @@ void MeshT::write_new_to(Writer& w) {
 
     auto lid = convert_id(id(), w);
 
+    auto name_h = w->CreateString(m_data.name);
+
+    std::vector<flatbuffers::Offset<noodles::GeometryPatch>> fbb_patches;
+
+    for (auto const& patch : m_data.patches) {
+        std::vector<flatbuffers::Offset<noodles::Attribute>> fbb_attrib;
+
+        for (auto const& attrib : patch.attributes) {
+
+            auto const& view = attrib.view;
+            view.get()->
+
+                auto fbb_attrib = noodles::CreateAttribute(w,
+
+            )
+        }
+    }
+
     auto bb = convert(m_data.bounding_box);
 
     auto x = noodles::CreateGeometryCreate(
@@ -52,18 +70,6 @@ void MeshT::write_new_to(Writer& w) {
 
 
     w.complete_message(x);
-}
-
-void MeshT::update(MeshData const& data, Writer& w) {
-    m_data = data;
-
-    write_new_to(w);
-}
-
-void MeshT::update(MeshData const& data) {
-    auto w = m_parent_list->new_bcast();
-
-    update(data, *w);
 }
 
 void MeshT::write_delete_to(Writer& w) {

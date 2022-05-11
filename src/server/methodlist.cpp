@@ -88,7 +88,7 @@ void SignalT::write_delete_to(Writer& w) {
 
 
 void SignalT::fire(
-    std::variant<std::monostate, TableID, ObjectID, PlotID> context,
+    std::variant<std::monostate, TableID, EntityID, PlotID> context,
     AnyVarList&&                                            v) {
 
     std::unique_ptr<Writer> w = [&]() {
@@ -125,7 +125,7 @@ void SignalT::fire(
             return CreateSignalInvoke(
                 *w, noodles_id, {}, noodles_tbl_id, {}, var);
         },
-        VCASE(ObjectID oid) {
+        VCASE(EntityID oid) {
             auto noodles_obj_id = convert_id(oid, *w);
             return CreateSignalInvoke(
                 *w, noodles_id, noodles_obj_id, {}, {}, var);

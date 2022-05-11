@@ -4,6 +4,7 @@
 
 namespace noo {
 
+#if 0
 
 bool AnyVar::has_int() const {
     return std::holds_alternative<int64_t>(*this);
@@ -212,5 +213,7 @@ std::string to_string(AnyVar const& v) {
 std::string AnyVar::dump_string() const {
     return ::noo::to_string(*this);
 }
+
+#endif
 
 } // namespace noo

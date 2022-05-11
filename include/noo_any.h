@@ -1,15 +1,17 @@
 #ifndef NOO_ANY_H
 #define NOO_ANY_H
 
-#include "noo_id.h"
-#include "noo_include_glm.h"
+#if 0
 
-#include <optional>
-#include <span>
-#include <string>
-#include <unordered_map>
-#include <variant>
-#include <vector>
+#    include "noo_id.h"
+#    include "noo_include_glm.h"
+
+#    include <optional>
+#    include <span>
+#    include <string>
+#    include <unordered_map>
+#    include <variant>
+#    include <vector>
 
 namespace noo {
 
@@ -27,7 +29,10 @@ using AnyVarBase = std::variant<std::monostate, // the null state
                                 AnyVarMap,
                                 AnyVarList,
                                 std::vector<double>,
-                                std::vector<int64_t>>;
+                                std::vector<int64_t>,
+                                glm::vec2,
+                                glm::vec3,
+                                glm::vec4>;
 
 ///
 /// \brief The AnyVar class models the noodles Any variable
@@ -71,23 +76,6 @@ public:
         for (auto const& [k, v] : map) {
             m[k] = AnyVar(v);
         }
-    }
-
-    AnyVar(glm::vec3 v) {
-        auto& ev = emplace<std::vector<double>>(3);
-
-        ev[0] = v.x;
-        ev[1] = v.y;
-        ev[2] = v.z;
-    }
-
-    AnyVar(glm::vec4 v) {
-        auto& ev = emplace<std::vector<double>>(4);
-
-        ev[0] = v.x;
-        ev[1] = v.y;
-        ev[2] = v.z;
-        ev[3] = v.w;
     }
 
     template <class T, class U>
@@ -300,17 +288,18 @@ inline AnyVar to_any(glm::vec3 const& v) {
 } // namespace noo
 
 
-#if (QT_VERSION > QT_VERSION_CHECK(6, 1, 0))
+#    if (QT_VERSION > QT_VERSION_CHECK(6, 1, 0))
 namespace QTypeTraits {
 template <>
-struct has_operator_less_than<noo::AnyVar> : std::false_type { };
+struct has_operator_less_than<QCborValue> : std::false_type { };
 
 template <>
-struct has_operator_less_than<noo::AnyVarList> : std::false_type { };
+struct has_operator_less_than<QCborValueList> : std::false_type { };
 
 } // namespace QTypeTraits
-#endif
+#    endif
 
-Q_DECLARE_METATYPE(noo::AnyVar);
+Q_DECLARE_METATYPE(QCborValue);
+#endif
 
 #endif // NOO_ANY_H

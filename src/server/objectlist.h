@@ -11,7 +11,7 @@
 
 namespace noo {
 
-class ObjectList : public ComponentListBase<ObjectList, ObjectID, ObjectT> {
+class ObjectList : public ComponentListBase<ObjectList, EntityID, ObjectT> {
 public:
     ObjectList(ServerT*);
     ~ObjectList();
@@ -19,7 +19,7 @@ public:
 
 class ObjectTUpdateHelper;
 
-class ObjectT : public ComponentMixin<ObjectT, ObjectList, ObjectID> {
+class ObjectT : public ComponentMixin<ObjectT, ObjectList, EntityID> {
     ObjectData m_data;
 
     AttachedMethodList m_method_search;

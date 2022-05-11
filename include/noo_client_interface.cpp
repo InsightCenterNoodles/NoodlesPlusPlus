@@ -27,7 +27,7 @@ PendingMethodReply::PendingMethodReply(MethodDelegate* d, MethodContext ctx)
     std::visit([&](auto x) { m_context = x; }, ctx);
 }
 
-void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
+void PendingMethodReply::call_direct(QCborValueList&& l) {
     if (m_called) {
         MethodException exception {
             .code    = -10000,
@@ -56,7 +56,7 @@ void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
         VCASE(std::monostate) {
             emit m_method->invoke(m_method->id(), std::monostate(), l, this);
         },
-        VCASE(QPointer<ObjectDelegate> & p) {
+        VCASE(QPointer<EntityDelegate> & p) {
             if (!p) {
                 MethodException exception {
                     .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
@@ -93,7 +93,7 @@ void PendingMethodReply::call_direct(noo::AnyVarList&& l) {
     );
 }
 
-void PendingMethodReply::complete(noo::AnyVarRef   v,
+void PendingMethodReply::complete(QCborValueRef    v,
                                   MethodException* exception_info) {
     qDebug() << Q_FUNC_INFO;
 
@@ -142,10 +142,10 @@ void GetStringListReply::interpret() {
     VMATCH_W(
         visit,
         m_var,
-        VCASE(noo::AnyVarListRef const& l) {
+        VCASE(QCborValueListRef const& l) {
             QStringList to_ret;
 
-            l.for_each([&](auto, noo::AnyVarRef r) {
+            l.for_each([&](auto, QCborValueRef r) {
                 to_ret << noo::to_qstring(r.to_string());
             });
 
@@ -255,10 +255,12 @@ AttachedSignalList::find_by_delegate(SignalDelegate* ptr) const {
 #define BASIC_DELEGATE_IMPL(C, ID, DATA)                                       \
     C::C(noo::ID i, DATA const&) : m_id(i) { }                                 \
     C::~C() = default;                                                         \
-    noo::ID C::id() const { return m_id; }
+    noo::ID C::id() const {                                                    \
+        return m_id;                                                           \
+    }
 
 
-MethodDelegate::MethodDelegate(noo::MethodID i, MethodData const& d)
+MethodDelegate::MethodDelegate(noo::MethodID i, MethodInit const& d)
     : m_id(i), m_method_name(d.method_name) { }
 MethodDelegate::~MethodDelegate() = default;
 noo::MethodID MethodDelegate::id() const {
@@ -270,7 +272,7 @@ std::string_view MethodDelegate::name() const {
 
 // =============================================================================
 
-SignalDelegate::SignalDelegate(noo::SignalID i, SignalData const& d)
+SignalDelegate::SignalDelegate(noo::SignalID i, SignalInit const& d)
     : m_id(i), m_signal_name(d.signal_name) { }
 SignalDelegate::~SignalDelegate() = default;
 noo::SignalID SignalDelegate::id() const {
@@ -282,7 +284,7 @@ std::string_view SignalDelegate::name() const {
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(BufferDelegate, BufferID, BufferData)
+BASIC_DELEGATE_IMPL(BufferDelegate, BufferID, BufferInit)
 
 // =============================================================================
 
@@ -338,14 +340,14 @@ noo::TableID TableDelegate::id() const {
 
 void TableDelegate::prepare_delete() { }
 
-void TableDelegate::on_table_initialize(noo::AnyVarListRef const&,
-                                        noo::AnyVarRef,
-                                        noo::AnyVarListRef const&,
-                                        noo::AnyVarListRef const&) { }
+void TableDelegate::on_table_initialize(QCborValueListRef const&,
+                                        QCborValueRef,
+                                        QCborValueListRef const&,
+                                        QCborValueListRef const&) { }
 
 void TableDelegate::on_table_reset() { }
-void TableDelegate::on_table_updated(noo::AnyVarRef, noo::AnyVarRef) { }
-void TableDelegate::on_table_rows_removed(noo::AnyVarRef) { }
+void TableDelegate::on_table_updated(QCborValueRef, QCborValueRef) { }
+void TableDelegate::on_table_rows_removed(QCborValueRef) { }
 void TableDelegate::on_table_selection_updated(std::string_view,
                                                noo::SelectionRef const&) { }
 
@@ -365,18 +367,18 @@ PendingMethodReply* TableDelegate::subscribe() const {
 
 
 PendingMethodReply*
-TableDelegate::request_row_insert(noo::AnyVarList&& row) const {
-    auto new_list = noo::AnyVarList(row.size());
+TableDelegate::request_row_insert(QCborValueList&& row) const {
+    auto new_list = QCborValueList(row.size());
 
     for (size_t i = 0; i < row.size(); i++) {
-        new_list[i] = noo::AnyVarList({ row[i] });
+        new_list[i] = QCborValueList({ row[i] });
     }
 
     return request_rows_insert(std::move(new_list));
 }
 
 PendingMethodReply*
-TableDelegate::request_rows_insert(noo::AnyVarList&& columns) const {
+TableDelegate::request_rows_insert(QCborValueList&& columns) const {
     auto* p = attached_methods().new_call_by_name("tbl_insert");
 
     p->call(columns);
@@ -385,11 +387,11 @@ TableDelegate::request_rows_insert(noo::AnyVarList&& columns) const {
 }
 
 PendingMethodReply*
-TableDelegate::request_row_update(int64_t key, noo::AnyVarList&& row) const {
-    auto new_list = noo::AnyVarList(row.size());
+TableDelegate::request_row_update(int64_t key, QCborValueList&& row) const {
+    auto new_list = QCborValueList(row.size());
 
     for (size_t i = 0; i < row.size(); i++) {
-        new_list[i] = noo::AnyVarList({ row[i] });
+        new_list[i] = QCborValueList({ row[i] });
     }
 
     return request_rows_update({ key }, std::move(new_list));
@@ -397,7 +399,7 @@ TableDelegate::request_row_update(int64_t key, noo::AnyVarList&& row) const {
 
 PendingMethodReply*
 TableDelegate::request_rows_update(std::vector<int64_t>&& keys,
-                                   noo::AnyVarList&&      columns) const {
+                                   QCborValueList&&       columns) const {
     auto* p = attached_methods().new_call_by_name("tbl_update");
 
     p->call(keys, columns);
@@ -432,11 +434,11 @@ TableDelegate::request_selection_update(std::string_view name,
     return p;
 }
 
-void TableDelegate::interp_table_reset(noo::AnyVarListRef const&) {
+void TableDelegate::interp_table_reset(QCborValueListRef const&) {
     this->on_table_reset();
 }
 
-void TableDelegate::interp_table_update(noo::AnyVarListRef const& ref) {
+void TableDelegate::interp_table_update(QCborValueListRef const& ref) {
     // row of keys, then row of columns
     if (ref.size() < 2) {
         qWarning() << Q_FUNC_INFO << "Malformed signal from server";
@@ -449,7 +451,7 @@ void TableDelegate::interp_table_update(noo::AnyVarListRef const& ref) {
     this->on_table_updated(keylist, cols);
 }
 
-void TableDelegate::interp_table_remove(noo::AnyVarListRef const& ref) {
+void TableDelegate::interp_table_remove(QCborValueListRef const& ref) {
     if (ref.size() < 1) {
         qWarning() << Q_FUNC_INFO << "Malformed signal from server";
         return;
@@ -458,7 +460,7 @@ void TableDelegate::interp_table_remove(noo::AnyVarListRef const& ref) {
     this->on_table_rows_removed(ref[0]);
 }
 
-void TableDelegate::interp_table_sel_update(noo::AnyVarListRef const& ref) {
+void TableDelegate::interp_table_sel_update(QCborValueListRef const& ref) {
     if (ref.size() < 2) {
         qWarning() << Q_FUNC_INFO << "Malformed signal from server";
         return;
@@ -473,31 +475,37 @@ void TableDelegate::interp_table_sel_update(noo::AnyVarListRef const& ref) {
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(TextureDelegate, TextureID, TextureData)
-void TextureDelegate::update(TextureData const&) { }
-void TextureDelegate::on_update(TextureData const&) { }
+BASIC_DELEGATE_IMPL(TextureDelegate, TextureID, TextureInit)
+void TextureDelegate::update(TextureInit const& d) {
+    this->on_update(d);
+}
+void TextureDelegate::on_update(TextureInit const&) { }
 
 // =============================================================================
 
 BASIC_DELEGATE_IMPL(LightDelegate, LightID, LightData)
-void LightDelegate::update(LightData const&) { }
+void LightDelegate::update(LightData const& d) {
+    this->on_update(d);
+}
 void LightDelegate::on_update(LightData const&) { }
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(MaterialDelegate, MaterialID, MaterialData)
-void MaterialDelegate::update(MaterialData const&) { }
-void MaterialDelegate::on_update(MaterialData const&) { }
+BASIC_DELEGATE_IMPL(MaterialDelegate, MaterialID, MaterialInit)
+void MaterialDelegate::update(MaterialInit const& d) {
+    this->on_update(d);
+}
+void MaterialDelegate::on_update(MaterialInit const&) { }
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(MeshDelegate, MeshID, MeshData)
+BASIC_DELEGATE_IMPL(MeshDelegate, GeometryID, MeshData)
 
 void MeshDelegate::prepare_delete() { }
 
 // =============================================================================
 
-ObjectDelegate::ObjectDelegate(noo::ObjectID i, ObjectUpdateData const& data)
+EntityDelegate::EntityDelegate(noo::EntityID i, EntityUpdateData const& data)
     : m_id(i), m_attached_methods(this), m_attached_signals(this) {
 
     if (data.name) {
@@ -511,25 +519,25 @@ ObjectDelegate::ObjectDelegate(noo::ObjectID i, ObjectUpdateData const& data)
     if (data.method_list) m_attached_methods = *data.method_list;
     if (data.signal_list) m_attached_signals = *data.signal_list;
 }
-ObjectDelegate::~ObjectDelegate() = default;
-void ObjectDelegate::update(ObjectUpdateData const& data) {
+EntityDelegate::~EntityDelegate() = default;
+void EntityDelegate::update(EntityUpdateData const& data) {
     if (data.method_list) m_attached_methods = *data.method_list;
     if (data.signal_list) m_attached_signals = *data.signal_list;
 
     this->on_update(data);
 }
-void                      ObjectDelegate::on_update(ObjectUpdateData const&) { }
-AttachedMethodList const& ObjectDelegate::attached_methods() const {
+void                      EntityDelegate::on_update(EntityUpdateData const&) { }
+AttachedMethodList const& EntityDelegate::attached_methods() const {
     return m_attached_methods;
 }
-AttachedSignalList const& ObjectDelegate::attached_signals() const {
+AttachedSignalList const& EntityDelegate::attached_signals() const {
     return m_attached_signals;
 }
-noo::ObjectID ObjectDelegate::id() const {
+noo::EntityID EntityDelegate::id() const {
     return m_id;
 }
 
-void ObjectDelegate::prepare_delete() { }
+void EntityDelegate::prepare_delete() { }
 
 // =============================================================================
 
@@ -661,12 +669,12 @@ public:
 
         return m_state->material_list().comp_at(id);
     }
-    MeshDelegate* get(noo::MeshID id) {
+    MeshDelegate* get(noo::GeometryID id) {
         if (!m_state) return {};
 
         return m_state->mesh_list().comp_at(id);
     }
-    ObjectDelegate* get(noo::ObjectID id) {
+    EntityDelegate* get(noo::EntityID id) {
         if (!m_state) return {};
 
         return m_state->object_list().comp_at(id);
@@ -705,15 +713,15 @@ create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
         };                                                                     \
     }
 
-    CREATE_DEFAULT(tex_maker, TextureID, TextureData, TextureDelegate);
-    CREATE_DEFAULT(buffer_maker, BufferID, BufferData, BufferDelegate);
+    CREATE_DEFAULT(tex_maker, TextureID, TextureInit, TextureDelegate);
+    CREATE_DEFAULT(buffer_maker, BufferID, BufferInit, BufferDelegate);
     CREATE_DEFAULT(table_maker, TableID, TableData, TableDelegate);
     CREATE_DEFAULT(light_maker, LightID, LightData, LightDelegate);
-    CREATE_DEFAULT(mat_maker, MaterialID, MaterialData, MaterialDelegate);
-    CREATE_DEFAULT(mesh_maker, MeshID, MeshData, MeshDelegate);
-    CREATE_DEFAULT(object_maker, ObjectID, ObjectUpdateData, ObjectDelegate);
-    CREATE_DEFAULT(sig_maker, SignalID, SignalData, SignalDelegate);
-    CREATE_DEFAULT(method_maker, MethodID, MethodData, MethodDelegate);
+    CREATE_DEFAULT(mat_maker, MaterialID, MaterialInit, MaterialDelegate);
+    CREATE_DEFAULT(mesh_maker, GeometryID, MeshData, MeshDelegate);
+    CREATE_DEFAULT(object_maker, EntityID, EntityUpdateData, EntityDelegate);
+    CREATE_DEFAULT(sig_maker, SignalID, SignalInit, SignalDelegate);
+    CREATE_DEFAULT(method_maker, MethodID, MethodInit, MethodDelegate);
 
 
     if (!d.doc_maker) {
@@ -763,12 +771,12 @@ MaterialDelegate* ClientConnection::get(noo::MaterialID id) {
 
     return m_data->get(id);
 }
-MeshDelegate* ClientConnection::get(noo::MeshID id) {
+MeshDelegate* ClientConnection::get(noo::GeometryID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-ObjectDelegate* ClientConnection::get(noo::ObjectID id) {
+EntityDelegate* ClientConnection::get(noo::EntityID id) {
     if (!m_data) return {};
 
     return m_data->get(id);

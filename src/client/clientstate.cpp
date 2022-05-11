@@ -48,7 +48,7 @@ ClientState::ClientState(QWebSocket& s, ClientDelegates& makers)
     auto cname_std = cname.toStdString();
 
     auto x =
-        noodles::CreateIntroductionMessageDirect(writer, cname_std.c_str(), 0);
+        noodles::CreateIntroductionMessageDirect(writer, cname_std.c_str());
 
     writer.complete_message(x);
     qDebug() << Q_FUNC_INFO;
@@ -70,7 +70,7 @@ void ClientState::on_new_text_message(QString t) {
 
 void ClientState::on_method_ask_invoke(noo::MethodID          method_id,
                                        MethodContext          context,
-                                       noo::AnyVarList const& args,
+                                       QCborValueList const& args,
                                        PendingMethodReply*    reply) {
     qDebug() << "Invoking" << method_id.to_qstring();
     Q_ASSERT(method_id.valid());
@@ -91,7 +91,7 @@ void ClientState::on_method_ask_invoke(noo::MethodID          method_id,
     auto ident_handle = writer->CreateString(id);
     auto arg_handle   = noo::write_to(args, writer);
 
-    flatbuffers::Offset<::noodles::ObjectID> const null_oid;
+    flatbuffers::Offset<::noodles::EntityID> const null_oid;
     flatbuffers::Offset<::noodles::TableID> const  null_tid;
     flatbuffers::Offset<::noodles::PlotID> const   null_pid;
 
@@ -106,7 +106,7 @@ void ClientState::on_method_ask_invoke(noo::MethodID          method_id,
                                                       ident_handle,
                                                       arg_handle);
         },
-        VCASE(ObjectDelegate * ptr) {
+        VCASE(EntityDelegate * ptr) {
             auto oid = convert_id(ptr->id(), writer);
 
             return noodles::CreateMethodInvokeMessage(

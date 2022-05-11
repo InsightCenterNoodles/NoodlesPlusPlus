@@ -8,6 +8,10 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <QCborArray>
+#include <QCborMap>
+#include <QCborValue>
+
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -16,6 +20,17 @@
 
 
 namespace noo {
+
+QVector<double>  coerce_to_real_list(QCborValue);
+QVector<int64_t> coerce_to_int_list(QCborValue);
+
+template <class T>
+QCborValue convert_to_cbor(T);
+
+template <class T>
+void convert_from_cbor(QCborValue, T&);
+
+// =============================================================================
 
 ///
 /// \brief The Selection struct models a noodles SelectionObject
@@ -28,9 +43,9 @@ struct Selection {
     std::vector<Pair>    row_ranges;
 
     Selection() = default;
-    Selection(AnyVar&& v);
+    Selection(QCborMap);
 
-    AnyVar to_any() const;
+    QCborValue to_any() const;
 };
 
 ///
@@ -40,15 +55,15 @@ struct Selection {
 struct SelectionRef {
     using Pair = std::pair<int64_t, int64_t>;
 
-    noo::PossiblyOwnedView<int64_t const> rows;
-    noo::PossiblyOwnedView<int64_t const> raw_ranges;
-    std::span<Pair const>                 row_ranges;
+    QVector<int64_t const> rows;
+    QVector<int64_t const> raw_ranges;
+    std::span<Pair const>  row_ranges;
 
     SelectionRef() = default;
     SelectionRef(Selection const&);
-    SelectionRef(AnyVarRef const&);
+    SelectionRef(QCborMap const&);
 
-    AnyVar to_any() const;
+    QCborValue to_any() const;
 
     Selection to_selection() const;
 };
@@ -83,6 +98,8 @@ template <class T>
 struct is_span<std::span<T>> : std::bool_constant<true> { };
 //@}
 
+// =============================================================================
+// These utils help with creating methods
 
 ///
 /// \brief The RealListArg struct is used in methods to coerce the Any type
@@ -90,10 +107,10 @@ struct is_span<std::span<T>> : std::bool_constant<true> { };
 /// reals.
 ///
 struct AnyListArg {
-    AnyVarListRef list;
+    QCborArray list;
 
     AnyListArg() = default;
-    AnyListArg(AnyVarRef const& a) : list(a.to_vector()) { }
+    AnyListArg(QCborValue const& a) : list(a.toArray()) { }
 };
 
 ///
@@ -102,10 +119,10 @@ struct AnyListArg {
 /// reals.
 ///
 struct RealListArg {
-    PossiblyOwnedView<double const> list;
+    QVector<double> list;
 
     RealListArg() = default;
-    RealListArg(AnyVarRef const& a) : list(a.coerce_real_list()) { }
+    RealListArg(QCborValue const& a) : list(coerce_to_real_list(a)) { }
 };
 
 ///
@@ -113,10 +130,10 @@ struct RealListArg {
 /// list of integers.
 ///
 struct IntListArg {
-    PossiblyOwnedView<int64_t const> list;
+    QVector<int64_t> list;
 
     IntListArg() = default;
-    IntListArg(AnyVarRef const& a) : list(a.coerce_int_list()) { }
+    IntListArg(QCborValue const& a) : list(coerce_to_int_list(a)) { }
 };
 
 ///
@@ -124,38 +141,38 @@ struct IntListArg {
 /// list of strings
 ///
 struct StringListArg {
-    std::vector<std::string> list;
+    QStringList list;
 
     StringListArg() = default;
-    StringListArg(AnyVarRef const& a);
+    StringListArg(QCborValue const& a);
 };
 
 
 struct Vec3Arg : std::optional<glm::vec3> {
     Vec3Arg() = default;
-    Vec3Arg(AnyVarRef const&);
+    Vec3Arg(QCborValue const&);
 };
 
 struct Vec3ListArg : std::vector<glm::vec3> {
     Vec3ListArg() = default;
-    Vec3ListArg(AnyVarRef const&);
+    Vec3ListArg(QCborValue const&);
 };
 
 struct Vec4Arg : std::optional<glm::vec4> {
     Vec4Arg() = default;
-    Vec4Arg(AnyVarRef const&);
+    Vec4Arg(QCborValue const&);
 };
 
 struct IntArg : std::optional<int64_t> {
     IntArg() = default;
-    IntArg(AnyVarRef const&);
+    IntArg(QCborValue const&);
 };
 
 struct BoolArg {
     char state = -1;
 
     BoolArg() = default;
-    BoolArg(AnyVarRef const&);
+    BoolArg(QCborValue const&);
 
     operator bool() const { return state >= 0; }
 

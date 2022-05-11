@@ -10,6 +10,8 @@
 #include <variant>
 #include <vector>
 
+#if 0
+
 // forwards
 namespace noodles {
 struct Any;
@@ -31,7 +33,7 @@ struct PossiblyOwnedView {
     PossiblyOwnedView(std::span<T> s) : storage(s) { }
     PossiblyOwnedView(std::vector<StrippedT>&& s) : storage(std::move(s)) { }
 
-    PossiblyOwnedView(PossiblyOwnedView&&) = default;
+    PossiblyOwnedView(PossiblyOwnedView&&)            = default;
     PossiblyOwnedView& operator=(PossiblyOwnedView&&) = default;
 
 
@@ -85,8 +87,11 @@ public:
         AnyList     = 7,
         AnyMap      = 8,
         AnyID       = 9,
+        AVec2       = 10,
+        AVec3       = 11,
+        AVec4       = 12,
         MIN         = NONE,
-        MAX         = AnyID
+        MAX         = AVec4
     };
 
     AnyVarRef() = default;
@@ -115,6 +120,9 @@ public:
     std::span<double const>    to_real_list() const;
     std::span<int64_t const>   to_int_list() const;
     AnyID                      to_id() const;
+    glm::vec2                  to_vec2() const;
+    glm::vec3                  to_vec3() const;
+    glm::vec4                  to_vec4() const;
 
     PossiblyOwnedView<double const>  coerce_real_list() const;
     PossiblyOwnedView<int64_t const> coerce_int_list() const;
@@ -207,7 +215,12 @@ auto visit(Function&& f, AnyVarRef const& r) {
     case AnyVarRef::AnyType::AnyList: return f(r.to_vector());
     case AnyVarRef::AnyType::AnyMap: return f(r.to_map());
     case AnyVarRef::AnyType::AnyID: return f(r.to_id());
+    case AnyVarRef::AnyType::AVec2: return f(r.to_vec2());
+    case AnyVarRef::AnyType::AVec3: return f(r.to_vec3());
+    case AnyVarRef::AnyType::AVec4: return f(r.to_vec4());
     }
 }
 
 } // namespace noo
+
+#endif
