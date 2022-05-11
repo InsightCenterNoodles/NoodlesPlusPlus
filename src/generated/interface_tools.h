@@ -1,7 +1,6 @@
 #ifndef NOO_INTERFACE_TOOLS_H
 #define NOO_INTERFACE_TOOLS_H
 
-#include "flatbuffers/flatbuffers.h"
 #include "include/noo_id.h"
 #include "include/noo_include_glm.h"
 
@@ -9,6 +8,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#if 0
 
 // Forward declare generated noodles types
 namespace noodles {
@@ -277,5 +278,6 @@ auto make_id_list(Iter b, Iter e, flatbuffers::FlatBufferBuilder& blder) {
 
 } // namespace noo
 
+#endif
 
 #endif // INTERFACE_TOOLS_H

@@ -4,8 +4,11 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <qcborvalue.h>
 #include <variant>
 
+#include <QCborArray>
+#include <QCborValue>
 #include <QVariant>
 
 namespace noo {
@@ -26,6 +29,12 @@ struct ID {
     uint32_t id_gen  = INVALID;
 
     ID() = default;
+
+    ID(QCborValue const& v) {
+        auto a  = v.toArray();
+        id_slot = a.at(0).toInteger(INVALID);
+        id_gen  = a.at(1).toInteger(INVALID);
+    }
 
     ID(uint32_t _slot, uint32_t _gen) : id_slot(_slot), id_gen(_gen) { }
 
@@ -57,7 +66,14 @@ struct ID {
             .arg(id_slot)
             .arg(id_gen);
     }
+
+    QCborValue to_cbor() const { return QCborArray({ id_slot, id_gen }); }
 };
+
+template <class T>
+static T id_from_message(QCborMap const& m) {
+    return T(m[QStringLiteral("id")]);
+}
 
 struct EntityIDTag;
 struct MeshIDTag;

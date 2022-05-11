@@ -23,8 +23,8 @@ public:
 
 // =============================================================================
 
-class ClientState;
+class InternalClientState;
 
-void process_message(QWebSocket& s, ClientState& state, QByteArray m);
+void process_message(QWebSocket& s, InternalClientState& state, QByteArray m);
 
 } // namespace nooc

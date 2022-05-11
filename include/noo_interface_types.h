@@ -14,6 +14,7 @@
 
 #include <span>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
@@ -21,14 +22,79 @@
 
 namespace noo {
 
+// convert to a CBOR
+
 QVector<double>  coerce_to_real_list(QCborValue);
 QVector<int64_t> coerce_to_int_list(QCborValue);
+
+
+// Convert from a CBOR
+
+template <class...>
+constexpr std::false_type always_false {};
 
 template <class T>
 QCborValue convert_to_cbor(T);
 
 template <class T>
-void convert_from_cbor(QCborValue, T&);
+bool convert_from_cbor(QCborValue v, T& t) {
+    if constexpr (std::is_constructible_v<T, QCborMap>) {
+        t = T(v.toMap());
+        return true;
+    } else {
+        static_assert(always_false<T>);
+    }
+}
+
+template <class T>
+bool convert_from_cbor(QCborValue v, QVector<T>& out) {
+    out.clear();
+    auto arr = v.toArray();
+    for (auto const& arr_v : arr) {
+        T item;
+        if (!convert_from_cbor(arr_v, item)) return false;
+        out.push_back(std::move(item));
+    }
+}
+
+template <class T>
+bool convert_from_cbor(QCborValue v, std::vector<T>& out) {
+    out.clear();
+    auto arr = v.toArray();
+    for (auto const& arr_v : arr) {
+        T item;
+        if (!convert_from_cbor(arr_v, item)) return false;
+        out.push_back(std::move(item));
+    }
+}
+
+template <class T>
+bool convert_from_cbor(QCborValue v, std::optional<T>& out) {
+    out.reset();
+    if (v.isUndefined()) { return true; }
+    T& lt = out.emplace();
+    return convert_from_cbor(v, lt);
+}
+
+struct CborDecoder {
+    QCborMap map;
+
+    CborDecoder() = default;
+    CborDecoder(QCborMap const& m) : map(m) { }
+
+    template <class T>
+    bool operator()(QString n, T& t) {
+        using namespace noo;
+        return convert_from_cbor(map[n], t);
+    }
+
+    template <class T>
+    bool conditional(QString n, T& t) {
+        using namespace noo;
+        if (map.contains(n)) { return convert_from_cbor(map[n], t); }
+        return true;
+    }
+};
 
 // =============================================================================
 

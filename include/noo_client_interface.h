@@ -4,6 +4,11 @@
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
+#include <qcbormap.h>
+#include <qimage.h>
+#include <qline.h>
+#include <qnetworkaccessmanager.h>
+#include <qsslerror.h>
 #include <span>
 
 #include <QCborValue>
@@ -13,6 +18,8 @@
 #include <QUrl>
 
 namespace nooc {
+
+class InternalClientState;
 
 class DocumentDelegate;
 
@@ -229,7 +236,7 @@ class AttachedMethodList {
     MethodContextPtr             m_context;
     std::vector<MethodDelegate*> m_list;
 
-    MethodDelegate* find_direct_by_name(std::string_view) const;
+    MethodDelegate* find_direct_by_name(QString) const;
     bool            check_direct_by_delegate(MethodDelegate*) const;
 
 public:
@@ -249,7 +256,7 @@ public:
     /// to call the method. Returns null if the delegate is not attached to this
     /// object/table/document.
     template <class Reply = PendingMethodReply, class... Args>
-    Reply* new_call_by_name(std::string_view v, Args&&... args) const {
+    Reply* new_call_by_name(QString v, Args&&... args) const {
         static_assert(std::is_base_of_v<PendingMethodReply, Reply>);
 
         auto mptr = find_direct_by_name(v);
@@ -311,7 +318,7 @@ public:
     AttachedSignalList& operator=(std::vector<SignalDelegate*> const& l);
 
     /// Find the attached signal by a name. Returns null if name is not found.
-    AttachedSignal* find_by_name(std::string_view) const;
+    AttachedSignal* find_by_name(QString) const;
 
     /// Find the attached signal by a delegate ptr. Returns null i the name is
     /// not found.
@@ -325,6 +332,9 @@ struct ArgDoc {
     QString name;
     QString doc;
     QString editor_hint;
+
+    ArgDoc() = default;
+    ArgDoc(QCborMap);
 };
 
 /// Describes a noodles method
@@ -334,7 +344,8 @@ struct MethodInit {
     QString         return_documentation;
     QVector<ArgDoc> argument_documentation;
 
-    MethodInit(QCborValue);
+    MethodInit();
+    MethodInit(QCborMap);
 };
 
 /// The base delegate class for methods. Users can inherit from this to add
@@ -365,9 +376,12 @@ signals:
 // =============================================================================
 
 struct SignalInit {
-    QString           name;
-    std::string_view  documentation;
-    std::span<ArgDoc> argument_documentation;
+    QString             name;
+    QString             documentation;
+    std::vector<ArgDoc> argument_documentation;
+
+    SignalInit() = default;
+    SignalInit(QCborMap);
 };
 
 /// The base delegate class for signals. Users can inherit from this to add
@@ -396,8 +410,13 @@ signals:
 
 struct BufferInit {
     QString name;
-    QUrl    url;
-    size_t  url_size;
+
+    size_t byte_count;
+
+    QByteArray inline_bytes;
+    QUrl       url;
+
+    BufferInit(QCborMap);
 };
 
 /// The base delegate class for buffers. Users can inherit from this to add
@@ -418,8 +437,16 @@ public:
 
     noo::BufferID id() const;
 
+    bool is_data_ready() const { return m_buffer_bytes.size(); }
+
+    QByteArray data() const { return m_buffer_bytes; }
+
+    void start_download(QNetworkAccessManager*);
+
 private slots:
-    void store_data(QByteArray);
+    void ready_read();
+    void on_error();
+    void on_ssl_error(QList<QSslError> const&);
 
 signals:
     void data_ready(QByteArray);
@@ -440,6 +467,8 @@ struct BufferViewInit {
     ViewType                 type;
     uint64_t                 offset;
     uint64_t                 length;
+
+    BufferViewInit(QCborMap, InternalClientState&);
 };
 
 /// The base delegate class for buffers. Users can inherit from this to add
@@ -456,7 +485,15 @@ public:
 
     NOODLES_CAN_UPDATE(false)
 
-    noo::BufferID id() const;
+    noo::BufferViewID id() const;
+
+    bool is_data_ready() const { return m_init.source_buffer->is_data_ready(); }
+
+    BufferDelegate* source_buffer() const { return m_init.source_buffer; }
+
+    QByteArray get_sub_range() const {
+        return m_init.source_buffer->data().mid(m_init.offset, m_init.length);
+    }
 
 signals:
     void data_ready(QByteArray);
@@ -469,9 +506,11 @@ struct ImageInit {
 
     QPointer<BufferViewDelegate> local_image;
     QUrl                         remote_image;
+
+    ImageInit(QCborMap, InternalClientState&);
 };
 
-struct Image : public QObject {
+struct ImageDelegate : public QObject {
     Q_OBJECT
     noo::ImageID m_id;
     ImageInit    m_init;
@@ -479,15 +518,23 @@ struct Image : public QObject {
     QImage m_image;
 
 public:
-    Image(noo::ImageID, ImageInit const&);
-    virtual ~Image();
+    ImageDelegate(noo::ImageID, ImageInit const&);
+    virtual ~ImageDelegate();
 
     NOODLES_CAN_UPDATE(false)
 
     noo::ImageID id() const;
 
+    bool is_data_ready() const { return !m_image.isNull(); }
+
+    void start_download(QNetworkAccessManager*);
+
 private slots:
-    void store_data(QByteArray);
+    void ready_read();
+    void on_error();
+    void on_ssl_error(QList<QSslError> const&);
+
+    void on_buffer_ready();
 
 signals:
     void data_ready(QImage);
@@ -503,9 +550,6 @@ enum class MagFilter : uint8_t {
 enum class MinFilter : uint8_t {
     NEAREST,
     LINEAR,
-    NEAREST_MIPMAP_NEAREST,
-    LINEAR_MIPMAP_NEAREST,
-    NEAREST_MIPMAP_LINEAR,
     LINEAR_MIPMAP_LINEAR,
 };
 
@@ -523,16 +567,18 @@ struct SamplerInit {
 
     SamplerMode wrap_s = SamplerMode::REPEAT;
     SamplerMode wrap_t = SamplerMode::REPEAT;
+
+    SamplerInit(QCborMap, InternalClientState&);
 };
 
-struct Sampler : public QObject {
+struct SamplerDelegate : public QObject {
     Q_OBJECT
     noo::SamplerID m_id;
     SamplerInit    m_init;
 
 public:
-    Sampler(noo::SamplerID, SamplerInit const&);
-    virtual ~Sampler();
+    SamplerDelegate(noo::SamplerID, SamplerInit const&);
+    virtual ~SamplerDelegate();
 
     NOODLES_CAN_UPDATE(false)
 
@@ -545,6 +591,8 @@ struct TextureInit {
     QString                   name;
     QPointer<ImageDelegate>   image;
     QPointer<SamplerDelegate> sampler;
+
+    TextureInit(QCborMap, InternalClientState&);
 };
 
 
@@ -563,6 +611,11 @@ public:
     NOODLES_CAN_UPDATE(false)
 
     noo::TextureID id() const;
+
+    bool is_data_ready() const { return !m_init.image->is_data_ready(); }
+
+signals:
+    void data_ready(QImage);
 };
 
 // =============================================================================
@@ -571,33 +624,41 @@ struct TextureRef {
     QPointer<TextureDelegate> texture;
     glm::mat3                 transform          = glm::mat3(1);
     uint8_t                   texture_coord_slot = 0;
+
+    TextureRef(QCborMap, InternalClientState&);
 };
 
 struct PBRInfo {
-    QColor                    base_color;
+    QColor                    base_color = Qt::white;
     std::optional<TextureRef> base_color_texture;
 
     float                     metallic  = 1.0;
     float                     roughness = 1.0;
     std::optional<TextureRef> metal_rough_texture;
+
+    PBRInfo(QCborMap, InternalClientState&);
 };
 
 struct MaterialInit {
-    std::optional<QString> name;
+    QString name;
 
-    std::optional<PBRInfo>    pbr_info;
+    PBRInfo                   pbr_info;
     std::optional<TextureRef> normal_texture;
 
     std::optional<TextureRef> occlusion_texture;
-    std::optional<float>      occlusion_texture_factor;
+    float                     occlusion_texture_factor = 1;
 
     std::optional<TextureRef> emissive_texture;
-    std::optional<glm::vec3>  emissive_factor;
+    glm::vec3                 emissive_factor = glm::vec3(1);
 
-    std::optional<bool>  use_alpha;
-    std::optional<float> alpha_cutoff;
-    std::optional<bool>  double_sided;
+    bool  use_alpha    = false;
+    float alpha_cutoff = .5;
+    bool  double_sided = false;
+
+    MaterialInit(QCborMap, InternalClientState&);
 };
+
+struct MaterialUpdate { };
 
 /// The base delegate class for materials. Users can inherit from this to add
 /// their own functionality. Delegates are instantiated on new materials from
@@ -607,6 +668,8 @@ class MaterialDelegate : public QObject {
     noo::MaterialID m_id;
     MaterialInit    m_init;
 
+    size_t m_unready_textures = 0;
+
 public:
     MaterialDelegate(noo::MaterialID, MaterialInit const&);
     virtual ~MaterialDelegate();
@@ -615,11 +678,17 @@ public:
 
     noo::MaterialID id() const;
 
-    void         update(MaterialInit const&);
-    virtual void on_update(MaterialInit const&);
+    bool is_data_ready() const { return !m_unready_textures; }
+
+    void         update(MaterialUpdate const&);
+    virtual void on_update(MaterialUpdate const&);
+
+private slots:
+    void texture_ready(QImage);
 
 signals:
     void updated();
+    void all_textures_ready();
 };
 
 // =============================================================================
@@ -782,13 +851,20 @@ struct EntityRenderableDefinition {
     std::optional<noo::BoundingBox> instance_bb;
 };
 
-using EntityDefinition = std::variant<std::monostate,
-                                      EntityTextDefinition,
-                                      EntityWebpageDefinition,
-                                      EntityRenderableDefinition>;
+struct EntityDefinition : std::variant<std::monostate,
+                                       EntityTextDefinition,
+                                       EntityWebpageDefinition,
+                                       EntityRenderableDefinition> {
+    using variant::variant;
+};
+
+struct EntityInit {
+    QString name;
+
+    EntityInit(QCborMap);
+};
 
 struct EntityUpdateData {
-    std::optional<QString>                         name;
     std::optional<EntityDelegate*>                 parent;
     std::optional<glm::mat4>                       transform;
     std::optional<EntityDefinition>                definition;
@@ -796,10 +872,11 @@ struct EntityUpdateData {
     std::optional<std::vector<TableDelegate*>>     tables;
     std::optional<std::vector<PlotDelegate*>>      plots;
     std::optional<std::vector<QString>>            tags;
-    std::optional<std::vector<MethodDelegate*>>    method_list;
-    std::optional<std::vector<SignalDelegate*>>    signal_list;
+    std::optional<std::vector<MethodDelegate*>>    methods_list;
+    std::optional<std::vector<SignalDelegate*>>    signals_list;
     std::optional<std::optional<noo::BoundingBox>> influence;
-    std::optional<bool>                            visibility;
+
+    EntityUpdateData(QCborMap, InternalClientState&);
 };
 
 

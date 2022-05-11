@@ -10,6 +10,15 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# hack for clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+  set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES
+      ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+endif()
+# end hack for clangd
+
+
 # CMake Modules ================================================================
 
 include(cmake/CPM.cmake)
@@ -31,7 +40,7 @@ CPMAddPackage(
 find_package(Qt6 COMPONENTS Gui Widgets Core Websockets)
 
 if (NOT Qt6_FOUND)
-    find_package(Qt5 COMPONENTS Gui Widgets Core Websockets)
+    find_package(Qt5 COMPONENTS Gui Widgets Core WebSockets)
 endif()
 
 # Options ======================================================================

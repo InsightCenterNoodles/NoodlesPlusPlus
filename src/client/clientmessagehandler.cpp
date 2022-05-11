@@ -1,7 +1,15 @@
 #include "clientmessagehandler.h"
 
 #include "clientstate.h"
-#include "src/generated/interface_tools.h"
+#include "noo_client_interface.h"
+#include "noo_id.h"
+
+#include <QCborArray>
+#include <QCborMap>
+#include <QCborValue>
+#include <QNetworkAccessManager>
+#include <QString>
+#include <qnetworkrequest.h>
 
 namespace nooc {
 
@@ -25,49 +33,11 @@ void ClientWriter::complete_message(QCborValue message, unsigned message_id) {
     finished_writing_and_export();
 }
 
-
-static MethodDelegate* lookup(ClientState&               state,
-                              ::noodles::MethodID const& ptr) {
-    return state.method_list().comp_at(noo::convert_id(ptr));
-}
-static SignalDelegate* lookup(ClientState&               state,
-                              ::noodles::SignalID const& ptr) {
-    return state.signal_list().comp_at(noo::convert_id(ptr));
-}
-static BufferDelegate* lookup(ClientState&               state,
-                              ::noodles::BufferID const& ptr) {
-    return state.buffer_list().comp_at(noo::convert_id(ptr));
-}
-static TableDelegate* lookup(ClientState&              state,
-                             ::noodles::TableID const& ptr) {
-    return state.table_list().comp_at(noo::convert_id(ptr));
-}
-static TextureDelegate* lookup(ClientState&                state,
-                               ::noodles::TextureID const& ptr) {
-    return state.texture_list().comp_at(noo::convert_id(ptr));
-}
-static LightDelegate* lookup(ClientState&              state,
-                             ::noodles::LightID const& ptr) {
-    return state.light_list().comp_at(noo::convert_id(ptr));
-}
-static MaterialDelegate* lookup(ClientState&                 state,
-                                ::noodles::MaterialID const& ptr) {
-    return state.material_list().comp_at(noo::convert_id(ptr));
-}
-static MeshDelegate* lookup(ClientState&                 state,
-                            ::noodles::GeometryID const& ptr) {
-    return state.mesh_list().comp_at(noo::convert_id(ptr));
-}
-static EntityDelegate* lookup(ClientState&               state,
-                              ::noodles::EntityID const& ptr) {
-    return state.object_list().comp_at(noo::convert_id(ptr));
-}
-
 // =============================================================================
 
 
 template <class U>
-auto make_v(ClientState& state, U const& arr) {
+auto make_v(InternalClientState& state, U const& arr) {
     using T = decltype(lookup(state, *(*arr.begin())));
     std::vector<T> ret;
 
@@ -79,189 +49,79 @@ auto make_v(ClientState& state, U const& arr) {
 };
 
 struct MessageState {
-    QWebSocket&  m_socket;
-    ClientState& m_state;
+    QWebSocket&          socket;
+    InternalClientState& state;
 };
 
-void MessageHandler::process_message(noodles::MethodCreate const& c) {
-    auto at = noo::convert_id(c.id());
+static void process_MsgMethodCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::MethodID>(value);
 
-    MethodInit md;
-    md.method_name          = c.name()->string_view();
-    md.documentation        = c.documentation()->string_view();
-    md.return_documentation = c.return_doc()->string_view();
-
-    std::vector<ArgDoc> arg_docs;
-
-    for (auto* d : *c.arg_doc()) {
-        arg_docs.push_back(
-            { d->name()->string_view(), d->doc()->string_view() });
-    }
-
-    md.argument_documentation = arg_docs;
+    MethodInit md(value);
 
     MethodDelegate* delegate =
-        m_state.method_list().handle_new(at, std::move(md));
+        ms.state.method_list().handle_new(id, std::move(md));
 
     QObject::connect(delegate,
                      &MethodDelegate::invoke,
-                     &m_state,
-                     &ClientState::on_method_ask_invoke);
+                     &ms.state,
+                     &InternalClientState::on_method_ask_invoke);
 }
 
-void MessageHandler::process_message(noodles::MethodDelete const& c) {
-    auto at = noo::convert_id(c.id());
+static void process_MsgMethodDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::MethodID>(value);
 
-    m_state.method_list().handle_delete(at);
+    ms.state.method_list().handle_delete(id);
 }
 
-void MessageHandler::process_message(noodles::SignalCreate const& m) {
-    auto at = noo::convert_id(m.id());
+static void process_MsgSignalCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::SignalID>(value);
 
-    std::vector<ArgDoc> arg_docs;
+    SignalInit init(value);
 
-    for (auto* d : *m.arg_doc()) {
-        arg_docs.push_back(
-            { d->name()->string_view(), d->doc()->string_view() });
+    ms.state.signal_list().handle_new(id, std::move(init));
+}
+static void process_MsgSignalDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::SignalID>(value);
+
+    ms.state.signal_list().handle_delete(id);
+}
+
+static void process_MsgEntityCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::EntityID>(value);
+
+    SignalInit init(value);
+}
+
+static void process_MsgEntityUpdate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::EntityID>(value);
+
+    EntityUpdateData data(value, ms.state);
+
+    ms.state.object_list().handle_new(id, std::move(data));
+}
+static void process_MsgEntityDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::EntityID>(value);
+
+    ms.state.object_list().handle_delete(id);
+}
+static void process_message(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::BufferID>(value);
+
+    BufferInit init(value);
+
+    auto* d = ms.state.buffer_list().handle_new(id, std::move(init));
+
+    if (!d->is_data_ready()) {
+        d->start_download(ms.state.network_manager());
     }
-
-    SignalInit sd { .signal_name            = m.name()->string_view(),
-                    .documentation          = m.documentation()->string_view(),
-                    .argument_documentation = arg_docs };
-
-    m_state.signal_list().handle_new(at, std::move(sd));
 }
-void MessageHandler::process_message(noodles::SignalDelete const& m) {
-    auto at = noo::convert_id(m.id());
-
-    m_state.signal_list().handle_delete(at);
-}
-
-#define EXIST_EXE(NPTR, OP)                                                    \
-    if (NPTR) {                                                                \
-        auto& VALUE = *NPTR;                                                   \
-        OP                                                                     \
-    }
-
-void MessageHandler::process_message(noodles::ObjectCreateUpdate const& m) {
-    auto at = noo::convert_id(m.id());
-    qDebug() << Q_FUNC_INFO << at.to_qstring();
-
-    EntityUpdateData od;
-
-    EXIST_EXE(m.name(), { od.name = VALUE.string_view(); })
-    EXIST_EXE(m.parent(), { od.parent = lookup(m_state, VALUE); })
-    EXIST_EXE(m.transform(), { od.transform = noo::convert(VALUE); })
-
-    if (m.definition()) {
-        auto& def = od.definition.emplace();
-
-        switch (m.definition_type()) {
-        case noodles::ObjectDefinition::EmptyDefinition:
-            def = std::monostate();
-            break;
-        case noodles::ObjectDefinition::TextDefinition: {
-            auto* v  = m.definition_as_TextDefinition();
-            auto& ot = def.emplace<EntityTextDefinition>();
-
-            ot.text   = v->text()->c_str();
-            ot.font   = v->font()->c_str();
-            ot.height = v->height();
-            ot.width  = v->width();
-            break;
-        }
-        case noodles::ObjectDefinition::WebpageDefinition: {
-            auto* v  = m.definition_as_WebpageDefinition();
-            auto& ot = def.emplace<EntityWebpageDefinition>();
-
-            ot.url    = QUrl(v->url()->c_str());
-            ot.height = v->height();
-            ot.width  = v->width();
-
-            break;
-        }
-        case noodles::ObjectDefinition::RenderableDefinition: {
-            auto* v  = m.definition_as_RenderableDefinition();
-            auto& ot = def.emplace<EntityRenderableDefinition>();
-
-            ot.material = lookup(m_state, *(v->material()));
-            ot.mesh     = lookup(m_state, *(v->mesh()));
-
-            if (v->instances()) {
-                auto* inst_v = v->instances();
-                if (inst_v->size() > 0) {
-                    static_assert(sizeof(glm::mat4) == sizeof(noodles::Mat4));
-
-                    assert(inst_v->Data());
-
-                    auto const* lm =
-                        reinterpret_cast<glm::mat4 const*>(inst_v->Data());
-
-                    ot.instances =
-                        std::span<glm::mat4 const>(lm, inst_v->size());
-                }
-            }
-
-            if (v->instance_bb()) {
-                ot.instance_bb = noo::convert(*v->instance_bb());
-            }
-
-
-            break;
-        }
-
-        default: def = std::monostate();
-        }
-    }
-
-    EXIST_EXE(m.lights(), { od.lights = make_v(m_state, VALUE); })
-    EXIST_EXE(m.tables(), { od.tables = make_v(m_state, VALUE); })
-
-    EXIST_EXE(m.influence(), { od.influence = noo::convert(VALUE); })
-    EXIST_EXE(m.visibility(), { od.visibility = VALUE.visible(); })
-
-
-    EXIST_EXE(m.tags(), {
-        std::vector<std::string_view> t;
-
-        for (auto* str : VALUE) {
-            t.push_back(str->string_view());
-        }
-
-        od.tags = t;
-    })
-
-    EXIST_EXE(m.methods_list(), { od.method_list = make_v(m_state, VALUE); })
-    EXIST_EXE(m.signals_list(), { od.signal_list = make_v(m_state, VALUE); })
-
-    m_state.object_list().handle_new(at, std::move(od));
-}
-void MessageHandler::process_message(noodles::ObjectDelete const& m) {
-    auto at = noo::convert_id(m.id());
-
-    m_state.object_list().handle_delete(at);
-}
-void MessageHandler::process_message(noodles::BufferCreate const& m) {
-    auto at = noo::convert_id(m.id());
-
-    BufferInit bd;
-
-    if (m.bytes()) {
-        bd.data = { (std::byte const*)m.bytes()->data(), m.bytes()->size() };
-    }
-
-    if (m.url()) {
-        bd.url = QUrl(QString::fromLocal8Bit(m.url()->data(), m.url()->size()));
-    }
-
-    m_state.buffer_list().handle_new(at, std::move(bd));
-}
-void MessageHandler::process_message(noodles::BufferDelete const& m) {
+static void process_message(MessageState& ms, noodles::BufferDelete const& m) {
     auto at = noo::convert_id(m.id());
 
     m_state.buffer_list().handle_delete(at);
 }
-void MessageHandler::process_message(noodles::MaterialCreateUpdate const& m) {
+static void process_message(MessageState&                        ms,
+                            noodles::MaterialCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
 
     MaterialInit md;
@@ -275,12 +135,14 @@ void MessageHandler::process_message(noodles::MaterialCreateUpdate const& m) {
 
     m_state.material_list().handle_new(at, std::move(md));
 }
-void MessageHandler::process_message(noodles::MaterialDelete const& m) {
+static void process_message(MessageState&                  ms,
+                            noodles::MaterialDelete const& m) {
     auto at = noo::convert_id(m.id());
 
     m_state.material_list().handle_delete(at);
 }
-void MessageHandler::process_message(noodles::TextureCreateUpdate const& m) {
+static void process_message(MessageState&                       ms,
+                            noodles::TextureCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
 
     TextureInit td;
@@ -296,12 +158,13 @@ void MessageHandler::process_message(noodles::TextureCreateUpdate const& m) {
 
     m_state.texture_list().handle_new(at, std::move(td));
 }
-void MessageHandler::process_message(noodles::TextureDelete const& m) {
+static void process_message(MessageState& ms, noodles::TextureDelete const& m) {
     auto at = noo::convert_id(m.id());
 
     m_state.texture_list().handle_delete(at);
 }
-void MessageHandler::process_message(noodles::LightCreateUpdate const& m) {
+static void process_message(MessageState&                     ms,
+                            noodles::LightCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
 
     LightData ld;
@@ -313,7 +176,7 @@ void MessageHandler::process_message(noodles::LightCreateUpdate const& m) {
 
     m_state.light_list().handle_new(at, std::move(ld));
 }
-void MessageHandler::process_message(noodles::LightDelete const& m) {
+static void process_message(MessageState& ms, noodles::LightDelete const& m) {
     auto at = noo::convert_id(m.id());
 
     m_state.light_list().handle_delete(at);
@@ -327,7 +190,8 @@ ComponentRef convert(ClientState& state, ::noodles::ComponentRef const& cr) {
              .stride = cr.stride() };
 }
 
-void MessageHandler::process_message(noodles::GeometryCreate const& m) {
+static void process_message(MessageState&                  ms,
+                            noodles::GeometryCreate const& m) {
     auto at = noo::convert_id(m.id());
 
     MeshData md;
@@ -343,12 +207,14 @@ void MessageHandler::process_message(noodles::GeometryCreate const& m) {
 
     m_state.mesh_list().handle_new(at, std::move(md));
 }
-void MessageHandler::process_message(noodles::GeometryDelete const& m) {
+static void process_message(MessageState&                  ms,
+                            noodles::GeometryDelete const& m) {
     auto at = noo::convert_id(m.id());
 
     m_state.mesh_list().handle_delete(at);
 }
-void MessageHandler::process_message(noodles::TableCreateUpdate const& m) {
+static void process_message(MessageState&                     ms,
+                            noodles::TableCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
 
     TableData td;
@@ -359,13 +225,14 @@ void MessageHandler::process_message(noodles::TableCreateUpdate const& m) {
 
     m_state.table_list().handle_new(at, std::move(td));
 }
-void MessageHandler::process_message(noodles::TableDelete const& m) {
+static void process_message(MessageState& ms, noodles::TableDelete const& m) {
     auto at = noo::convert_id(m.id());
 
     m_state.table_list().handle_delete(at);
 }
 
-void MessageHandler::process_message(noodles::PlotCreateUpdate const& m) {
+static void process_message(MessageState&                    ms,
+                            noodles::PlotCreateUpdate const& m) {
     auto at = noo::convert_id(m.id());
 
     PlotData pd;
@@ -398,13 +265,14 @@ void MessageHandler::process_message(noodles::PlotCreateUpdate const& m) {
 
     m_state.plot_list().handle_new(at, std::move(pd));
 }
-void MessageHandler::process_message(noodles::PlotDelete const& m) {
+static void process_message(MessageState& ms, noodles::PlotDelete const& m) {
     auto at = noo::convert_id(m.id());
 
     m_state.plot_list().handle_delete(at);
 }
 
-void MessageHandler::process_message(noodles::DocumentUpdate const& m) {
+static void process_message(MessageState&                  ms,
+                            noodles::DocumentUpdate const& m) {
 
     DocumentData dd;
 
@@ -413,7 +281,7 @@ void MessageHandler::process_message(noodles::DocumentUpdate const& m) {
 
     m_state.document().update(dd);
 }
-void MessageHandler::process_message(noodles::DocumentReset const&) {
+static void process_message(MessageState& ms, noodles::DocumentReset const&) {
     m_state.document().clear();
 
     m_state.method_list().clear();
@@ -426,7 +294,7 @@ void MessageHandler::process_message(noodles::DocumentReset const&) {
     m_state.mesh_list().clear();
     m_state.object_list().clear();
 }
-void MessageHandler::process_message(noodles::SignalInvoke const& m) {
+static void process_message(MessageState& ms, noodles::SignalInvoke const& m) {
     qDebug() << Q_FUNC_INFO;
     auto sig = lookup(m_state, *m.id());
 
@@ -473,7 +341,7 @@ void MessageHandler::process_message(noodles::SignalInvoke const& m) {
     // local notification
     if (attached) emit attached->fired(av);
 }
-void MessageHandler::process_message(noodles::MethodReply const& m) {
+static void process_message(MessageState& ms, noodles::MethodReply const& m) {
     auto ident = m.invoke_ident()->str();
 
     auto iter = m_state.inflight_methods().find(ident);
@@ -579,7 +447,7 @@ static void process_server_message(MessageState const& ms,
 }
 
 
-void process_message(QWebSocket& s, ClientState& state, QByteArray m) {
+void process_message(QWebSocket& s, InternalClientState& state, QByteArray m) {
     MessageState ms { .m_socket = s, .m_state = state };
 
     QCborParserError error;

@@ -1,33 +1,88 @@
 #include "noo_client_interface.h"
 
 #include "noo_common.h"
+#include "noo_interface_types.h"
 #include "src/client/client_common.h"
 #include "src/client/clientstate.h"
 #include "src/common/variant_tools.h"
 
 #include <QWebSocket>
 
+#include <optional>
+#include <qcbormap.h>
+#include <qcborvalue.h>
+#include <qglobal.h>
+#include <qnetworkaccessmanager.h>
+#include <qnetworkreply.h>
+#include <qnetworkrequest.h>
+#include <qpoint.h>
+#include <qstringliteral.h>
 #include <unordered_set>
+#include <variant>
 
 namespace nooc {
 
+template <class T>
+bool decode_entity(InternalClientState& state, QCborValue rid, T*& out_ptr) {
+    using IDType = decltype(out_ptr->id());
+    auto new_id  = IDType(rid);
+    out_ptr      = state.lookup(new_id);
+    return true;
+}
+
+template <class T>
+bool decode_entity(InternalClientState& state,
+                   QCborValue           rid,
+                   QPointer<T>&         out_ptr) {
+    using IDType = decltype(out_ptr->id());
+    auto new_id  = IDType(rid);
+    out_ptr      = state.lookup(new_id);
+    return true;
+}
+
+template <class T>
+bool decode_entity(InternalClientState& state,
+                   QCborValue           value,
+                   std::vector<T*>&     out_ptr) {
+    using IDType = decltype(out_ptr[0]->id());
+    auto arr     = value.toArray();
+    out_ptr.clear();
+    for (auto lv : arr) {
+        T* ptr = nullptr;
+        decode_entity(state, IDType(lv), ptr);
+        out_ptr.push_back(ptr);
+    }
+    return true;
+}
+
+template <class T>
+bool decode_entity(InternalClientState& state,
+                   QCborValue           value,
+                   std::optional<T>&    out) {
+    if (value.isUndefined()) return true;
+    auto& lt = out.emplace();
+    return decode_entity(state, value, lt);
+}
+
+// =============================================================================
+
 QString to_string(MethodException const& me) {
-    auto str = me.additional.dump_string();
+    auto str = me.additional.toDiagnosticNotation();
     return QString("Code %1: %2 Additional: %3")
         .arg(me.code)
         .arg(me.message)
-        .arg(str.c_str());
+        .arg(str);
 }
 
 void PendingMethodReply::interpret() { }
 
-PendingMethodReply::PendingMethodReply(MethodDelegate* d, MethodContext ctx)
+PendingMethodReply::PendingMethodReply(MethodDelegate* d, MethodContextPtr ctx)
     : m_method(d) {
 
     std::visit([&](auto x) { m_context = x; }, ctx);
 }
 
-void PendingMethodReply::call_direct(QCborValueList&& l) {
+void PendingMethodReply::call_direct(QCborArray l) {
     if (m_called) {
         MethodException exception {
             .code    = -10000,
@@ -93,7 +148,7 @@ void PendingMethodReply::call_direct(QCborValueList&& l) {
     );
 }
 
-void PendingMethodReply::complete(QCborValueRef    v,
+void PendingMethodReply::complete(QCborValue       v,
                                   MethodException* exception_info) {
     qDebug() << Q_FUNC_INFO;
 
@@ -112,66 +167,54 @@ void PendingMethodReply::complete(QCborValueRef    v,
 namespace replies {
 
 void GetIntegerReply::interpret() {
-    VMATCH_W(
-        visit,
-        m_var,
-        VCASE(int64_t i) { emit recv(i); },
-        VCASE(auto const&) {
-            auto s = m_var.dump_string();
-
-            emit recv_fail("Wrong result type expected" +
-                           QString::fromStdString(s));
-        });
+    if (m_var.isInteger()) {
+        emit recv(m_var.toInteger());
+    } else {
+        auto s = m_var.toDiagnosticNotation();
+        emit recv_fail("Wrong result type expected" + s);
+    }
 }
 
 void GetStringReply::interpret() {
-
-    VMATCH_W(
-        visit,
-        m_var,
-        VCASE(std::string_view str) { emit recv(noo::to_qstring(str)); },
-        VCASE(auto const&) {
-            auto s = m_var.dump_string();
-
-            emit recv_fail("Wrong result type expected" +
-                           QString::fromStdString(s));
-        });
+    if (m_var.isString()) {
+        emit recv(m_var.toString());
+    } else {
+        auto s = m_var.toDiagnosticNotation();
+        emit recv_fail("Wrong result type expected" + s);
+    }
 }
 
 void GetStringListReply::interpret() {
-    VMATCH_W(
-        visit,
-        m_var,
-        VCASE(QCborValueListRef const& l) {
-            QStringList to_ret;
+    QStringList list;
 
-            l.for_each([&](auto, QCborValueRef r) {
-                to_ret << noo::to_qstring(r.to_string());
-            });
+    noo::convert_from_cbor(m_var, list);
 
-            emit recv(to_ret);
-        },
-        VCASE(auto const&) {
-            auto s = m_var.dump_string();
-
-            emit recv_fail("Wrong result type expected" +
-                           QString::fromStdString(s));
-        });
+    if (list.empty()) {
+        auto s = m_var.toDiagnosticNotation();
+        emit recv_fail("Wrong result type expected" + s);
+    } else {
+        emit recv(list);
+    }
 }
 
 void GetRealsReply::interpret() {
-    auto rlist = m_var.coerce_real_list();
-    emit recv(rlist);
+    auto list = noo::coerce_to_real_list(m_var);
+
+    if (list.size()) {
+        emit recv(list);
+    } else {
+        auto s = m_var.toDiagnosticNotation();
+        emit recv_fail("Wrong result type expected" + s);
+    }
 }
 
 } // namespace replies
 
 // =============================================================================
 
-AttachedMethodList::AttachedMethodList(MethodContext c) : m_context(c) { }
+AttachedMethodList::AttachedMethodList(MethodContextPtr c) : m_context(c) { }
 
-MethodDelegate*
-AttachedMethodList::find_direct_by_name(std::string_view name) const {
+MethodDelegate* AttachedMethodList::find_direct_by_name(QString name) const {
     // try to find it
 
     auto iter =
@@ -202,7 +245,7 @@ SignalDelegate* AttachedSignal::delegate() const {
     return m_signal;
 }
 
-AttachedSignalList::AttachedSignalList(MethodContext c) : m_context(c) { }
+AttachedSignalList::AttachedSignalList(MethodContextPtr c) : m_context(c) { }
 
 AttachedSignalList&
 AttachedSignalList::operator=(std::vector<SignalDelegate*> const& l) {
@@ -235,7 +278,7 @@ AttachedSignalList::operator=(std::vector<SignalDelegate*> const& l) {
     return *this;
 }
 
-AttachedSignal* AttachedSignalList::find_by_name(std::string_view name) const {
+AttachedSignal* AttachedSignalList::find_by_name(QString name) const {
     for (auto const& p : m_list) {
         if (p->delegate()->name() == name) return p.get();
     }
@@ -259,6 +302,25 @@ AttachedSignalList::find_by_delegate(SignalDelegate* ptr) const {
         return m_id;                                                           \
     }
 
+// =============================================================================
+
+ArgDoc::ArgDoc(QCborMap m) {
+    noo::CborDecoder decoder(m);
+
+    decoder("name", name);
+    decoder("doc", doc);
+    decoder("editor_hint", editor_hint);
+}
+
+MethodInit::MethodInit(QCborMap m) {
+    noo::CborDecoder decoder(m);
+
+    decoder("name", method_name);
+    decoder("doc", documentation);
+    decoder("return_doc", return_documentation);
+
+    decoder("arg_dog", argument_documentation);
+}
 
 MethodDelegate::MethodDelegate(noo::MethodID i, MethodInit const& d)
     : m_id(i), m_method_name(d.method_name) { }
@@ -266,25 +328,313 @@ MethodDelegate::~MethodDelegate() = default;
 noo::MethodID MethodDelegate::id() const {
     return m_id;
 }
-std::string_view MethodDelegate::name() const {
+QString MethodDelegate::name() const {
     return m_method_name;
 }
 
 // =============================================================================
 
+SignalInit::SignalInit(QCborMap m) {
+    noo::CborDecoder decoder(m);
+
+    decoder("name", name);
+    decoder("doc", documentation);
+    decoder("arg_dog", argument_documentation);
+}
+
 SignalDelegate::SignalDelegate(noo::SignalID i, SignalInit const& d)
-    : m_id(i), m_signal_name(d.signal_name) { }
+    : m_id(i), m_data(d) { }
 SignalDelegate::~SignalDelegate() = default;
 noo::SignalID SignalDelegate::id() const {
     return m_id;
 }
-std::string_view SignalDelegate::name() const {
-    return m_signal_name;
+QString SignalDelegate::name() const {
+    return m_data.name;
 }
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(BufferDelegate, BufferID, BufferInit)
+BufferInit::BufferInit(QCborMap m) {
+    noo::CborDecoder decoder(m);
+
+    decoder("name", name);
+    decoder("size", byte_count);
+
+    auto inline_name  = QStringLiteral("inline_bytes");
+    auto outline_name = QStringLiteral("uri_bytes");
+
+    if (m.contains(inline_name)) {
+        decoder(inline_name, inline_bytes);
+    } else {
+        decoder(outline_name, url);
+    }
+}
+
+BufferDelegate::BufferDelegate(noo::BufferID i, BufferInit const& data)
+    : m_id(i), m_data(data) {
+    if (m_data.inline_bytes.size()) { m_buffer_bytes = m_data.inline_bytes; }
+}
+BufferDelegate::~BufferDelegate() = default;
+noo::BufferID BufferDelegate::id() const {
+    return m_id;
+}
+
+void BufferDelegate::start_download(QNetworkAccessManager* nm) {
+    QNetworkRequest request;
+    request.setUrl(m_data.url);
+
+    auto* reply = nm->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, &BufferDelegate::ready_read);
+    connect(
+        reply, &QNetworkReply::errorOccurred, this, &BufferDelegate::on_error);
+    connect(
+        reply, &QNetworkReply::sslErrors, this, &BufferDelegate::on_ssl_error);
+}
+
+void BufferDelegate::ready_read() {
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    m_buffer_bytes       = reply->readAll();
+    reply->deleteLater();
+
+    if (is_data_ready()) emit data_ready(m_buffer_bytes);
+}
+void BufferDelegate::on_error() {
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    qWarning() << "Download failed:" << reply->errorString();
+    reply->deleteLater();
+}
+void BufferDelegate::on_ssl_error(QList<QSslError> const& errs) {
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    qWarning() << "Download failed:";
+
+    for (auto err : errs) {
+        qWarning() << err.errorString();
+    }
+    reply->deleteLater();
+}
+
+// =============================================================================
+
+BufferViewInit::BufferViewInit(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder decoder(m);
+
+    decoder(QStringLiteral("name"), name);
+    decode_entity(state, m[QStringLiteral("source_buffer")], source_buffer);
+    decoder(QStringLiteral("offset"), offset);
+    decoder(QStringLiteral("length"), length);
+}
+
+BufferViewDelegate::BufferViewDelegate(noo::BufferViewID     i,
+                                       BufferViewInit const& data)
+    : m_id(i), m_init(data) {
+    connect(m_init.source_buffer,
+            &BufferDelegate::data_ready,
+            this,
+            &BufferViewDelegate::data_ready);
+}
+BufferViewDelegate::~BufferViewDelegate() = default;
+noo::BufferViewID BufferViewDelegate::id() const {
+    return m_id;
+}
+
+// =============================================================================
+
+ImageInit::ImageInit(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder decoder(m);
+
+    decoder(QStringLiteral("name"), name);
+
+    auto buffer_source_name = QStringLiteral("buffer_source");
+    auto uri_source_name    = QStringLiteral("uri_source");
+
+    if (m.contains(buffer_source_name)) {
+        decode_entity(state, m[buffer_source_name], local_image);
+    } else {
+        decoder(uri_source_name, remote_image);
+    }
+}
+
+ImageDelegate::ImageDelegate(noo::ImageID i, ImageInit const& data)
+    : m_id(i), m_init(data) {
+    if (m_init.local_image) {
+        connect(m_init.local_image,
+                &BufferViewDelegate::data_ready,
+                this,
+                &ImageDelegate::on_buffer_ready);
+    }
+}
+ImageDelegate::~ImageDelegate() = default;
+noo::ImageID ImageDelegate::id() const {
+    return m_id;
+}
+
+static QImage convert_image(QByteArray array) {
+    return QImage::fromData(array);
+}
+
+void ImageDelegate::ready_read() {
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    m_image              = convert_image(reply->readAll());
+    reply->deleteLater();
+
+    if (is_data_ready()) emit data_ready(m_image);
+}
+void ImageDelegate::on_error() {
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    qWarning() << "Download failed:" << reply->errorString();
+    reply->deleteLater();
+}
+void ImageDelegate::on_ssl_error(QList<QSslError> const& errs) {
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    qWarning() << "Download failed:";
+
+    for (auto err : errs) {
+        qWarning() << err.errorString();
+    }
+    reply->deleteLater();
+}
+void ImageDelegate::on_buffer_ready() {
+    m_image = convert_image(m_init.local_image->get_sub_range());
+}
+
+// =============================================================================
+
+SamplerInit::SamplerInit(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder d(m);
+
+    d(QStringLiteral("name"), name);
+    d.conditional("mag_filter", mag_filter);
+    d.conditional("min_filter", min_filter);
+
+    d.conditional("wrap_s", wrap_s);
+    d.conditional("wrap_t", wrap_t);
+}
+
+SamplerDelegate::SamplerDelegate(noo::SamplerID i, SamplerInit const& data)
+    : m_id(i), m_init(data) { }
+SamplerDelegate::~SamplerDelegate() = default;
+noo::SamplerID SamplerDelegate::id() const {
+    return m_id;
+}
+
+// =============================================================================
+
+TextureInit::TextureInit(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder d(m);
+
+    d(QStringLiteral("name"), name);
+
+    decode_entity(state, m[QStringLiteral("image")], image);
+    decode_entity(state, m[QStringLiteral("sampler")], sampler);
+}
+
+TextureDelegate::TextureDelegate(noo::TextureID i, TextureInit const& data)
+    : m_id(i), m_init(data) {
+    if (m_init.image) {
+        connect(m_init.image,
+                &ImageDelegate::data_ready,
+                this,
+                &TextureDelegate::data_ready);
+    }
+}
+TextureDelegate::~TextureDelegate() = default;
+noo::TextureID TextureDelegate::id() const {
+    return m_id;
+}
+
+// =============================================================================
+
+TextureRef::TextureRef(QCborMap m, InternalClientState& state) {
+    decode_entity(state, m[QStringLiteral("texture")], texture);
+
+    noo::CborDecoder d(m);
+    d.conditional("transform", transform);
+    d.conditional("texture_coord_slot", texture_coord_slot);
+}
+
+PBRInfo::PBRInfo(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder d(m);
+    d.conditional("base_color", base_color);
+
+    decode_entity(
+        state, m[QStringLiteral("base_color_texture")], base_color_texture);
+
+    d.conditional("metallic", metallic);
+    d.conditional("roughness", roughness);
+
+    decode_entity(
+        state, m[QStringLiteral("metal_rough_texture")], metal_rough_texture);
+}
+
+MaterialInit::MaterialInit(QCborMap m, InternalClientState& state)
+    : pbr_info(m[QStringLiteral("pbr_info")].toMap(), state) {
+    noo::CborDecoder d(m);
+
+    d(QStringLiteral("name"), name);
+
+    decode_entity(state, m[QStringLiteral("normal_texture")], normal_texture);
+
+    decode_entity(
+        state, m[QStringLiteral("occlusion_texture")], occlusion_texture);
+    d.conditional(QStringLiteral("occlusion_texture_factor"),
+                  occlusion_texture_factor);
+
+    decode_entity(
+        state, m[QStringLiteral("emissive_texture")], emissive_texture);
+    d.conditional(QStringLiteral("emissive_factor"), emissive_factor);
+
+    d.conditional(QStringLiteral("use_alpha"), use_alpha);
+    d.conditional(QStringLiteral("alpha_cutoff"), alpha_cutoff);
+    d.conditional(QStringLiteral("double_sided"), double_sided);
+}
+
+MaterialDelegate::MaterialDelegate(noo::MaterialID i, MaterialInit const& data)
+    : m_id(i), m_init(data) {
+    // for any textures, we need to link up
+
+    auto test_texture = [&](std::optional<TextureRef> otex) {
+        if (!otex) return;
+
+        auto const& tr = *otex;
+
+        TextureDelegate* tex = tr.texture;
+
+        if (!tex) return;
+
+        if (tex->is_data_ready()) {
+            // textures are immutable, sooooo
+            return;
+        }
+
+        m_unready_textures++;
+
+        connect(tex,
+                &TextureDelegate::data_ready,
+                this,
+                &MaterialDelegate::texture_ready);
+    };
+
+    test_texture(m_init.pbr_info.base_color_texture);
+    test_texture(m_init.pbr_info.metal_rough_texture);
+    test_texture(m_init.normal_texture);
+    test_texture(m_init.occlusion_texture);
+    test_texture(m_init.emissive_texture);
+}
+MaterialDelegate::~MaterialDelegate() = default;
+noo::MaterialID MaterialDelegate::id() const {
+    return m_id;
+}
+void MaterialDelegate::update(MaterialUpdate const& d) {
+    this->on_update(d);
+}
+void MaterialDelegate::on_update(MaterialUpdate const&) { }
+
+void MaterialDelegate::texture_ready(QImage) {
+    Q_ASSERT(m_unready_textures > 0);
+    m_unready_textures--;
+    if (!m_unready_textures) { emit all_textures_ready(); }
+}
 
 // =============================================================================
 
@@ -475,14 +825,6 @@ void TableDelegate::interp_table_sel_update(QCborValueListRef const& ref) {
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(TextureDelegate, TextureID, TextureInit)
-void TextureDelegate::update(TextureInit const& d) {
-    this->on_update(d);
-}
-void TextureDelegate::on_update(TextureInit const&) { }
-
-// =============================================================================
-
 BASIC_DELEGATE_IMPL(LightDelegate, LightID, LightData)
 void LightDelegate::update(LightData const& d) {
     this->on_update(d);
@@ -491,19 +833,48 @@ void LightDelegate::on_update(LightData const&) { }
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(MaterialDelegate, MaterialID, MaterialInit)
-void MaterialDelegate::update(MaterialInit const& d) {
-    this->on_update(d);
-}
-void MaterialDelegate::on_update(MaterialInit const&) { }
-
-// =============================================================================
-
 BASIC_DELEGATE_IMPL(MeshDelegate, GeometryID, MeshData)
 
 void MeshDelegate::prepare_delete() { }
 
 // =============================================================================
+
+
+EntityInit::EntityInit(QCborMap m) {
+    auto decoder = noo::CborDecoder(m);
+
+    decoder("name", name);
+}
+
+static auto e_null_rep   = QStringLiteral("null_rep");
+static auto e_text_rep   = QStringLiteral("text_rep");
+static auto e_web_rep    = QStringLiteral("web_rep");
+static auto e_render_rep = QStringLiteral("render_rep");
+
+EntityUpdateData::EntityUpdateData(QCborMap value, InternalClientState& state) {
+    auto d = noo::CborDecoder(value);
+
+    decode_entity(state, value["parent"], parent);
+    d("transform", transform);
+
+    if (value.contains(e_null_rep)) {
+        definition = std::monostate;
+    } else if (value.contains(e_text_rep)) {
+        definition = EntityTextDefinition(value[e_text_rep], state);
+    } else if (value.contains(e_web_rep)) {
+        definition = EntityWebpageDefinition(value[e_web_rep], state);
+    } else if (value.contains(e_render_rep)) {
+        definition = EntityRenderableDefinition(value[e_render_rep], state);
+    }
+
+    decode_entity(state, value["lights"], lights);
+    decode_entity(state, value["tables"], tables);
+    decode_entity(state, value["plots"], plots);
+    d("tags", tags);
+    decode_entity(state, value["methods_list"], methods_list);
+    decode_entity(state, value["signals_list"], signals_list);
+    d("influence", influence);
+}
 
 EntityDelegate::EntityDelegate(noo::EntityID i, EntityUpdateData const& data)
     : m_id(i), m_attached_methods(this), m_attached_signals(this) {
@@ -611,7 +982,7 @@ class ClientCore : public QObject {
 
     ClientDelegates m_makers;
 
-    std::optional<ClientState> m_state;
+    std::optional<InternalClientState> m_state;
 
     bool       m_connecting = true;
     QWebSocket m_socket;

@@ -119,7 +119,7 @@ public:
 };
 
 
-class ClientState : public QObject {
+class InternalClientState : public QObject {
     QWebSocket& m_socket;
 
     std::shared_ptr<DocumentDelegate> m_document;
@@ -146,8 +146,8 @@ class ClientState : public QObject {
         m_in_flight_methods;
 
 public:
-    ClientState(QWebSocket& s, ClientDelegates&);
-    ~ClientState();
+    InternalClientState(QWebSocket& s, ClientDelegates&);
+    ~InternalClientState();
 
     DocumentDelegate& document() { return *m_document; }
 
@@ -165,6 +165,28 @@ public:
     auto& image_list() { return m_image_list; }
 
     auto& inflight_methods() { return m_in_flight_methods; }
+
+    MethodDelegate* lookup(noo::MethodID id) {
+        return method_list().comp_at(id);
+    }
+    SignalDelegate* lookup(noo::SignalID id) {
+        return signal_list().comp_at(id);
+    }
+    BufferDelegate* lookup(noo::BufferID id) {
+        return buffer_list().comp_at(id);
+    }
+    TableDelegate* lookup(noo::TableID id) { return table_list().comp_at(id); }
+    TextureDelegate* lookup(noo::TextureID id) {
+        return texture_list().comp_at(id);
+    }
+    LightDelegate* lookup(noo::LightID id) { return light_list().comp_at(id); }
+    MaterialDelegate* lookup(noo::MaterialID id) {
+        return material_list().comp_at(id);
+    }
+    MeshDelegate* lookup(noo::GeometryID id) { return mesh_list().comp_at(id); }
+    EntityDelegate* lookup(noo::EntityID id) {
+        return object_list().comp_at(id);
+    }
 
 public slots:
     void on_new_binary_message(QByteArray m);

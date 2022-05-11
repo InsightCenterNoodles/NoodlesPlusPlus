@@ -8,7 +8,7 @@
 
 namespace nooc {
 
-ClientState::ClientState(QWebSocket& s, ClientDelegates& makers)
+InternalClientState::InternalClientState(QWebSocket& s, ClientDelegates& makers)
     : m_socket(s),
       m_document(makers.doc_maker()),
       m_method_list(makers.method_maker),
@@ -24,12 +24,12 @@ ClientState::ClientState(QWebSocket& s, ClientDelegates& makers)
     connect(&m_socket,
             &QWebSocket::textMessageReceived,
             this,
-            &ClientState::on_new_text_message);
+            &InternalClientState::on_new_text_message);
 
     connect(&m_socket,
             &QWebSocket::binaryMessageReceived,
             this,
-            &ClientState::on_new_binary_message);
+            &InternalClientState::on_new_binary_message);
 
     connect(&m_socket,
             QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
@@ -54,21 +54,21 @@ ClientState::ClientState(QWebSocket& s, ClientDelegates& makers)
     qDebug() << Q_FUNC_INFO;
 }
 
-ClientState::~ClientState() {
+InternalClientState::~InternalClientState() {
     qDebug() << Q_FUNC_INFO;
 }
 
-void ClientState::on_new_binary_message(QByteArray m) {
+void InternalClientState::on_new_binary_message(QByteArray m) {
     MessageHandler handler(m_socket, *this, m);
 
     handler.process();
 }
-void ClientState::on_new_text_message(QString t) {
+void InternalClientState::on_new_text_message(QString t) {
     // we dont expect there to be text...
     qWarning() << "Unexpected text from server" << t;
 }
 
-void ClientState::on_method_ask_invoke(noo::MethodID          method_id,
+void InternalClientState::on_method_ask_invoke(noo::MethodID          method_id,
                                        MethodContext          context,
                                        QCborValueList const& args,
                                        PendingMethodReply*    reply) {
