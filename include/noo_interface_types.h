@@ -11,6 +11,7 @@
 #include <QCborArray>
 #include <QCborMap>
 #include <QCborValue>
+#include <QColor>
 
 #include <span>
 #include <string>
@@ -44,6 +45,32 @@ bool convert_from_cbor(QCborValue v, T& t) {
     } else {
         static_assert(always_false<T>);
     }
+}
+
+inline bool convert_from_cbor(QCborValue v, QCborArray& array) {
+    array = v.toArray();
+    return true;
+}
+
+inline bool convert_from_cbor(QCborValue v, QString& s) {
+    s = v.toString();
+    return true;
+}
+
+inline bool convert_from_cbor(QCborValue v, glm::vec4& s) {
+    auto arr = v.toArray();
+    s.x      = arr[0].toDouble(1);
+    s.y      = arr[1].toDouble(1);
+    s.z      = arr[2].toDouble(1);
+    s.w      = arr[3].toDouble(1);
+    return true;
+}
+
+inline bool convert_from_cbor(QCborValue v, QColor& s) {
+    glm::vec4 col;
+    convert_from_cbor(v, col);
+    s = QColor(col.r, col.g, col.b, col.a);
+    return true;
 }
 
 template <class T>
@@ -112,26 +139,6 @@ struct Selection {
     Selection(QCborMap);
 
     QCborValue to_any() const;
-};
-
-///
-/// \brief The SelectionRef struct models a noodles SelectionObject, but uses
-/// spans to reference data.
-///
-struct SelectionRef {
-    using Pair = std::pair<int64_t, int64_t>;
-
-    QVector<int64_t const> rows;
-    QVector<int64_t const> raw_ranges;
-    std::span<Pair const>  row_ranges;
-
-    SelectionRef() = default;
-    SelectionRef(Selection const&);
-    SelectionRef(QCborMap const&);
-
-    QCborValue to_any() const;
-
-    Selection to_selection() const;
 };
 
 // =============================================================================

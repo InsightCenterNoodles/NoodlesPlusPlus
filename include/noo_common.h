@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <variant>
 
-class QString;
+#include <QString>
 
 namespace noo {
 
@@ -14,7 +14,7 @@ namespace noo {
 
 namespace names {
 
-#define NOO_STRING(t, d) inline constexpr std::string_view t##d = #d;
+#define NOO_STRING(t, d) inline QString t##d = QStringLiteral(#d);
 
 NOO_STRING(mthd_, tbl_subscribe);
 NOO_STRING(mthd_, tbl_insert);

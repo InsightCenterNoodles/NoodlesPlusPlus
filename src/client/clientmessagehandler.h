@@ -12,13 +12,13 @@ class ClientWriter {
 
     bool m_written = false;
 
-    void finished_writing_and_export();
-
 public:
     ClientWriter(QWebSocket& s);
     ~ClientWriter();
 
-    void complete_message(QCborValue message, unsigned message_id);
+    void add(QCborValue message, unsigned message_id);
+
+    void flush();
 };
 
 // =============================================================================

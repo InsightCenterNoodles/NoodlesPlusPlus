@@ -8,6 +8,7 @@
 #include <variant>
 
 #include <QCborArray>
+#include <QCborMap>
 #include <QCborValue>
 #include <QVariant>
 
@@ -129,8 +130,20 @@ struct TagToString<TextureIDTag> {
     static constexpr const char* str = "Texture";
 };
 template <>
+struct TagToString<SamplerIDTag> {
+    static constexpr const char* str = "Sampler";
+};
+template <>
+struct TagToString<ImageIDTag> {
+    static constexpr const char* str = "Image";
+};
+template <>
 struct TagToString<BufferIDTag> {
     static constexpr const char* str = "Buffer";
+};
+template <>
+struct TagToString<BufferViewIDTag> {
+    static constexpr const char* str = "Bufferview";
 };
 template <>
 struct TagToString<MethodIDTag> {
@@ -145,6 +158,18 @@ struct TagToString<PlotIDTag> {
     static constexpr const char* str = "Plot";
 };
 
+///
+/// \brief The AnyID struct models the NOODLES Any type
+///
+struct InvokeID
+    : public std::variant<std::monostate, EntityID, TableID, PlotID> {
+    using variant::variant;
+
+    InvokeID() = default;
+    InvokeID(QCborMap);
+
+    QCborMap to_cbor() const;
+};
 
 ///
 /// \brief The AnyID struct models the NOODLES Any type

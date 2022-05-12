@@ -2,7 +2,10 @@
 
 #include "clientstate.h"
 #include "noo_client_interface.h"
+#include "noo_common.h"
 #include "noo_id.h"
+
+#include "src/common/variant_tools.h"
 
 #include <QCborArray>
 #include <QCborMap>
@@ -13,24 +16,30 @@
 
 namespace nooc {
 
-void ClientWriter::finished_writing_and_export() {
+ClientWriter::ClientWriter(QWebSocket& s) : m_socket(s) { }
+ClientWriter::~ClientWriter() {
+    flush();
+}
+
+void ClientWriter::add(QCborValue message, unsigned message_id) {
+    m_written = false;
+
+    QCborMap mmap;
+    mmap[message_id] = message;
+
+    m_message_list << mmap;
+}
+
+void ClientWriter::flush() {
+    if (m_written) return;
 
     auto byte_array = m_message_list.toCborValue().toCbor();
 
     m_socket.sendBinaryMessage(byte_array);
 
     m_written = true;
-}
 
-ClientWriter::ClientWriter(QWebSocket& s) : m_socket(s) { }
-ClientWriter::~ClientWriter() {
-    if (!m_written) { qWarning() << "Message should have been written!"; }
-}
-
-void ClientWriter::complete_message(QCborValue message, unsigned message_id) {
-    m_message_list << QCborArray({ message_id, message });
-
-    finished_writing_and_export();
+    m_message_list.clear();
 }
 
 // =============================================================================
@@ -66,7 +75,6 @@ static void process_MsgMethodCreate(MessageState& ms, QCborMap value) {
                      &ms.state,
                      &InternalClientState::on_method_ask_invoke);
 }
-
 static void process_MsgMethodDelete(MessageState& ms, QCborMap value) {
     auto id = noo::id_from_message<noo::MethodID>(value);
 
@@ -89,9 +97,8 @@ static void process_MsgSignalDelete(MessageState& ms, QCborMap value) {
 static void process_MsgEntityCreate(MessageState& ms, QCborMap value) {
     auto id = noo::id_from_message<noo::EntityID>(value);
 
-    SignalInit init(value);
+    EntityInit init(value);
 }
-
 static void process_MsgEntityUpdate(MessageState& ms, QCborMap value) {
     auto id = noo::id_from_message<noo::EntityID>(value);
 
@@ -104,236 +111,220 @@ static void process_MsgEntityDelete(MessageState& ms, QCborMap value) {
 
     ms.state.object_list().handle_delete(id);
 }
-static void process_message(MessageState& ms, QCborMap value) {
+
+static void process_MsgBufferCreate(MessageState& ms, QCborMap value) {
     auto id = noo::id_from_message<noo::BufferID>(value);
 
     BufferInit init(value);
 
     auto* d = ms.state.buffer_list().handle_new(id, std::move(init));
 
-    if (!d->is_data_ready()) {
-        d->start_download(ms.state.network_manager());
-    }
+    d->start_download(ms.state.network_manager());
 }
-static void process_message(MessageState& ms, noodles::BufferDelete const& m) {
-    auto at = noo::convert_id(m.id());
+static void process_MsgBufferDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::BufferID>(value);
 
-    m_state.buffer_list().handle_delete(at);
-}
-static void process_message(MessageState&                        ms,
-                            noodles::MaterialCreateUpdate const& m) {
-    auto at = noo::convert_id(m.id());
-
-    MaterialInit md;
-
-    EXIST_EXE(m.color(), { md.color = noo::convert(VALUE); })
-
-    md.metallic     = m.metallic();
-    md.roughness    = m.roughness();
-    md.use_blending = m.use_blending();
-    md.texture = m.texture_id() ? lookup(m_state, *m.texture_id()) : nullptr;
-
-    m_state.material_list().handle_new(at, std::move(md));
-}
-static void process_message(MessageState&                  ms,
-                            noodles::MaterialDelete const& m) {
-    auto at = noo::convert_id(m.id());
-
-    m_state.material_list().handle_delete(at);
-}
-static void process_message(MessageState&                       ms,
-                            noodles::TextureCreateUpdate const& m) {
-    auto at = noo::convert_id(m.id());
-
-    TextureInit td;
-
-    if (!m.reference()) {
-        m_state.texture_list().handle_new(at, std::move(td));
-        return;
-    }
-
-    td.buffer = lookup(m_state, *m.reference()->id());
-    td.start  = m.reference()->start();
-    td.size   = m.reference()->size();
-
-    m_state.texture_list().handle_new(at, std::move(td));
-}
-static void process_message(MessageState& ms, noodles::TextureDelete const& m) {
-    auto at = noo::convert_id(m.id());
-
-    m_state.texture_list().handle_delete(at);
-}
-static void process_message(MessageState&                     ms,
-                            noodles::LightCreateUpdate const& m) {
-    auto at = noo::convert_id(m.id());
-
-    LightData ld;
-
-    EXIST_EXE(m.color(), { ld.color = noo::convert(VALUE); });
-    ld.intensity = m.intensity();
-    EXIST_EXE(m.spatial(), { ld.spatial = noo::convert(VALUE); });
-    ld.type = (nooc::LightType)m.light_type();
-
-    m_state.light_list().handle_new(at, std::move(ld));
-}
-static void process_message(MessageState& ms, noodles::LightDelete const& m) {
-    auto at = noo::convert_id(m.id());
-
-    m_state.light_list().handle_delete(at);
+    ms.state.buffer_list().handle_delete(id);
 }
 
-ComponentRef convert(ClientState& state, ::noodles::ComponentRef const& cr) {
-    qDebug() << cr.size() << cr.start() << cr.stride();
-    return { .buffer = lookup(state, *cr.id()),
-             .start  = cr.start(),
-             .size   = cr.size(),
-             .stride = cr.stride() };
+static void process_MsgBufferViewCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::BufferViewID>(value);
+
+    BufferViewInit init(value, ms.state);
+
+    ms.state.buffer_view_list().handle_new(id, std::move(init));
+}
+static void process_MsgBufferViewDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::BufferViewID>(value);
+
+    ms.state.buffer_view_list().handle_delete(id);
 }
 
-static void process_message(MessageState&                  ms,
-                            noodles::GeometryCreate const& m) {
-    auto at = noo::convert_id(m.id());
+static void process_MsgMaterialCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::MaterialID>(value);
 
-    MeshData md;
+    MaterialInit md(value, ms.state);
 
-    EXIST_EXE(m.extent(), md.extent = noo::convert(VALUE););
-
-    EXIST_EXE(m.positions(), md.positions = convert(m_state, VALUE););
-    EXIST_EXE(m.normals(), md.normals = convert(m_state, VALUE););
-    EXIST_EXE(m.tex_coords(), md.textures = convert(m_state, VALUE););
-    EXIST_EXE(m.colors(), md.colors = convert(m_state, VALUE););
-    EXIST_EXE(m.lines(), md.lines = convert(m_state, VALUE););
-    EXIST_EXE(m.triangles(), md.triangles = convert(m_state, VALUE););
-
-    m_state.mesh_list().handle_new(at, std::move(md));
+    ms.state.material_list().handle_new(id, std::move(md));
 }
-static void process_message(MessageState&                  ms,
-                            noodles::GeometryDelete const& m) {
-    auto at = noo::convert_id(m.id());
+static void process_MsgMaterialUpdate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::MaterialID>(value);
 
-    m_state.mesh_list().handle_delete(at);
+    MaterialUpdate md;
+
+    ms.state.material_list().handle_update(id, std::move(md));
 }
-static void process_message(MessageState&                     ms,
-                            noodles::TableCreateUpdate const& m) {
-    auto at = noo::convert_id(m.id());
+static void process_MsgMaterialDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::MaterialID>(value);
 
-    TableData td;
-
-    EXIST_EXE(m.name(), { td.name = VALUE.string_view(); })
-    EXIST_EXE(m.methods_list(), { td.method_list = make_v(m_state, VALUE); })
-    EXIST_EXE(m.signals_list(), { td.signal_list = make_v(m_state, VALUE); })
-
-    m_state.table_list().handle_new(at, std::move(td));
-}
-static void process_message(MessageState& ms, noodles::TableDelete const& m) {
-    auto at = noo::convert_id(m.id());
-
-    m_state.table_list().handle_delete(at);
+    ms.state.material_list().handle_delete(id);
 }
 
-static void process_message(MessageState&                    ms,
-                            noodles::PlotCreateUpdate const& m) {
-    auto at = noo::convert_id(m.id());
+static void process_MsgTextureCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::TextureID>(value);
 
-    PlotData pd;
+    TextureInit td(value, ms.state);
 
-    if (m.type()) {
-        auto& def = pd.type.emplace();
-
-        switch (m.type_type()) {
-        case noodles::PlotType::SimplePlot: {
-            auto const* as = m.type_as_SimplePlot();
-            def.emplace<PlotSimpleDelegate>().definition = QString::fromUtf8(
-                as->definition()->data(), as->definition()->size());
-        }
-        case noodles::PlotType::URLPlot: {
-            auto const* as = m.type_as_URLPlot();
-            auto str = QString::fromUtf8(as->url()->data(), as->url()->size());
-            def.emplace<PlotURLDelegate>().url = QUrl(str);
-        }
-        default:
-            // nothing?
-            pd.type.reset();
-        }
-    }
-
-    EXIST_EXE(m.table(), { pd.table = lookup(m_state, VALUE); })
-
-
-    EXIST_EXE(m.methods_list(), { pd.method_list = make_v(m_state, VALUE); })
-    EXIST_EXE(m.signals_list(), { pd.signal_list = make_v(m_state, VALUE); })
-
-    m_state.plot_list().handle_new(at, std::move(pd));
+    ms.state.texture_list().handle_new(id, std::move(td));
 }
-static void process_message(MessageState& ms, noodles::PlotDelete const& m) {
-    auto at = noo::convert_id(m.id());
+static void process_MsgTextureDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::TextureID>(value);
 
-    m_state.plot_list().handle_delete(at);
+    ms.state.texture_list().handle_delete(id);
 }
 
-static void process_message(MessageState&                  ms,
-                            noodles::DocumentUpdate const& m) {
+static void process_MsgImageCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::ImageID>(value);
 
-    DocumentData dd;
+    ImageInit init(value, ms.state);
 
-    EXIST_EXE(m.methods_list(), { dd.method_list = make_v(m_state, VALUE); })
-    EXIST_EXE(m.signals_list(), { dd.signal_list = make_v(m_state, VALUE); })
-
-    m_state.document().update(dd);
+    ms.state.image_list().handle_new(id, std::move(init));
 }
-static void process_message(MessageState& ms, noodles::DocumentReset const&) {
-    m_state.document().clear();
+static void process_MsgImageDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::ImageID>(value);
 
-    m_state.method_list().clear();
-    m_state.signal_list().clear();
-    m_state.buffer_list().clear();
-    m_state.table_list().clear();
-    m_state.texture_list().clear();
-    m_state.light_list().clear();
-    m_state.material_list().clear();
-    m_state.mesh_list().clear();
-    m_state.object_list().clear();
+    ms.state.image_list().handle_delete(id);
 }
-static void process_message(MessageState& ms, noodles::SignalInvoke const& m) {
+
+static void process_MsgSamplerCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::SamplerID>(value);
+
+    SamplerInit init(value, ms.state);
+
+    ms.state.sampler_list().handle_new(id, std::move(init));
+}
+static void process_MsgSamplerDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::SamplerID>(value);
+
+    ms.state.sampler_list().handle_delete(id);
+}
+
+static void process_MsgLightCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::LightID>(value);
+
+    LightInit ld(value);
+
+    ms.state.light_list().handle_new(id, std::move(ld));
+}
+static void process_MsgLightUpdate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::LightID>(value);
+
+    LightUpdate ld(value);
+
+    ms.state.light_list().handle_update(id, std::move(ld));
+}
+static void process_MsgLightDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::LightID>(value);
+
+    ms.state.light_list().handle_delete(id);
+}
+
+static void process_MsgGeometryCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::GeometryID>(value);
+
+    MeshInit md(value, ms.state);
+
+    ms.state.mesh_list().handle_new(id, std::move(md));
+}
+static void process_MsgGeometryDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::GeometryID>(value);
+
+    ms.state.mesh_list().handle_delete(id);
+}
+
+static void process_MsgTableCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::TableID>(value);
+
+    TableInit td(value);
+
+    ms.state.table_list().handle_new(id, std::move(td));
+}
+static void process_MsgTableUpdate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::TableID>(value);
+
+    TableUpdate td(value, ms.state);
+
+    ms.state.table_list().handle_update(id, std::move(td));
+}
+static void process_MsgTableDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::TableID>(value);
+
+    ms.state.table_list().handle_delete(id);
+}
+
+static void process_MsgPlotCreate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::PlotID>(value);
+
+    PlotInit pd(value);
+
+    ms.state.plot_list().handle_new(id, std::move(pd));
+}
+static void process_MsgPlotUpdate(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::PlotID>(value);
+
+    PlotUpdate pd(value, ms.state);
+
+    ms.state.plot_list().handle_update(id, std::move(pd));
+}
+static void process_MsgPlotDelete(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::PlotID>(value);
+
+    ms.state.plot_list().handle_delete(id);
+}
+
+static void process_MsgDocumentUpdate(MessageState& ms, QCborMap value) {
+
+    DocumentData dd(value, ms.state);
+
+    ms.state.document().update(dd);
+}
+static void process_MsgDocumentReset(MessageState& ms, QCborMap) {
+    ms.state.clear();
+}
+
+static void process_MsgSignalInvoke(MessageState& ms, QCborMap value) {
+    auto id = noo::id_from_message<noo::SignalID>(value);
+
     qDebug() << Q_FUNC_INFO;
-    auto sig = lookup(m_state, *m.id());
+    auto sig = ms.state.lookup(id);
 
     if (!sig) {
         qWarning() << "Unknown signal being invoked!";
         return;
     }
 
-    QCborValueListRef av;
-    if (m.signal_data()) { av = QCborValueListRef(m.signal_data()); }
+    auto d = noo::CborDecoder(value);
 
-    MethodContext   ctx;
-    AttachedSignal* attached = nullptr;
+    QCborArray av;
 
-    if (m.on_object()) {
-        qDebug() << "Invoke on object";
-        auto obj = lookup(m_state, *m.on_object());
-        if (!obj) {
-            qWarning() << "Unknown object for signal!";
-            return;
-        }
-        ctx = obj;
-        // listener notification
-        attached = obj->attached_signals().find_by_delegate(sig);
+    d.conditional("signal_data", av);
 
-    } else if (m.on_table()) {
-        qDebug() << "Invoke on table";
-        auto tbl = lookup(m_state, *m.on_table());
-        if (!tbl) {
-            qWarning() << "Unknown table for signal!";
-            return;
-        }
-        ctx      = tbl;
-        attached = tbl->attached_signals().find_by_delegate(sig);
-    } else {
-        qDebug() << "Invoke on document";
-        ctx      = std::monostate();
-        attached = m_state.document().attached_signals().find_by_delegate(sig);
-    }
+    MethodContextPtr ctx;
+    AttachedSignal*  attached = nullptr;
+
+    auto inv_id = noo::InvokeID(value[QStringLiteral("context")].toMap());
+
+    VMATCH(
+        inv_id,
+        VCASE(std::monostate) {
+            // invoke on document
+            qDebug() << "Invoke on document";
+            ctx = std::monostate();
+            attached =
+                ms.state.document().attached_signals().find_by_delegate(sig);
+        },
+        VCASE(auto eid) {
+            // invoke on document
+            qDebug() << "Invoke on thingy";
+            auto obj = ms.state.lookup(eid);
+            if (!obj) {
+                qWarning() << "Unknown object for signal!";
+                return;
+            }
+            ctx = obj;
+            // listener notification
+            attached = obj->attached_signals().find_by_delegate(sig);
+        });
 
     // global notification
     emit sig->fired(ctx, av);
@@ -341,114 +332,90 @@ static void process_message(MessageState& ms, noodles::SignalInvoke const& m) {
     // local notification
     if (attached) emit attached->fired(av);
 }
-static void process_message(MessageState& ms, noodles::MethodReply const& m) {
-    auto ident = m.invoke_ident()->str();
 
-    auto iter = m_state.inflight_methods().find(ident);
+static void process_MsgMethodReply(MessageState& ms, QCborMap value) {
+    auto d = noo::CborDecoder(value);
 
-    if (iter == m_state.inflight_methods().end()) {
+    QString ident;
+    d("invoke_id", ident);
+
+    auto iter = ms.state.inflight_methods().find(ident);
+
+    if (iter == ms.state.inflight_methods().end()) {
         qWarning() << "Reply for method we did not send!";
         return;
     }
 
-    auto& reply_ptr = iter->second;
+    QPointer<PendingMethodReply> reply_ptr = iter.value();
 
     Q_ASSERT(reply_ptr);
 
-    QCborValueRef av;
+    QCborValue result;
 
     std::optional<MethodException> err;
 
-    if (m.method_data()) { av = QCborValueRef(m.method_data()); }
+    d.conditional("result", result);
 
-    if (m.method_exception()) {
-        err.emplace();
-
-        auto* excp = m.method_exception();
-
-        err->code = excp->code();
-
-        if (excp->message()) {
-            err->message = QString::fromUtf8(excp->message()->c_str());
-        }
-
-        if (excp->data()) { err->additional = QCborValueRef(excp->data()); }
-    }
+    d("method_exception", err);
 
     qDebug() << "Completing reply...";
-    reply_ptr->complete(std::move(av), err ? &err.value() : nullptr);
+    reply_ptr->complete(std::move(result), err ? &err.value() : nullptr);
 
     qDebug() << "Clean up...";
     reply_ptr->deleteLater();
 
-    m_state.inflight_methods().erase(iter);
+    ms.state.inflight_methods().erase(iter);
 }
 
 
-static void process_server_message(MessageState const& ms,
-                                   QCborValue const&   value) {
+static void
+process_server_message(MessageState& ms, int mid, QCborValue const& value) {
     qDebug() << Q_FUNC_INFO << value.toDiagnosticNotation();
 
-    auto array = value.toArray();
 
-    for (auto const& v : array) {
-        auto pack    = v.toArray();
-        auto id      = pack.at(0).toInteger(-1);
-        auto content = pack.at(1);
-    }
-
-    switch (message.message_type()) {
-    case noodles::ServerMessageType::NONE: return;
-    case noodles::ServerMessageType::MethodCreate:
-        return process_message(*message.message_as_MethodCreate());
-    case noodles::ServerMessageType::MethodDelete:
-        return process_message(*message.message_as_MethodDelete());
-    case noodles::ServerMessageType::SignalCreate:
-        return process_message(*message.message_as_SignalCreate());
-    case noodles::ServerMessageType::SignalDelete:
-        return process_message(*message.message_as_SignalDelete());
-    case noodles::ServerMessageType::ObjectCreateUpdate:
-        return process_message(*message.message_as_ObjectCreateUpdate());
-    case noodles::ServerMessageType::ObjectDelete:
-        return process_message(*message.message_as_ObjectDelete());
-    case noodles::ServerMessageType::BufferCreate:
-        return process_message(*message.message_as_BufferCreate());
-    case noodles::ServerMessageType::BufferDelete:
-        return process_message(*message.message_as_BufferDelete());
-    case noodles::ServerMessageType::MaterialCreateUpdate:
-        return process_message(*message.message_as_MaterialCreateUpdate());
-    case noodles::ServerMessageType::MaterialDelete:
-        return process_message(*message.message_as_MaterialDelete());
-    case noodles::ServerMessageType::TextureCreateUpdate:
-        return process_message(*message.message_as_TextureCreateUpdate());
-    case noodles::ServerMessageType::TextureDelete:
-        return process_message(*message.message_as_TextureDelete());
-    case noodles::ServerMessageType::LightCreateUpdate:
-        return process_message(*message.message_as_LightCreateUpdate());
-    case noodles::ServerMessageType::LightDelete:
-        return process_message(*message.message_as_LightDelete());
-    case noodles::ServerMessageType::GeometryCreate:
-        return process_message(*message.message_as_GeometryCreate());
-    case noodles::ServerMessageType::GeometryDelete:
-        return process_message(*message.message_as_GeometryDelete());
-    case noodles::ServerMessageType::TableCreateUpdate:
-        return process_message(*message.message_as_TableCreateUpdate());
-    case noodles::ServerMessageType::TableDelete:
-        return process_message(*message.message_as_TableDelete());
-    case noodles::ServerMessageType::DocumentUpdate:
-        return process_message(*message.message_as_DocumentUpdate());
-    case noodles::ServerMessageType::DocumentReset:
-        return process_message(*message.message_as_DocumentReset());
-    case noodles::ServerMessageType::SignalInvoke:
-        return process_message(*message.message_as_SignalInvoke());
-    case noodles::ServerMessageType::MethodReply:
-        return process_message(*message.message_as_MethodReply());
+    switch (mid) {
+    case 0: process_MsgMethodCreate(ms, value.toMap()); break;
+    case 1: process_MsgMethodDelete(ms, value.toMap()); break;
+    case 2: process_MsgSignalCreate(ms, value.toMap()); break;
+    case 3: process_MsgSignalDelete(ms, value.toMap()); break;
+    case 4: process_MsgEntityCreate(ms, value.toMap()); break;
+    case 5: process_MsgEntityUpdate(ms, value.toMap()); break;
+    case 6: process_MsgEntityDelete(ms, value.toMap()); break;
+    case 7: process_MsgPlotCreate(ms, value.toMap()); break;
+    case 8: process_MsgPlotUpdate(ms, value.toMap()); break;
+    case 9: process_MsgPlotDelete(ms, value.toMap()); break;
+    case 10: process_MsgBufferCreate(ms, value.toMap()); break;
+    case 11: process_MsgBufferDelete(ms, value.toMap()); break;
+    case 12: process_MsgBufferViewCreate(ms, value.toMap()); break;
+    case 13: process_MsgBufferViewDelete(ms, value.toMap()); break;
+    case 14: process_MsgMaterialCreate(ms, value.toMap()); break;
+    case 15: process_MsgMaterialUpdate(ms, value.toMap()); break;
+    case 16: process_MsgMaterialDelete(ms, value.toMap()); break;
+    case 17: process_MsgImageCreate(ms, value.toMap()); break;
+    case 18: process_MsgImageDelete(ms, value.toMap()); break;
+    case 19: process_MsgTextureCreate(ms, value.toMap()); break;
+    case 20: process_MsgTextureDelete(ms, value.toMap()); break;
+    case 21: process_MsgSamplerCreate(ms, value.toMap()); break;
+    case 22: process_MsgSamplerDelete(ms, value.toMap()); break;
+    case 23: process_MsgLightCreate(ms, value.toMap()); break;
+    case 24: process_MsgLightUpdate(ms, value.toMap()); break;
+    case 25: process_MsgLightDelete(ms, value.toMap()); break;
+    case 26: process_MsgGeometryCreate(ms, value.toMap()); break;
+    case 27: process_MsgGeometryDelete(ms, value.toMap()); break;
+    case 28: process_MsgTableCreate(ms, value.toMap()); break;
+    case 29: process_MsgTableUpdate(ms, value.toMap()); break;
+    case 30: process_MsgTableDelete(ms, value.toMap()); break;
+    case 31: process_MsgDocumentUpdate(ms, value.toMap()); break;
+    case 32: process_MsgDocumentReset(ms, value.toMap()); break;
+    case 33: process_MsgSignalInvoke(ms, value.toMap()); break;
+    case 34: process_MsgMethodReply(ms, value.toMap()); break;
+    default: qWarning() << "Unknown message: " << mid;
     }
 }
 
 
 void process_message(QWebSocket& s, InternalClientState& state, QByteArray m) {
-    MessageState ms { .m_socket = s, .m_state = state };
+    MessageState ms { .socket = s, .state = state };
 
     QCborParserError error;
     auto             value = QCborValue::fromCbor(m, &error);
@@ -458,7 +425,15 @@ void process_message(QWebSocket& s, InternalClientState& state, QByteArray m) {
         return;
     }
 
-    process_server_message(m, value);
+    auto array = value.toArray();
+
+    for (auto const& v : array) {
+        auto pack = v.toMap();
+
+        for (auto [k, v] : pack) {
+            process_server_message(ms, k.toInteger(-1), v);
+        }
+    }
 }
 
 } // namespace nooc

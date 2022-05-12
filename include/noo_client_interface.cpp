@@ -44,12 +44,12 @@ template <class T>
 bool decode_entity(InternalClientState& state,
                    QCborValue           value,
                    std::vector<T*>&     out_ptr) {
-    using IDType = decltype(out_ptr[0]->id());
-    auto arr     = value.toArray();
+    // using IDType = decltype(out_ptr[0]->id());
+    auto arr = value.toArray();
     out_ptr.clear();
     for (auto lv : arr) {
         T* ptr = nullptr;
-        decode_entity(state, IDType(lv), ptr);
+        decode_entity(state, lv, ptr);
         out_ptr.push_back(ptr);
     }
     return true;
@@ -60,8 +60,13 @@ bool decode_entity(InternalClientState& state,
                    QCborValue           value,
                    std::optional<T>&    out) {
     if (value.isUndefined()) return true;
-    auto& lt = out.emplace();
-    return decode_entity(state, value, lt);
+    if constexpr (std::is_constructible_v<T, QCborMap, InternalClientState&>) {
+        out = T(value.toMap(), state);
+    } else {
+        auto& lt = out.emplace();
+        return decode_entity(state, value, lt);
+    }
+    __builtin_unreachable();
 }
 
 // =============================================================================
@@ -84,11 +89,11 @@ PendingMethodReply::PendingMethodReply(MethodDelegate* d, MethodContextPtr ctx)
 
 void PendingMethodReply::call_direct(QCborArray l) {
     if (m_called) {
-        MethodException exception {
-            .code    = -10000,
-            .message = "Create a new invocation object instead of re-calling "
-                       "this one",
-        };
+        MethodException exception;
+        exception.code = -10000;
+        exception.message =
+            "Create a new invocation object instead of re-calling "
+            "this one";
 
         return complete({}, &exception);
     }
@@ -97,10 +102,10 @@ void PendingMethodReply::call_direct(QCborArray l) {
 
 
     if (!m_method) {
-        MethodException exception {
-            .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
-            .message = "Method does not exist on this object",
-        };
+        MethodException exception;
+        exception.code    = noo::ErrorCodes::METHOD_NOT_FOUND;
+        exception.message = "Method does not exist on this object";
+
         return complete({}, &exception);
     }
 
@@ -113,10 +118,10 @@ void PendingMethodReply::call_direct(QCborArray l) {
         },
         VCASE(QPointer<EntityDelegate> & p) {
             if (!p) {
-                MethodException exception {
-                    .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
-                    .message = "Method does not exist on this object anymore",
-                };
+                MethodException exception;
+                exception.code = noo::ErrorCodes::METHOD_NOT_FOUND;
+                exception.message =
+                    "Method does not exist on this object anymore";
                 return complete({}, &exception);
             }
 
@@ -124,10 +129,12 @@ void PendingMethodReply::call_direct(QCborArray l) {
         },
         VCASE(QPointer<TableDelegate> & p) {
             if (!p) {
-                MethodException exception {
-                    .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
-                    .message = "Method does not exist on this table anymore",
-                };
+                MethodException exception;
+
+                exception.code = noo::ErrorCodes::METHOD_NOT_FOUND;
+                exception.message =
+                    "Method does not exist on this table anymore";
+
                 return complete({}, &exception);
             }
 
@@ -135,10 +142,11 @@ void PendingMethodReply::call_direct(QCborArray l) {
         },
         VCASE(QPointer<PlotDelegate> & p) {
             if (!p) {
-                MethodException exception {
-                    .code    = noo::ErrorCodes::METHOD_NOT_FOUND,
-                    .message = "Method does not exist on this table anymore",
-                };
+                MethodException exception;
+
+                exception.code = noo::ErrorCodes::METHOD_NOT_FOUND;
+                exception.message =
+                    "Method does not exist on this table anymore";
                 return complete({}, &exception);
             }
 
@@ -380,6 +388,8 @@ noo::BufferID BufferDelegate::id() const {
 }
 
 void BufferDelegate::start_download(QNetworkAccessManager* nm) {
+    if (is_data_ready()) return;
+
     QNetworkRequest request;
     request.setUrl(m_data.url);
 
@@ -473,6 +483,21 @@ static QImage convert_image(QByteArray array) {
     return QImage::fromData(array);
 }
 
+void ImageDelegate::start_download(QNetworkAccessManager* nm) {
+    if (!m_init.remote_image.isValid()) return;
+
+    QNetworkRequest request;
+    request.setUrl(m_init.remote_image);
+
+    auto* reply = nm->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, &ImageDelegate::ready_read);
+    connect(
+        reply, &QNetworkReply::errorOccurred, this, &ImageDelegate::on_error);
+    connect(
+        reply, &QNetworkReply::sslErrors, this, &ImageDelegate::on_ssl_error);
+}
+
 void ImageDelegate::ready_read() {
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
     m_image              = convert_image(reply->readAll());
@@ -500,7 +525,7 @@ void ImageDelegate::on_buffer_ready() {
 
 // =============================================================================
 
-SamplerInit::SamplerInit(QCborMap m, InternalClientState& state) {
+SamplerInit::SamplerInit(QCborMap m, InternalClientState&) {
     noo::CborDecoder d(m);
 
     d(QStringLiteral("name"), name);
@@ -627,6 +652,7 @@ noo::MaterialID MaterialDelegate::id() const {
 }
 void MaterialDelegate::update(MaterialUpdate const& d) {
     this->on_update(d);
+    emit updated();
 }
 void MaterialDelegate::on_update(MaterialUpdate const&) { }
 
@@ -638,26 +664,155 @@ void MaterialDelegate::texture_ready(QImage) {
 
 // =============================================================================
 
-TableDelegate::TableDelegate(noo::TableID i, TableData const& data)
-    : m_id(i), m_attached_methods(this), m_attached_signals(this) {
+LightInit::LightInit(QCborMap m) {
+    noo::CborDecoder d(m);
 
-    update(data);
+    d(QStringLiteral("name"), name);
+
+    auto point_name = QStringLiteral("point");
+    auto spot_name  = QStringLiteral("spot");
+    auto dir_name   = QStringLiteral("directional");
+
+    if (m.contains(dir_name)) {
+        DirectionLight& l = type.emplace<DirectionLight>();
+        d(dir_name, l);
+    } else if (m.contains(spot_name)) {
+        SpotLight& l = type.emplace<SpotLight>();
+        d(spot_name, l);
+    } else {
+        // default to point
+        PointLight& l = type.emplace<PointLight>();
+        d(point_name, l);
+    }
+
+    d.conditional("color", color);
+    d.conditional("intensity", intensity);
 }
+
+LightUpdate::LightUpdate(QCborMap m) {
+    noo::CborDecoder d(m);
+
+    d.conditional("color", color);
+    d.conditional("intensity", intensity);
+}
+
+LightDelegate::LightDelegate(noo::LightID i, LightInit const& data)
+    : m_id(i), m_init(data) { }
+
+LightDelegate::~LightDelegate() = default;
+
+noo::LightID LightDelegate::id() const {
+    return m_id;
+}
+
+void LightDelegate::update(LightUpdate const& d) {
+    this->on_update(d);
+    emit updated();
+}
+
+void LightDelegate::on_update(LightUpdate const&) { }
+
+// =============================================================================
+
+Attribute::Attribute(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder d(m);
+
+    decode_entity(state, m[QStringLiteral("view")], view);
+
+    d(QStringLiteral("semantic"), semantic);
+    d.conditional(QStringLiteral("channel"), channel);
+    d.conditional(QStringLiteral("stride"), stride);
+    d(QStringLiteral("format"), format);
+
+    d(QStringLiteral("minimum_value"), minimum_value);
+    d(QStringLiteral("maximum_value"), maximum_value);
+
+    d.conditional(QStringLiteral("normalized"), normalized);
+}
+
+Index::Index(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder d(m);
+
+    decode_entity(state, m[QStringLiteral("view")], view);
+    d.conditional(QStringLiteral("stride"), stride);
+    d(QStringLiteral("format"), format);
+}
+
+MeshPatch::MeshPatch(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder d(m);
+
+    {
+        auto attrib_arr = m[QStringLiteral("attributes")].toArray();
+
+        for (auto attrib : attrib_arr) {
+            attributes.emplace_back(attrib.toMap(), state);
+        }
+    }
+
+    indicies = Index(m[QStringLiteral("indicies")].toMap(), state);
+
+    d(QStringLiteral("type"), type);
+
+    decode_entity(state, m[QStringLiteral("material")], material);
+}
+
+MeshInit::MeshInit(QCborMap m, InternalClientState& state) {
+    noo::CborDecoder d(m);
+
+    d(QStringLiteral("name"), name);
+
+    auto patch_arr = m[QStringLiteral("patches")].toArray();
+
+    for (auto sp : patch_arr) {
+        patches.emplace_back(sp.toMap(), state);
+    }
+}
+
+MeshDelegate::MeshDelegate(noo::GeometryID i, MeshInit const& data)
+    : m_id(i), m_init(data) { }
+
+MeshDelegate::~MeshDelegate() = default;
+
+noo::GeometryID MeshDelegate::id() const {
+    return m_id;
+}
+
+void MeshDelegate::prepare_delete() { }
+
+
+// =============================================================================
+
+TableInit::TableInit(QCborMap m) {
+    noo::CborDecoder d(m);
+
+    d(QStringLiteral("name"), name);
+}
+
+TableUpdate::TableUpdate(QCborMap m, InternalClientState& state) {
+    decode_entity(state, m[QStringLiteral("methods_list")], methods_list);
+    decode_entity(state, m[QStringLiteral("signals_list")], signals_list);
+}
+
+TableDelegate::TableDelegate(noo::TableID i, TableInit const& data)
+    : m_id(i),
+      m_init(data),
+      m_attached_methods(this),
+      m_attached_signals(this) { }
 TableDelegate::~TableDelegate() = default;
 
-void TableDelegate::update(TableData const& data) {
-    if (data.method_list) m_attached_methods = *data.method_list;
-    if (data.signal_list) {
+void TableDelegate::update(TableUpdate const& data) {
+    if (data.methods_list) m_attached_methods = *data.methods_list;
+    if (data.signals_list) {
 
         for (auto c : m_spec_signals) {
             disconnect(c);
         }
 
-        m_attached_signals = *data.signal_list;
+        m_attached_signals = *data.signals_list;
 
         // find specific signals
 
-        auto find_sig = [&](std::string_view n, auto targ) {
+        auto find_sig = [&](QString n, auto targ) {
             auto* p = m_attached_signals.find_by_name(n);
 
             if (p) {
@@ -666,17 +821,21 @@ void TableDelegate::update(TableData const& data) {
             }
         };
 
-        find_sig("tbl_reset", &TableDelegate::interp_table_reset);
-        find_sig("tbl_updated", &TableDelegate::interp_table_update);
-        find_sig("tbl_rows_removed", &TableDelegate::interp_table_remove);
-        find_sig("tbl_selection_updated",
+
+        find_sig(noo::names::sig_tbl_reset, &TableDelegate::interp_table_reset);
+        find_sig(noo::names::sig_tbl_updated,
+                 &TableDelegate::interp_table_update);
+        find_sig(noo::names::sig_tbl_rows_removed,
+                 &TableDelegate::interp_table_remove);
+        find_sig(noo::names::sig_tbl_selection_updated,
                  &TableDelegate::interp_table_sel_update);
     }
 
     this->on_update(data);
+    emit updated();
 }
 
-void TableDelegate::on_update(TableData const&) { }
+void TableDelegate::on_update(TableUpdate const&) { }
 
 AttachedMethodList const& TableDelegate::attached_methods() const {
     return m_attached_methods;
@@ -690,16 +849,16 @@ noo::TableID TableDelegate::id() const {
 
 void TableDelegate::prepare_delete() { }
 
-void TableDelegate::on_table_initialize(QCborValueListRef const&,
-                                        QCborValueRef,
-                                        QCborValueListRef const&,
-                                        QCborValueListRef const&) { }
+void TableDelegate::on_table_initialize(QCborArray const&,
+                                        QCborValue,
+                                        QCborArray const&,
+                                        QCborArray const&) { }
 
 void TableDelegate::on_table_reset() { }
-void TableDelegate::on_table_updated(QCborValueRef, QCborValueRef) { }
-void TableDelegate::on_table_rows_removed(QCborValueRef) { }
-void TableDelegate::on_table_selection_updated(std::string_view,
-                                               noo::SelectionRef const&) { }
+void TableDelegate::on_table_updated(QCborValue, QCborValue) { }
+void TableDelegate::on_table_rows_removed(QCborValue) { }
+void TableDelegate::on_table_selection_updated(QString, noo::Selection const&) {
+}
 
 PendingMethodReply* TableDelegate::subscribe() const {
     auto* p = attached_methods().new_call_by_name<SubscribeInitReply>(
@@ -716,19 +875,18 @@ PendingMethodReply* TableDelegate::subscribe() const {
 }
 
 
-PendingMethodReply*
-TableDelegate::request_row_insert(QCborValueList&& row) const {
-    auto new_list = QCborValueList(row.size());
+PendingMethodReply* TableDelegate::request_row_insert(QCborArray&& row) const {
+    QCborArray new_list;
 
-    for (size_t i = 0; i < row.size(); i++) {
-        new_list[i] = QCborValueList({ row[i] });
+    for (int i = 0; i < row.size(); i++) {
+        new_list << QCborArray({ row[i] });
     }
 
     return request_rows_insert(std::move(new_list));
 }
 
 PendingMethodReply*
-TableDelegate::request_rows_insert(QCborValueList&& columns) const {
+TableDelegate::request_rows_insert(QCborArray&& columns) const {
     auto* p = attached_methods().new_call_by_name("tbl_insert");
 
     p->call(columns);
@@ -736,12 +894,12 @@ TableDelegate::request_rows_insert(QCborValueList&& columns) const {
     return p;
 }
 
-PendingMethodReply*
-TableDelegate::request_row_update(int64_t key, QCborValueList&& row) const {
-    auto new_list = QCborValueList(row.size());
+PendingMethodReply* TableDelegate::request_row_update(int64_t      key,
+                                                      QCborArray&& row) const {
+    QCborArray new_list;
 
-    for (size_t i = 0; i < row.size(); i++) {
-        new_list[i] = QCborValueList({ row[i] });
+    for (int i = 0; i < row.size(); i++) {
+        new_list << QCborArray({ row[i] });
     }
 
     return request_rows_update({ key }, std::move(new_list));
@@ -749,7 +907,7 @@ TableDelegate::request_row_update(int64_t key, QCborValueList&& row) const {
 
 PendingMethodReply*
 TableDelegate::request_rows_update(std::vector<int64_t>&& keys,
-                                   QCborValueList&&       columns) const {
+                                   QCborArray&&           columns) const {
     auto* p = attached_methods().new_call_by_name("tbl_update");
 
     p->call(keys, columns);
@@ -775,8 +933,8 @@ PendingMethodReply* TableDelegate::request_clear() const {
 }
 
 PendingMethodReply*
-TableDelegate::request_selection_update(std::string_view name,
-                                        noo::Selection   selection) const {
+TableDelegate::request_selection_update(QString        name,
+                                        noo::Selection selection) const {
     auto* p = attached_methods().new_call_by_name("tbl_update_selection");
 
     p->call(name, selection.to_any());
@@ -784,11 +942,11 @@ TableDelegate::request_selection_update(std::string_view name,
     return p;
 }
 
-void TableDelegate::interp_table_reset(QCborValueListRef const&) {
+void TableDelegate::interp_table_reset(QCborArray const&) {
     this->on_table_reset();
 }
 
-void TableDelegate::interp_table_update(QCborValueListRef const& ref) {
+void TableDelegate::interp_table_update(QCborArray const& ref) {
     // row of keys, then row of columns
     if (ref.size() < 2) {
         qWarning() << Q_FUNC_INFO << "Malformed signal from server";
@@ -801,7 +959,7 @@ void TableDelegate::interp_table_update(QCborValueListRef const& ref) {
     this->on_table_updated(keylist, cols);
 }
 
-void TableDelegate::interp_table_remove(QCborValueListRef const& ref) {
+void TableDelegate::interp_table_remove(QCborArray const& ref) {
     if (ref.size() < 1) {
         qWarning() << Q_FUNC_INFO << "Malformed signal from server";
         return;
@@ -810,14 +968,14 @@ void TableDelegate::interp_table_remove(QCborValueListRef const& ref) {
     this->on_table_rows_removed(ref[0]);
 }
 
-void TableDelegate::interp_table_sel_update(QCborValueListRef const& ref) {
+void TableDelegate::interp_table_sel_update(QCborArray const& ref) {
     if (ref.size() < 2) {
         qWarning() << Q_FUNC_INFO << "Malformed signal from server";
         return;
     }
 
-    auto str     = ref[0].to_string();
-    auto sel_ref = noo::SelectionRef(ref[1]);
+    auto str     = ref[0].toString();
+    auto sel_ref = noo::Selection(ref[1].toMap());
 
     this->on_table_selection_updated(str, sel_ref);
 }
@@ -825,20 +983,42 @@ void TableDelegate::interp_table_sel_update(QCborValueListRef const& ref) {
 
 // =============================================================================
 
-BASIC_DELEGATE_IMPL(LightDelegate, LightID, LightData)
-void LightDelegate::update(LightData const& d) {
-    this->on_update(d);
+EntityTextDefinition::EntityTextDefinition(QCborMap m, InternalClientState&) {
+    auto d = noo::CborDecoder(m);
+
+    d("txt", text);
+
+    d.conditional("font", font);
+    d.conditional("height", height);
+    d.conditional("width", width);
 }
-void LightDelegate::on_update(LightData const&) { }
 
-// =============================================================================
+EntityWebpageDefinition::EntityWebpageDefinition(QCborMap m,
+                                                 InternalClientState&) {
+    auto d = noo::CborDecoder(m);
 
-BASIC_DELEGATE_IMPL(MeshDelegate, GeometryID, MeshData)
+    d("source", url);
 
-void MeshDelegate::prepare_delete() { }
+    d.conditional("height", height);
+    d.conditional("width", width);
+}
 
-// =============================================================================
+InstanceSource::InstanceSource(QCborMap m, InternalClientState& state) {
 
+    auto d = noo::CborDecoder(m);
+
+    decode_entity(state, m[QStringLiteral("view")], view);
+    d.conditional("stride", stride);
+    d("bb", instance_bb);
+}
+
+EntityRenderableDefinition::EntityRenderableDefinition(
+    QCborMap             m,
+    InternalClientState& state) {
+
+    decode_entity(state, m[QStringLiteral("mesh")], mesh);
+    decode_entity(state, m[QStringLiteral("instances")], instances);
+}
 
 EntityInit::EntityInit(QCborMap m) {
     auto decoder = noo::CborDecoder(m);
@@ -854,46 +1034,38 @@ static auto e_render_rep = QStringLiteral("render_rep");
 EntityUpdateData::EntityUpdateData(QCborMap value, InternalClientState& state) {
     auto d = noo::CborDecoder(value);
 
-    decode_entity(state, value["parent"], parent);
+    decode_entity(state, value[QStringLiteral("parent")], parent);
     d("transform", transform);
 
     if (value.contains(e_null_rep)) {
-        definition = std::monostate;
+        definition = std::monostate();
     } else if (value.contains(e_text_rep)) {
-        definition = EntityTextDefinition(value[e_text_rep], state);
+        definition = EntityTextDefinition(value[e_text_rep].toMap(), state);
     } else if (value.contains(e_web_rep)) {
-        definition = EntityWebpageDefinition(value[e_web_rep], state);
+        definition = EntityWebpageDefinition(value[e_web_rep].toMap(), state);
     } else if (value.contains(e_render_rep)) {
-        definition = EntityRenderableDefinition(value[e_render_rep], state);
+        definition =
+            EntityRenderableDefinition(value[e_render_rep].toMap(), state);
     }
 
-    decode_entity(state, value["lights"], lights);
-    decode_entity(state, value["tables"], tables);
-    decode_entity(state, value["plots"], plots);
+    decode_entity(state, value[QStringLiteral("lights")], lights);
+    decode_entity(state, value[QStringLiteral("tables")], tables);
+    decode_entity(state, value[QStringLiteral("plots")], plots);
     d("tags", tags);
-    decode_entity(state, value["methods_list"], methods_list);
-    decode_entity(state, value["signals_list"], signals_list);
+    decode_entity(state, value[QStringLiteral("methods_list")], methods_list);
+    decode_entity(state, value[QStringLiteral("signals_list")], signals_list);
     d("influence", influence);
 }
 
 EntityDelegate::EntityDelegate(noo::EntityID i, EntityUpdateData const& data)
-    : m_id(i), m_attached_methods(this), m_attached_signals(this) {
-
-    if (data.name) {
-        m_name = *data.name;
-    } else {
-        m_name = i.to_string();
-    }
-
-    if (data.parent) { m_parent = *data.parent; }
-
-    if (data.method_list) m_attached_methods = *data.method_list;
-    if (data.signal_list) m_attached_signals = *data.signal_list;
-}
+    : m_id(i),
+      m_data(data),
+      m_attached_methods(this),
+      m_attached_signals(this) { }
 EntityDelegate::~EntityDelegate() = default;
 void EntityDelegate::update(EntityUpdateData const& data) {
-    if (data.method_list) m_attached_methods = *data.method_list;
-    if (data.signal_list) m_attached_signals = *data.signal_list;
+    if (data.methods_list) m_attached_methods = *data.methods_list;
+    if (data.signals_list) m_attached_signals = *data.signals_list;
 
     this->on_update(data);
 }
@@ -912,25 +1084,51 @@ void EntityDelegate::prepare_delete() { }
 
 // =============================================================================
 
-PlotDelegate::PlotDelegate(noo::PlotID i, PlotData const& data)
+PlotInit::PlotInit(QCborMap m) {
+    auto d = noo::CborDecoder(m);
+
+    d("name", name);
+}
+
+PlotUpdate::PlotUpdate(QCborMap m, InternalClientState& state) {
+    auto d = noo::CborDecoder(m);
+
+    decode_entity(state, m[QStringLiteral("table")], table);
+
+    auto simple_name = QStringLiteral("simple_plot");
+    auto url_name    = QStringLiteral("url_plot");
+
+    if (m.contains(simple_name)) {
+        QString def;
+        d(simple_name, def);
+        type = def;
+    } else {
+        QUrl url;
+        d(url_name, url);
+        type = url;
+    }
+
+    decode_entity(state, m[QStringLiteral("methods_list")], methods_list);
+    decode_entity(state, m[QStringLiteral("signals_list")], signals_list);
+}
+
+PlotDelegate::PlotDelegate(noo::PlotID i, PlotInit const& data)
     : m_id(i), m_attached_methods(this), m_attached_signals(this) {
 
-    if (data.type) { m_type = *data.type; }
-    if (data.table) { m_table = *data.table; }
-
-    if (data.method_list) m_attached_methods = *data.method_list;
-    if (data.signal_list) m_attached_signals = *data.signal_list;
+    m_name = data.name;
 }
 PlotDelegate::~PlotDelegate() = default;
-void PlotDelegate::update(PlotData const& data) {
+void PlotDelegate::update(PlotUpdate const& data) {
     if (data.type) { m_type = *data.type; }
     if (data.table) { m_table = *data.table; }
-    if (data.method_list) m_attached_methods = *data.method_list;
-    if (data.signal_list) m_attached_signals = *data.signal_list;
+
+    if (data.methods_list) m_attached_methods = *data.methods_list;
+    if (data.signals_list) m_attached_signals = *data.signals_list;
 
     this->on_update(data);
+    emit updated();
 }
-void                      PlotDelegate::on_update(PlotData const&) { }
+void                      PlotDelegate::on_update(PlotUpdate const&) { }
 AttachedMethodList const& PlotDelegate::attached_methods() const {
     return m_attached_methods;
 }
@@ -945,6 +1143,11 @@ void PlotDelegate::prepare_delete() { }
 
 // =============================================================================
 
+DocumentData::DocumentData(QCborMap m, InternalClientState& state) {
+    decode_entity(state, m[QStringLiteral("methods_list")], methods_list);
+    decode_entity(state, m[QStringLiteral("signals_list")], signals_list);
+}
+
 DocumentDelegate::DocumentDelegate()
     : m_attached_methods(std::monostate()),
       m_attached_signals(std::monostate()) {
@@ -953,8 +1156,8 @@ DocumentDelegate::DocumentDelegate()
 }
 DocumentDelegate::~DocumentDelegate() = default;
 void DocumentDelegate::update(DocumentData const& data) {
-    m_attached_methods = data.method_list;
-    m_attached_signals = data.signal_list;
+    if (data.methods_list) m_attached_methods = *data.methods_list;
+    if (data.signals_list) m_attached_signals = *data.signals_list;
     this->on_update(data);
     emit updated();
 }
@@ -1086,10 +1289,14 @@ create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
 
     CREATE_DEFAULT(tex_maker, TextureID, TextureInit, TextureDelegate);
     CREATE_DEFAULT(buffer_maker, BufferID, BufferInit, BufferDelegate);
-    CREATE_DEFAULT(table_maker, TableID, TableData, TableDelegate);
-    CREATE_DEFAULT(light_maker, LightID, LightData, LightDelegate);
+    CREATE_DEFAULT(
+        buffer_view_maker, BufferViewID, BufferViewInit, BufferViewDelegate);
+    CREATE_DEFAULT(sampler_maker, SamplerID, SamplerInit, SamplerDelegate);
+    CREATE_DEFAULT(image_maker, ImageID, ImageInit, ImageDelegate);
+    CREATE_DEFAULT(table_maker, TableID, TableInit, TableDelegate);
+    CREATE_DEFAULT(light_maker, LightID, LightInit, LightDelegate);
     CREATE_DEFAULT(mat_maker, MaterialID, MaterialInit, MaterialDelegate);
-    CREATE_DEFAULT(mesh_maker, GeometryID, MeshData, MeshDelegate);
+    CREATE_DEFAULT(mesh_maker, GeometryID, MeshInit, MeshDelegate);
     CREATE_DEFAULT(object_maker, EntityID, EntityUpdateData, EntityDelegate);
     CREATE_DEFAULT(sig_maker, SignalID, SignalInit, SignalDelegate);
     CREATE_DEFAULT(method_maker, MethodID, MethodInit, MethodDelegate);

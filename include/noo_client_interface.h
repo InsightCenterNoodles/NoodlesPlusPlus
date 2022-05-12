@@ -64,6 +64,9 @@ struct MethodException {
     int        code;
     QString    message;
     QCborValue additional;
+
+    MethodException() = default;
+    MethodException(QCborMap);
 };
 
 QString to_string(MethodException const&);
@@ -107,8 +110,8 @@ public:
         call_direct(arr);
     }
 
-private slots:
-    /// Internal use
+public slots:
+    /// Internal use. do not touch!
     void complete(QCborValue, MethodException*);
 
 signals:
@@ -711,11 +714,19 @@ struct DirectionLight {
 struct LightInit {
     using LT = std::variant<PointLight, SpotLight, DirectionLight>;
 
-    QString                  name;
-    LT                       type;
-    std::optional<QColor>    color;
-    std::optional<float>     intensity;
-    std::optional<glm::vec4> spatial;
+    QString name;
+    LT      type;
+    QColor  color     = Qt::white;
+    float   intensity = 1;
+
+    LightInit(QCborMap);
+};
+
+struct LightUpdate {
+    std::optional<QColor> color;
+    std::optional<float>  intensity;
+
+    LightUpdate(QCborMap);
 };
 
 /// The base light class for buffers. Users can inherit from this to add
@@ -734,8 +745,8 @@ public:
 
     noo::LightID id() const;
 
-    void         update(LightInit const&);
-    virtual void on_update(LightInit const&);
+    void         update(LightUpdate const&);
+    virtual void on_update(LightUpdate const&);
 
 signals:
     void updated();
@@ -786,10 +797,13 @@ struct Attribute {
     uint64_t stride = 0;
     Format   format;
 
-    glm::vec4 minimum_value;
-    glm::vec4 maximum_value;
+    std::optional<glm::vec4> minimum_value;
+    std::optional<glm::vec4> maximum_value;
 
     bool normalized = false;
+
+    Attribute() = default;
+    Attribute(QCborMap, InternalClientState&);
 };
 
 struct Index {
@@ -797,6 +811,9 @@ struct Index {
 
     uint64_t stride = 0;
     Format   format;
+
+    Index() = default;
+    Index(QCborMap, InternalClientState&);
 };
 
 struct MeshPatch {
@@ -807,11 +824,16 @@ struct MeshPatch {
     PrimitiveType type;
 
     QPointer<MaterialDelegate> material;
+
+    MeshPatch() = default;
+    MeshPatch(QCborMap, InternalClientState&);
 };
 
 struct MeshInit {
-    QString                               name;
-    std::optional<std::vector<MeshPatch>> patches;
+    QString                name;
+    std::vector<MeshPatch> patches;
+
+    MeshInit(QCborMap, InternalClientState&);
 };
 
 class MeshDelegate : public QObject {
@@ -833,22 +855,35 @@ public:
 // =============================================================================
 
 struct EntityTextDefinition {
-    std::string text;
-    std::string font;
-    float       height = .25;
-    float       width  = -1;
+    QString text;
+    QString font   = "Arial";
+    float   height = .25;
+    float   width  = -1;
+
+    EntityTextDefinition(QCborMap, InternalClientState&);
 };
 
 struct EntityWebpageDefinition {
     QUrl  url;
     float height = .5;
     float width  = .5;
+
+    EntityWebpageDefinition(QCborMap, InternalClientState&);
+};
+
+struct InstanceSource {
+    QPointer<BufferViewDelegate>    view;
+    uint64_t                        stride = 0;
+    std::optional<noo::BoundingBox> instance_bb;
+
+    InstanceSource(QCborMap, InternalClientState&);
 };
 
 struct EntityRenderableDefinition {
-    QPointer<MeshDelegate>          mesh;
-    std::span<glm::mat4 const>      instances;
-    std::optional<noo::BoundingBox> instance_bb;
+    QPointer<MeshDelegate>        mesh;
+    std::optional<InstanceSource> instances;
+
+    EntityRenderableDefinition(QCborMap, InternalClientState&);
 };
 
 struct EntityDefinition : std::variant<std::monostate,
@@ -914,10 +949,17 @@ signals:
 
 // =============================================================================
 
-struct TableData {
-    std::optional<QString>                      name;
-    std::optional<std::vector<MethodDelegate*>> method_list;
-    std::optional<std::vector<SignalDelegate*>> signal_list;
+struct TableInit {
+    QString name;
+
+    TableInit(QCborMap);
+};
+
+struct TableUpdate {
+    std::optional<std::vector<MethodDelegate*>> methods_list;
+    std::optional<std::vector<SignalDelegate*>> signals_list;
+
+    TableUpdate(QCborMap, InternalClientState&);
 };
 
 /// The base delegate class for tables. Users can inherit from this to add
@@ -925,23 +967,26 @@ struct TableData {
 /// server. Table delegates can also be updated.
 class TableDelegate : public QObject {
     Q_OBJECT
-    noo::TableID       m_id;
+    noo::TableID m_id;
+
+    TableInit m_init;
+
     AttachedMethodList m_attached_methods;
     AttachedSignalList m_attached_signals;
 
     std::vector<QMetaObject::Connection> m_spec_signals;
 
 public:
-    TableDelegate(noo::TableID, TableData const&);
+    TableDelegate(noo::TableID, TableInit const&);
     virtual ~TableDelegate();
 
     NOODLES_CAN_UPDATE(true)
 
     noo::TableID id() const;
 
-    void update(TableData const&);
+    void update(TableUpdate const&);
 
-    virtual void on_update(TableData const&);
+    virtual void on_update(TableUpdate const&);
 
     virtual void prepare_delete();
 
@@ -957,8 +1002,7 @@ public slots:
     virtual void on_table_reset();
     virtual void on_table_updated(QCborValue keys, QCborValue columns);
     virtual void on_table_rows_removed(QCborValue keys);
-    virtual void on_table_selection_updated(std::string_view,
-                                            noo::SelectionRef const&);
+    virtual void on_table_selection_updated(QString, noo::Selection const&);
 
 public:
     PendingMethodReply* subscribe() const;
@@ -972,8 +1016,7 @@ public:
     PendingMethodReply* request_deletion(std::span<int64_t> keys) const;
 
     PendingMethodReply* request_clear() const;
-    PendingMethodReply* request_selection_update(std::string_view,
-                                                 noo::Selection) const;
+    PendingMethodReply* request_selection_update(QString, noo::Selection) const;
 
 private slots:
     void interp_table_reset(QCborArray const&);
@@ -988,48 +1031,47 @@ signals:
 
 // =============================================================================
 
-struct PlotSimpleDelegate {
-    QString definition;
+using PlotType = std::variant<QString, QUrl>;
+
+struct PlotInit {
+    QString name;
+
+    PlotInit(QCborMap);
 };
 
-struct PlotURLDelegate {
-    QUrl url;
-};
-
-using PlotType = std::variant<PlotSimpleDelegate, PlotURLDelegate>;
-
-struct PlotData {
-    std::optional<noo::PlotID> id;
-
+struct PlotUpdate {
     std::optional<QPointer<TableDelegate>> table;
     std::optional<PlotType>                type;
 
-    std::optional<std::vector<MethodDelegate*>> method_list;
-    std::optional<std::vector<SignalDelegate*>> signal_list;
+    std::optional<std::vector<MethodDelegate*>> methods_list;
+    std::optional<std::vector<SignalDelegate*>> signals_list;
+
+    PlotUpdate(QCborMap, InternalClientState&);
 };
 
 class PlotDelegate : public QObject {
     Q_OBJECT
     noo::PlotID m_id;
 
-    PlotType m_type;
+    QString m_name;
 
     QPointer<TableDelegate> m_table;
+    PlotType                m_type;
 
     AttachedMethodList m_attached_methods;
     AttachedSignalList m_attached_signals;
 
 public:
-    PlotDelegate(noo::PlotID, PlotData const&);
+    PlotDelegate(noo::PlotID, PlotInit const&);
     virtual ~PlotDelegate();
 
     NOODLES_CAN_UPDATE(true)
 
     noo::PlotID id() const;
 
-    void update(PlotData const&);
+    void update(PlotUpdate const&);
 
-    virtual void on_update(PlotData const&);
+    virtual void on_update(PlotUpdate const&);
 
     virtual void prepare_delete();
 
@@ -1044,8 +1086,10 @@ signals:
 // =============================================================================
 
 struct DocumentData {
-    std::vector<MethodDelegate*> method_list;
-    std::vector<SignalDelegate*> signal_list;
+    std::optional<std::vector<MethodDelegate*>> methods_list;
+    std::optional<std::vector<SignalDelegate*>> signals_list;
+
+    DocumentData(QCborMap, InternalClientState&);
 };
 
 
@@ -1090,16 +1134,18 @@ struct ClientDelegates {
     template <class T, class ID, class Init>
     using DispatchFn = std::function<std::unique_ptr<T>(ID, Init const&)>;
 
-    DispatchFn<TextureDelegate, noo::TextureID, TextureInit>    tex_maker;
-    DispatchFn<BufferDelegate, noo::BufferID, BufferInit>       buffer_maker;
-    DispatchFn<TableDelegate, noo::TableID, TableData>          table_maker;
-    DispatchFn<LightDelegate, noo::LightID, LightInit>          light_maker;
+    DispatchFn<TextureDelegate, noo::TextureID, TextureInit> tex_maker;
+    DispatchFn<BufferDelegate, noo::BufferID, BufferInit>    buffer_maker;
+    DispatchFn<BufferViewDelegate, noo::BufferViewID, BufferViewInit>
+                                                       buffer_view_maker;
+    DispatchFn<TableDelegate, noo::TableID, TableInit> table_maker;
+    DispatchFn<LightDelegate, noo::LightID, LightInit> light_maker;
     DispatchFn<MaterialDelegate, noo::MaterialID, MaterialInit> mat_maker;
     DispatchFn<MeshDelegate, noo::GeometryID, MeshInit>         mesh_maker;
     DispatchFn<EntityDelegate, noo::EntityID, EntityUpdateData> object_maker;
     DispatchFn<SignalDelegate, noo::SignalID, SignalInit>       sig_maker;
     DispatchFn<MethodDelegate, noo::MethodID, MethodInit>       method_maker;
-    DispatchFn<PlotDelegate, noo::PlotID, PlotData>             plot_maker;
+    DispatchFn<PlotDelegate, noo::PlotID, PlotInit>             plot_maker;
     DispatchFn<ImageDelegate, noo::ImageID, ImageInit>          image_maker;
     DispatchFn<SamplerDelegate, noo::SamplerID, SamplerInit>    sampler_maker;
 
