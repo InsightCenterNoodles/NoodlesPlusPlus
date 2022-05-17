@@ -1,12 +1,15 @@
 #include "meshlist.h"
 
 #include "bufferlist.h"
+#include "materiallist.h"
 #include "noodlesserver.h"
-#include "serialize.h"
+#include "src/common/serialize.h"
 #include "src/generated/interface_tools.h"
-#include "src/generated/noodles_generated.h"
+
+#include <magic_enum.hpp>
 
 #include <QDebug>
+
 namespace noo {
 
 MeshList::MeshList(ServerT* s) : ComponentListBase(s) { }
@@ -17,67 +20,54 @@ MeshList::~MeshList() = default;
 MeshT::MeshT(IDType id, MeshList* host, MeshData const& d)
     : ComponentMixin(id, host), m_data(d) { }
 
-static flatbuffers::Offset<noodles::ComponentRef>
-setup_comp_ref(ComponentRef const& r, Writer& w) {
-    auto bid = convert_id(r.buffer, w);
+void MeshT::write_new_to(SMsgWriter& w) {
 
-    // qDebug() << Q_FUNC_INFO << bid.id_slot() << r.start << r.size <<
-    // r.stride;
-
-    return noodles::CreateComponentRef(w, bid, r.start, r.size, r.stride);
-}
-
-static flatbuffers::Offset<noodles::ComponentRef>
-conditional_comp_ref(std::optional<ComponentRef> const& r, Writer& w) {
-    if (r) return setup_comp_ref(*r, w);
-    return 0;
-}
-
-void MeshT::write_new_to(Writer& w) {
-
-    auto lid = convert_id(id(), w);
-
-    auto name_h = w->CreateString(m_data.name);
-
-    std::vector<flatbuffers::Offset<noodles::GeometryPatch>> fbb_patches;
+    messages::MsgGeometryCreate m;
+    m.id   = id();
+    m.name = m_data.name;
 
     for (auto const& patch : m_data.patches) {
-        std::vector<flatbuffers::Offset<noodles::Attribute>> fbb_attrib;
+
+        messages::GeometryPatch geom_patch;
+
+        if (patch.material) geom_patch.material = patch.material->id();
+
+        auto ind   = geom_patch.indicies.emplace();
+        ind.view   = patch.indicies.view->id();
+        ind.format = QString::fromLocal8Bit(
+            magic_enum::enum_name(patch.indicies.format));
+        ind.stride = patch.indicies.stride;
 
         for (auto const& attrib : patch.attributes) {
 
-            auto const& view = attrib.view;
-            view.get()->
+            messages::Attribute new_attrib;
 
-                auto fbb_attrib = noodles::CreateAttribute(w,
+            new_attrib.view = attrib.view->id();
+            new_attrib.semantic =
+                QString::fromLocal8Bit(magic_enum::enum_name(attrib.semantic));
 
-            )
+            if (attrib.channel) new_attrib.channel = attrib.channel;
+            if (attrib.stride) new_attrib.stride = attrib.stride;
+
+            new_attrib.format =
+                QString::fromLocal8Bit(magic_enum::enum_name(attrib.format));
+
+            if (attrib.maximum_value.size()) {
+                new_attrib.maximum_value = attrib.maximum_value;
+            }
+            if (attrib.minimum_value.size()) {
+                new_attrib.minimum_value = attrib.minimum_value;
+            }
+
+            new_attrib.normalized = attrib.normalized;
         }
     }
 
-    auto bb = convert(m_data.bounding_box);
-
-    auto x = noodles::CreateGeometryCreate(
-        w,
-        lid,
-        &bb,
-        conditional_comp_ref(m_data.positions, w),
-        conditional_comp_ref(m_data.normals, w),
-        conditional_comp_ref(m_data.textures, w),
-        conditional_comp_ref(m_data.colors, w),
-        conditional_comp_ref(m_data.lines, w),
-        conditional_comp_ref(m_data.triangles, w));
-
-
-    w.complete_message(x);
+    w.add(m);
 }
 
-void MeshT::write_delete_to(Writer& w) {
-    auto lid = convert_id(id(), w);
-
-    auto x = noodles::CreateGeometryDelete(w, lid);
-
-    w.complete_message(x);
+void MeshT::write_delete_to(SMsgWriter& w) {
+    w.add(messages::MsgGeometryCreate { .id = id() });
 }
 
 } // namespace noo

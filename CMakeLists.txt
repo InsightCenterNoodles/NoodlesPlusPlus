@@ -37,6 +37,12 @@ CPMAddPackage(
     VERSION 0.9.9.8
 )
 
+CPMAddPackage(
+    NAME magic_enum
+    GITHUB_REPOSITORY Neargye/magic_enum
+    GIT_TAG v0.8.0
+)
+
 find_package(Qt6 COMPONENTS Gui Widgets Core Websockets)
 
 if (NOT Qt6_FOUND)
@@ -68,7 +74,7 @@ target_include_directories(noodles PUBLIC
 )
 
 # Because packagers like having fun
-target_link_libraries(noodles PRIVATE glm)
+target_link_libraries(noodles PRIVATE glm magic_enum)
 target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
 
 add_subdirectory(src)
@@ -79,10 +85,6 @@ target_sources(noodles
 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_interface_types.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_interface_types.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_any.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_any.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_anyref.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_anyref.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_client_interface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_client_interface.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_common.cpp

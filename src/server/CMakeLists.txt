@@ -17,12 +17,12 @@ PRIVATE
     objectlist.cpp
     objectlist.h
     search_helpers.h
-    serialize.cpp
-    serialize.h
     tablelist.cpp
     tablelist.h
     texturelist.cpp
     texturelist.h
     plotlist.cpp
     plotlist.h
+    assetstorage.cpp
+    assetstorage.h
 )

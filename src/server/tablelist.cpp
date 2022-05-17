@@ -2,7 +2,7 @@
 
 #include "noodlesserver.h"
 #include "noodlesstate.h"
-#include "serialize.h"
+#include "src/common/serialize.h"
 #include "src/generated/interface_tools.h"
 
 namespace noo {
@@ -64,32 +64,24 @@ AttachedSignalList& TableT::att_signal_list() {
     return m_signal_list;
 }
 
-void TableT::write_new_to(Writer& w) {
-    auto lid = convert_id(id(), w);
+void TableT::write_new_to(SMsgWriter& w) {
 
-    auto update_methods_list =
-        make_id_list(m_method_list.begin(), m_method_list.end(), w);
+    messages::MsgTableCreate m;
+    m.id   = id();
+    m.name = opt_string(m_data.name);
+    m.meta = opt_string(m_data.meta);
 
-    auto update_signals_list =
-        make_id_list(m_signal_list.begin(), m_signal_list.end(), w);
+    m.methods_list =
+        delegates_to_ids(m_method_list.begin(), m_method_list.end());
 
+    m.signals_list =
+        delegates_to_ids(m_signal_list.begin(), m_signal_list.end());
 
-    auto x = noodles::CreateTableCreateUpdateDirect(w,
-                                                    lid,
-                                                    m_data.name.c_str(),
-                                                    m_data.meta.c_str(),
-                                                    &update_methods_list,
-                                                    &update_signals_list);
-
-    w.complete_message(x);
+    w.add(m);
 }
 
-void TableT::write_delete_to(Writer& w) {
-    auto lid = convert_id(id(), w);
-
-    auto x = noodles::CreateTableDelete(w, lid);
-
-    w.complete_message(x);
+void TableT::write_delete_to(SMsgWriter& w) {
+    w.add(messages::MsgTableDelete { .id = id() });
 }
 
 TableSource* TableT::get_source() const {
@@ -106,19 +98,20 @@ static void send_table_signal(TableT& n, BuiltinSignals bs, Args&&... args) {
 
     if (!sig) return;
 
-    auto to_send = marshall_to_any(std::forward<Args>(args)...);
+    auto to_send = convert_to_cbor_array(std::forward<Args>(args)...);
 
     sig->fire(n.id(), std::move(to_send));
 }
 
 
-void TableT::on_table_selection_updated(std::string         name,
-                                        SelectionRef const& ref) {
+void TableT::on_table_selection_updated(QString name, Selection const& ref) {
     //    qDebug() << "Table emit" << Q_FUNC_INFO
     //             << QString::fromStdString(ref.to_any().dump_string());
 
-    send_table_signal(
-        *this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, name, ref.to_any());
+    send_table_signal(*this,
+                      BuiltinSignals::TABLE_SIG_SELECTION_CHANGED,
+                      name,
+                      ref.to_cbor());
 }
 
 void TableT::on_table_row_deleted(TableQueryPtr q) {
@@ -128,7 +121,7 @@ void TableT::on_table_row_deleted(TableQueryPtr q) {
 
     q->get_keys_to(keys);
 
-    AnyVar v = std::move(keys);
+    auto v = to_cbor(keys);
 
     //    qDebug() << "Table emit" << Q_FUNC_INFO
     //             << QString::fromStdString(v.dump_string());
@@ -137,8 +130,8 @@ void TableT::on_table_row_deleted(TableQueryPtr q) {
 }
 
 void TableT::on_table_row_updated(TableQueryPtr q) {
-    AnyVar kv;
-    AnyVar cols;
+    QCborValue kv;
+    QCborValue cols;
 
     {
         std::vector<int64_t> keys;
@@ -146,25 +139,26 @@ void TableT::on_table_row_updated(TableQueryPtr q) {
 
         q->get_keys_to(keys);
 
-        kv = std::move(keys);
+        kv = to_cbor(keys);
     }
 
     {
-        AnyVarList l;
-        l.reserve(q->num_cols);
+        QCborArray l;
+        // l.reserve(q->num_cols);
 
         for (size_t i = 0; i < q->num_cols; i++) {
-            AnyVar this_c;
+            QCborValue this_c;
 
             if (q->is_column_string(i)) {
-                AnyVarList avl(q->num_rows);
+                QCborArray avl;
+                // avl.(q->num_rows);
 
-                for (size_t row_i = 0; row_i < avl.size(); row_i++) {
-                    std::string_view value_view;
+                for (int row_i = 0; row_i < avl.size(); row_i++) {
+                    QString value_view;
 
                     q->get_cell_to(i, row_i, value_view);
 
-                    avl[i] = std::string(value_view);
+                    avl << QString(value_view);
                 }
 
                 this_c = std::move(avl);
@@ -174,10 +168,10 @@ void TableT::on_table_row_updated(TableQueryPtr q) {
 
                 q->get_reals_to(i, d);
 
-                this_c = std::move(d);
+                this_c = to_cbor(d);
             }
 
-            l.emplace_back(std::move(this_c));
+            l << std::move(this_c);
         }
 
         cols = std::move(l);

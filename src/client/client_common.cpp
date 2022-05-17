@@ -1,7 +1,5 @@
 #include "client_common.h"
 
-#include "include/noo_anyref.h"
-
 #include <QDebug>
 
 namespace nooc {

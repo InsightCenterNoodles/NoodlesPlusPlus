@@ -1,7 +1,7 @@
 #include "noodlesstate.h"
 
 #include "noodlesserver.h"
-#include "serialize.h"
+#include "src/common/serialize.h"
 
 #include <QDebug>
 
@@ -12,12 +12,16 @@ DocumentT::DocumentT(ServerT* s)
       m_method_list(s),
       m_signal_list(s),
       m_buffer_list(s),
+      m_buffer_view_list(s),
+      m_image_list(s),
       m_light_list(s),
       m_mat_list(s),
       m_mesh_list(s),
       m_obj_list(s),
+      m_sampler_list(s),
       m_tex_list(s),
-      m_table_list(s) { }
+      m_table_list(s),
+      m_plot_list(s) { }
 
 BufferList& DocumentT::buffer_list() {
     return m_buffer_list;
@@ -44,8 +48,20 @@ ObjectList& DocumentT::obj_list() {
 TextureList& DocumentT::tex_list() {
     return m_tex_list;
 }
+PlotList& DocumentT::plot_list() {
+    return m_plot_list;
+}
 TableList& DocumentT::table_list() {
     return m_table_list;
+}
+BufferViewList& DocumentT::buffer_view_list() {
+    return m_buffer_view_list;
+}
+SamplerList& DocumentT::sampler_list() {
+    return m_sampler_list;
+}
+ImageList& DocumentT::image_list() {
+    return m_image_list;
 }
 
 
@@ -56,20 +72,22 @@ AttachedSignalList& DocumentT::att_signal_list() {
     return m_att_signal_list_search;
 }
 
-void DocumentT::update(DocumentData const& d, Writer& w) {
-    m_doc_method_list = d.method_list;
-    m_doc_signal_list = d.signal_list;
+void DocumentT::update(DocumentData const& d, SMsgWriter& w) {
 
-    m_att_method_list_search = m_doc_method_list;
-    m_att_signal_list_search = m_doc_signal_list;
+    messages::MsgDocumentUpdate m;
 
+    if (d.method_list) {
+        m_doc_method_list        = d.method_list.value();
+        m_att_method_list_search = m_doc_method_list;
+        m.methods_list           = delegates_to_ids(m_doc_method_list);
+    }
+    if (d.signal_list) {
+        m_doc_signal_list        = d.signal_list.value();
+        m_att_signal_list_search = m_doc_signal_list;
+        m.signals_list           = delegates_to_ids(m_doc_signal_list);
+    }
 
-    auto mv = make_id_list(m_doc_method_list, w);
-    auto sv = make_id_list(m_doc_signal_list, w);
-
-    auto x = noodles::CreateDocumentUpdateDirect(w, &mv, &sv);
-
-    w.complete_message(x);
+    w.add(m);
 }
 
 void DocumentT::update(DocumentData const& d) {
@@ -78,13 +96,13 @@ void DocumentT::update(DocumentData const& d) {
     update(d, *w);
 }
 
-void DocumentT::write_refresh(Writer& w) {
-    auto mv = make_id_list(m_doc_method_list, w);
-    auto sv = make_id_list(m_doc_signal_list, w);
+void DocumentT::write_refresh(SMsgWriter& w) {
 
-    auto x = noodles::CreateDocumentUpdateDirect(w, &mv, &sv);
+    messages::MsgDocumentUpdate m;
+    m.methods_list = delegates_to_ids(m_doc_method_list);
+    m.signals_list = delegates_to_ids(m_doc_signal_list);
 
-    w.complete_message(x);
+    w.add(m);
 }
 
 
@@ -109,8 +127,8 @@ static TableTPtr get_table(MethodContext const& context) {
 }
 
 
-static AnyVar table_subscribe(MethodContext const& context,
-                              AnyVarListRef const& /*args*/) {
+static QCborValue table_subscribe(MethodContext const& context,
+                                  QCborArray const& /*args*/) {
 
     // qDebug() << Q_FUNC_INFO;
 
@@ -125,9 +143,10 @@ static AnyVar table_subscribe(MethodContext const& context,
     auto& source = *tbl->get_source();
 
 
-    AnyVarMap return_obj;
+    QCborMap return_obj;
 
-    return_obj["columns"] = source.get_headers();
+    return_obj[QStringLiteral("columns")] =
+        QCborArray::fromStringList(source.get_headers());
 
     auto q = source.get_all_data();
 
@@ -136,57 +155,59 @@ static AnyVar table_subscribe(MethodContext const& context,
 
         q->get_keys_to(keys);
 
-        return_obj["keys"] = std::move(keys);
+        return_obj[QStringLiteral("keys")] = to_cbor(keys);
     }
 
     {
-        AnyVarList lv(q->num_cols);
+        QCborArray lv; //(q->num_cols);
 
-        for (size_t ci = 0; ci < lv.size(); ci++) {
+        for (int ci = 0; ci < lv.size(); ci++) {
             if (q->is_column_string(ci)) {
-                AnyVarList data(q->num_rows);
+                QCborArray data;
+                //(q->num_rows);
 
-                for (size_t ri = 0; ri < data.size(); ri++) {
-                    std::string_view view;
+                for (int ri = 0; ri < data.size(); ri++) {
+                    QString view;
                     q->get_cell_to(ci, ri, view);
-                    data[ri] = std::string(view);
+                    data << QString(view);
                 }
 
-                lv[ci] = std::move(data);
+                lv << std::move(data);
 
             } else {
                 std::vector<double> data(q->num_rows);
 
                 q->get_reals_to(ci, data);
 
-                lv[ci] = std::move(data);
+                lv << to_cbor(data);
             }
         }
 
-        return_obj["data"] = std::move(lv);
+        return_obj[QStringLiteral("data")] = std::move(lv);
     }
 
     {
         auto const& selections = source.get_all_selections();
 
-        AnyVarList lv;
+        QCborArray lv;
 
-        for (auto const& [k, v] : selections) {
-            AnyVarList entry;
-            entry.push_back(k);
-            entry.emplace_back(v.to_any());
+        for (auto iter = selections.begin(); iter != selections.end(); ++iter) {
+            QCborArray entry;
+            entry << iter.key();
+            entry << to_cbor(iter.value());
 
             lv.push_back(std::move(entry));
         }
 
-        return_obj["selections"] = std::move(lv);
+        return_obj[QStringLiteral("selections")] = std::move(lv);
     }
 
 
     return return_obj;
 }
 
-static AnyVar table_data_insert(MethodContext const& context, AnyListArg ref) {
+static QCborValue table_data_insert(MethodContext const& context,
+                                    AnyListArg           ref) {
     auto tbl = get_table(context);
 
     bool ok = tbl->get_source()->ask_insert(ref.list);
@@ -200,9 +221,9 @@ static AnyVar table_data_insert(MethodContext const& context, AnyListArg ref) {
 }
 
 
-static AnyVar table_data_update(MethodContext const& context,
-                                AnyVarRef            keys,
-                                AnyListArg           cols) {
+static QCborValue table_data_update(MethodContext const& context,
+                                    QCborValue           keys,
+                                    AnyListArg           cols) {
     auto tbl = get_table(context);
 
     bool ok = tbl->get_source()->ask_update(keys, cols.list);
@@ -215,7 +236,8 @@ static AnyVar table_data_update(MethodContext const& context,
     return {};
 }
 
-static AnyVar table_data_remove(MethodContext const& context, AnyVarRef keys) {
+static QCborValue table_data_remove(MethodContext const& context,
+                                    QCborValue           keys) {
     auto tbl = get_table(context);
 
     bool ok = tbl->get_source()->ask_delete(keys);
@@ -228,7 +250,7 @@ static AnyVar table_data_remove(MethodContext const& context, AnyVarRef keys) {
     return {};
 }
 
-static AnyVar table_data_clear(MethodContext const& context) {
+static QCborValue table_data_clear(MethodContext const& context) {
     auto tbl = get_table(context);
 
     bool ok = tbl->get_source()->ask_clear();
@@ -241,9 +263,9 @@ static AnyVar table_data_clear(MethodContext const& context) {
     return {};
 }
 
-static AnyVar table_update_selection(MethodContext const& context,
-                                     std::string_view     selection_id,
-                                     SelectionRef         selection_ref) {
+static QCborValue table_update_selection(MethodContext const& context,
+                                         QString              selection_id,
+                                         Selection            selection_ref) {
     // qDebug() << Q_FUNC_INFO;
 
     auto tbl = get_table(context);
@@ -271,7 +293,7 @@ static ObjectTPtr get_object(MethodContext const& context) {
     return ctlb;
 }
 
-static ObjectCallbacks* get_callbacks(ObjectTPtr const& p) {
+static EntityCallbacks* get_callbacks(ObjectTPtr const& p) {
     auto* cb = p->callbacks();
     if (!cb) {
         throw MethodException(
@@ -282,22 +304,21 @@ static ObjectCallbacks* get_callbacks(ObjectTPtr const& p) {
     return cb;
 }
 
-struct StringOrIntArgument
-    : std::variant<std::monostate, int64_t, std::string> {
+struct StringOrIntArgument : std::variant<std::monostate, int64_t, QString> {
 
     StringOrIntArgument() = default;
 
-    StringOrIntArgument(AnyVarRef const& a) {
-        if (a.has_int()) {
-            emplace<int64_t>(a.to_int());
-        } else if (a.has_string()) {
-            emplace<std::string>(a.to_string());
+    StringOrIntArgument(QCborValue const& a) {
+        if (a.isInteger()) {
+            emplace<int64_t>(a.toInteger());
+        } else if (a.isString()) {
+            emplace<QString>(a.toString());
         }
     }
 };
 
-static AnyVar object_activate(MethodContext const& context,
-                              StringOrIntArgument  arg) {
+static QCborValue object_activate(MethodContext const& context,
+                                  StringOrIntArgument  arg) {
 
     auto obj = get_object(context);
 
@@ -308,8 +329,8 @@ static AnyVar object_activate(MethodContext const& context,
         return {};
     }
 
-    if (std::holds_alternative<std::string>(arg)) {
-        cb->on_activate_str(std::get<std::string>(arg));
+    if (std::holds_alternative<QString>(arg)) {
+        cb->on_activate_str(std::get<QString>(arg));
         return {};
     }
 
@@ -317,46 +338,47 @@ static AnyVar object_activate(MethodContext const& context,
                           "Argument must be int or string!");
 }
 
-static AnyVar object_get_activate_choices(MethodContext const& context) {
+static QCborValue object_get_activate_choices(MethodContext const& context) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    return cb->get_activation_choices();
+    return QCborArray::fromStringList(cb->get_activation_choices());
 }
 
-static AnyVar object_get_option_choices(MethodContext const& context) {
+static QCborValue object_get_option_choices(MethodContext const& context) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    return cb->get_option_choices();
+    return QCborArray::fromStringList(cb->get_activation_choices());
 }
 
-static AnyVar object_get_current_option(MethodContext const& context) {
+static QCborValue object_get_current_option(MethodContext const& context) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    return cb->get_current_option();
+    return QCborArray::fromStringList(cb->get_activation_choices());
 }
 
-static AnyVar object_set_current_option(MethodContext const& context,
-                                        std::string_view     arg) {
+static QCborValue object_set_current_option(MethodContext const& context,
+                                            QString              arg) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    cb->set_current_option(std::string(arg));
+    cb->set_current_option(arg);
 
     return {};
 }
 
-static AnyVar object_set_position(MethodContext const& context, Vec3Arg arg) {
+static QCborValue object_set_position(MethodContext const& context,
+                                      Vec3Arg              arg) {
 
     auto obj = get_object(context);
 
@@ -371,7 +393,8 @@ static AnyVar object_set_position(MethodContext const& context, Vec3Arg arg) {
     return {};
 }
 
-static AnyVar object_set_rotation(MethodContext const& context, Vec4Arg v4arg) {
+static QCborValue object_set_rotation(MethodContext const& context,
+                                      Vec4Arg              v4arg) {
 
     auto obj = get_object(context);
 
@@ -388,7 +411,7 @@ static AnyVar object_set_rotation(MethodContext const& context, Vec4Arg v4arg) {
     return {};
 }
 
-static AnyVar object_set_scale(MethodContext const& context, Vec3Arg arg) {
+static QCborValue object_set_scale(MethodContext const& context, Vec3Arg arg) {
 
     auto obj = get_object(context);
 
@@ -403,14 +426,14 @@ static AnyVar object_set_scale(MethodContext const& context, Vec3Arg arg) {
     return {};
 }
 
-static ObjectCallbacks::SelAction decode_selection_action(int64_t i) {
-    return ObjectCallbacks::SelAction(std::clamp<int64_t>(i, -1, 1));
+static EntityCallbacks::SelAction decode_selection_action(int64_t i) {
+    return EntityCallbacks::SelAction(std::clamp<int64_t>(i, -1, 1));
 }
 
-static AnyVar object_select_region(MethodContext const& context,
-                                   Vec3Arg              min,
-                                   Vec3Arg              max,
-                                   IntArg               select) {
+static QCborValue object_select_region(MethodContext const& context,
+                                       Vec3Arg              min,
+                                       Vec3Arg              max,
+                                       IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -425,10 +448,10 @@ static AnyVar object_select_region(MethodContext const& context,
     return {};
 }
 
-static AnyVar object_select_sphere(MethodContext const& context,
-                                   Vec3Arg              p,
-                                   double               radius,
-                                   IntArg               select) {
+static QCborValue object_select_sphere(MethodContext const& context,
+                                       Vec3Arg              p,
+                                       double               radius,
+                                       IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -443,10 +466,10 @@ static AnyVar object_select_sphere(MethodContext const& context,
     return {};
 }
 
-static AnyVar object_select_plane(MethodContext const& context,
-                                  Vec3Arg              p,
-                                  Vec3Arg              n,
-                                  IntArg               select) {
+static QCborValue object_select_plane(MethodContext const& context,
+                                      Vec3Arg              p,
+                                      Vec3Arg              n,
+                                      IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -461,10 +484,10 @@ static AnyVar object_select_plane(MethodContext const& context,
     return {};
 }
 
-static AnyVar object_select_hull(MethodContext const& context,
-                                 Vec3ListArg          point_list,
-                                 IntListArg           index_list,
-                                 IntArg               select) {
+static QCborValue object_select_hull(MethodContext const& context,
+                                     Vec3ListArg          point_list,
+                                     IntListArg           index_list,
+                                     IntArg               select) {
 
     auto obj = get_object(context);
 
@@ -479,13 +502,14 @@ static AnyVar object_select_hull(MethodContext const& context,
         throw MethodException(ErrorCodes::INVALID_PARAMS, "Indicies should be");
     }
 
-    cb->select_hull(
-        point_list, index_list.list.span(), decode_selection_action(*select));
+    cb->select_hull(point_list,
+                    std::span(index_list.list),
+                    decode_selection_action(*select));
 
     return {};
 }
 
-static AnyVar object_probe_at(MethodContext const& context, Vec3Arg p) {
+static QCborValue object_probe_at(MethodContext const& context, Vec3Arg p) {
 
     auto obj = get_object(context);
 
@@ -495,7 +519,13 @@ static AnyVar object_probe_at(MethodContext const& context, Vec3Arg p) {
         throw MethodException(ErrorCodes::INVALID_PARAMS,
                               "Need a vec3 position!");
 
-    return cb->probe_at(*p);
+    auto p_result = cb->probe_at(*p);
+
+    QCborArray ret;
+    ret << p_result.first;
+    ret << to_cbor(p_result.second);
+
+    return ret;
 }
 
 void DocumentT::build_table_methods() {
@@ -504,8 +534,8 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name          = noo::names::mthd_tbl_subscribe;
-        d.documentation        = "Subscribe to this table's signals"sv;
-        d.return_documentation = "A table initialization object."sv;
+        d.documentation        = "Subscribe to this table's signals";
+        d.return_documentation = "A table initialization object.";
         d.code                 = table_subscribe;
 
         m_builtin_methods[BuiltinMethods::TABLE_SUBSCRIBE] =
@@ -514,14 +544,14 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name = noo::names::mthd_tbl_insert;
-        d.documentation =
-            "Request that given data be inserted into the table."sv;
+        d.method_name   = noo::names::mthd_tbl_insert;
+        d.documentation = "Request that given data be inserted into the table.";
         d.argument_documentation = {
             { "[ col ]",
-              "A list of columns to insert. Columns must be the same length." },
+              "A list of columns to insert. Columns must be the same length.",
+              QString() },
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
         d.set_code(table_data_insert);
 
         m_builtin_methods[BuiltinMethods::TABLE_INSERT] =
@@ -532,12 +562,12 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name   = noo::names::mthd_tbl_update;
-        d.documentation = "Request that rows be updated with given data."sv;
+        d.documentation = "Request that rows be updated with given data.";
         d.argument_documentation = {
-            { "[keys]", "Integer list of keys to update" },
-            { "[cols]", "Data to use to update the table" },
+            { "[keys]", "Integer list of keys to update", QString() },
+            { "[cols]", "Data to use to update the table", QString() },
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
         d.set_code(table_data_update);
 
         m_builtin_methods[BuiltinMethods::TABLE_UPDATE] =
@@ -548,9 +578,11 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_tbl_remove;
-        d.documentation          = "Request that data be deleted"sv;
-        d.argument_documentation = { { "[keys]", "A list of keys to delete" } };
-        d.return_documentation   = "None"sv;
+        d.documentation          = "Request that data be deleted";
+        d.argument_documentation = {
+            { "[keys]", "A list of keys to delete", QString() }
+        };
+        d.return_documentation = "None";
         d.set_code(table_data_remove);
 
         m_builtin_methods[BuiltinMethods::TABLE_REMOVE] =
@@ -560,15 +592,12 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_tbl_update_selection;
-        d.documentation          = "Set the table selection."sv;
+        d.documentation          = "Set the table selection.";
         d.argument_documentation = {
-            {
-                "string",
-                "Name of the selection to update",
-            },
-            { "selection_data", "A SelectionObject" },
+            { "string", "Name of the selection to update", QString() },
+            { "selection_data", "A SelectionObject", QString() },
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
         d.set_code(table_update_selection);
 
         m_builtin_methods[BuiltinMethods::TABLE_UPDATE_SELECTION] =
@@ -578,8 +607,8 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name          = noo::names::mthd_tbl_clear;
-        d.documentation        = "Request to clear all data and selections"sv;
-        d.return_documentation = "None"sv;
+        d.documentation        = "Request to clear all data and selections";
+        d.return_documentation = "None";
         d.set_code(table_data_clear);
 
         m_builtin_methods[BuiltinMethods::TABLE_CLEAR] = create_method(this, d);
@@ -591,13 +620,14 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_activate;
-        d.documentation          = "Activate the object"sv;
+        d.documentation          = "Activate the object";
         d.argument_documentation = {
             { "int | string",
               "Either a string (for the activation name) or an integer for the "
-              "activation index." }
+              "activation index.",
+              QString() }
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
 
         d.set_code(object_activate);
 
@@ -608,8 +638,8 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name          = noo::names::mthd_get_activation_choices;
-        d.documentation        = "Get the names of activations on the object"sv;
-        d.return_documentation = "[string]"sv;
+        d.documentation        = "Get the names of activations on the object";
+        d.return_documentation = "[string]";
 
         d.set_code(object_get_activate_choices);
 
@@ -620,8 +650,8 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name          = noo::names::mthd_get_option_choices;
-        d.documentation        = "Get the names of options on the object"sv;
-        d.return_documentation = "[string]"sv;
+        d.documentation        = "Get the names of options on the object";
+        d.return_documentation = "[string]";
 
         d.set_code(object_get_option_choices);
 
@@ -632,8 +662,8 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name          = noo::names::mthd_get_current_option;
-        d.documentation        = "Get the current option name"sv;
-        d.return_documentation = "string"sv;
+        d.documentation        = "Get the current option name";
+        d.return_documentation = "string";
 
         d.set_code(object_get_current_option);
 
@@ -644,9 +674,11 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_set_current_option;
-        d.documentation          = "Set the current option on an object"sv;
-        d.argument_documentation = { { "string", "The option name to set." } };
-        d.return_documentation   = "None"sv;
+        d.documentation          = "Set the current option on an object";
+        d.argument_documentation = {
+            { "string", "The option name to set.", QString() }
+        };
+        d.return_documentation = "None";
 
         d.set_code(object_set_current_option);
 
@@ -657,11 +689,13 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_set_position;
-        d.documentation          = "Ask to set the object position."sv;
+        d.documentation          = "Ask to set the object position.";
         d.argument_documentation = {
-            { "vec3", "A list of 3 reals as an object local position" }
+            { "vec3",
+              "A list of 3 reals as an object local position",
+              QString() }
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
 
         d.set_code(object_set_position);
 
@@ -671,11 +705,12 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_set_rotation;
-        d.documentation          = "Ask to set the object rotation."sv;
+        d.documentation          = "Ask to set the object rotation.";
         d.argument_documentation = { { "vec4",
                                        "A list of 4 reals as an object local "
-                                       "rotation in quaternion form." } };
-        d.return_documentation   = "None"sv;
+                                       "rotation in quaternion form.",
+                                       QString() } };
+        d.return_documentation   = "None";
 
         d.set_code(object_set_rotation);
 
@@ -685,11 +720,11 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_set_scale;
-        d.documentation          = "Ask to set the object scale."sv;
+        d.documentation          = "Ask to set the object scale.";
         d.argument_documentation = {
-            { "vec3", "A list of 3 reals as an object local scale." }
+            { "vec3", "A list of 3 reals as an object local scale.", QString() }
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
 
         d.set_code(object_set_scale);
 
@@ -700,13 +735,13 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name            = noo::names::mthd_select_region;
-        d.documentation          = "Ask the object to select an AABB region."sv;
+        d.documentation          = "Ask the object to select an AABB region.";
         d.argument_documentation = {
-            { "vec3", "The minimum extent of the BB" },
-            { "vec3", "The maximum extent of the BB" },
-            { "bool", "Select (true) or deselect (false)" },
+            { "vec3", "The minimum extent of the BB", QString() },
+            { "vec3", "The maximum extent of the BB", QString() },
+            { "bool", "Select (true) or deselect (false)", QString() },
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
 
         d.set_code(object_select_region);
 
@@ -717,13 +752,13 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name   = noo::names::mthd_select_sphere;
-        d.documentation = "Ask the object to select a spherical region."sv;
+        d.documentation = "Ask the object to select a spherical region.";
         d.argument_documentation = {
-            { "vec3", "The position of the sphere center" },
-            { "real", "The radius of the sphere" },
-            { "bool", "Select (true) or deselect (false)" },
+            { "vec3", "The position of the sphere center", QString() },
+            { "real", "The radius of the sphere", QString() },
+            { "bool", "Select (true) or deselect (false)", QString() },
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
 
         d.set_code(object_select_sphere);
 
@@ -734,13 +769,13 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name   = noo::names::mthd_select_half_plane;
-        d.documentation = "Ask the object to select a half plane region"sv;
+        d.documentation = "Ask the object to select a half plane region";
         d.argument_documentation = {
-            { "vec3", "A position on the plane" },
-            { "vec3", "The normal of the plane" },
-            { "bool", "Select (true) or deselect (false)" },
+            { "vec3", "A position on the plane", QString() },
+            { "vec3", "The normal of the plane", QString() },
+            { "bool", "Select (true) or deselect (false)", QString() },
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
 
         d.set_code(object_select_plane);
 
@@ -751,13 +786,15 @@ void DocumentT::build_table_methods() {
     {
         MethodData d;
         d.method_name   = noo::names::mthd_select_hull;
-        d.documentation = "Ask the object to select a convex hull region"sv;
+        d.documentation = "Ask the object to select a convex hull region";
         d.argument_documentation = {
-            { "[ vec3 ]", "A list of points" },
-            { "[ int64 ]", "A list of indicies, each triple is a triangle" },
-            { "bool", "Select (true) or deselect (false)" },
+            { "[ vec3 ]", "A list of points", QString() },
+            { "[ int64 ]",
+              "A list of indicies, each triple is a triangle",
+              QString() },
+            { "bool", "Select (true) or deselect (false)", QString() },
         };
-        d.return_documentation = "None"sv;
+        d.return_documentation = "None";
 
         d.set_code(object_select_hull);
 
@@ -769,10 +806,12 @@ void DocumentT::build_table_methods() {
         MethodData d;
         d.method_name = noo::names::mthd_probe_at;
         d.documentation =
-            "Ask the object to probe a given point. Returns a list of a string to display, and a possibly edited (or snapped) point."sv;
-        d.argument_documentation = { { "vec3",
-                                       "A position to probe, object local" } };
-        d.return_documentation   = "[ string, vec3 ]"sv;
+            "Ask the object to probe a given point. Returns a list of a string "
+            "to display, and a possibly edited (or snapped) point.";
+        d.argument_documentation = {
+            { "vec3", "A position to probe, object local", QString() }
+        };
+        d.return_documentation = "[ string, vec3 ]";
 
         d.set_code(object_probe_at);
 
@@ -785,8 +824,8 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name   = "tbl_reset"sv;
-        d.documentation = "The table has been reset, and cleared."sv;
+        d.signal_name   = "tbl_reset";
+        d.documentation = "The table has been reset, and cleared.";
 
         m_builtin_signals[BuiltinSignals::TABLE_SIG_RESET] =
             create_signal(this, d);
@@ -794,8 +833,8 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name   = "tbl_updated"sv;
-        d.documentation = "Rows have been inserted or updated in the table"sv;
+        d.signal_name      = "tbl_updated";
+        d.documentation    = "Rows have been inserted or updated in the table";
         std::string args[] = {
             "[key]",
             "[col]",
@@ -807,8 +846,8 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name      = "tbl_rows_removed"sv;
-        d.documentation    = "Rows have been deleted from the table"sv;
+        d.signal_name      = "tbl_rows_removed";
+        d.documentation    = "Rows have been deleted from the table";
         std::string args[] = { "[key]" };
 
         m_builtin_signals[BuiltinSignals::TABLE_SIG_ROWS_DELETED] =
@@ -817,8 +856,8 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name      = "tbl_selection_updated"sv;
-        d.documentation    = "A selection of the table has changed"sv;
+        d.signal_name      = "tbl_selection_updated";
+        d.documentation    = "A selection of the table has changed";
         std::string args[] = {
             "Selection ID",
             "Selection Object",
@@ -830,9 +869,9 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name = "signal_attention"sv;
-        d.documentation =
-            "User attention is requested. The two arguments may be omitted from the signal."sv;
+        d.signal_name   = "signal_attention";
+        d.documentation = "User attention is requested. The two arguments may "
+                          "be omitted from the signal.";
         std::string args[] = {
             "position",
             "text",

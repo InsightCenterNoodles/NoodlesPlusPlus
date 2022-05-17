@@ -4,6 +4,7 @@
 #include "componentlistbase.h"
 #include "include/noo_id.h"
 #include "include/noo_server_interface.h"
+#include "search_helpers.h"
 
 namespace noo {
 
@@ -13,20 +14,22 @@ public:
     ~PlotList();
 };
 
-struct PlotTWriteSelect;
-
 class PlotT : public ComponentMixin<PlotT, PlotList, PlotID> {
     PlotData m_data;
 
-    void write_common(Writer&, PlotTWriteSelect const&);
+    AttachedMethodList m_method_search;
+    AttachedSignalList m_signal_search;
 
 public:
     PlotT(IDType, PlotList*, PlotData const&);
 
-    void write_new_to(Writer&);
-    void update(PlotUpdateData const&, Writer&);
+    AttachedMethodList& att_method_list();
+    AttachedSignalList& att_signal_list();
+
+    void write_new_to(SMsgWriter&);
+    void update(PlotUpdateData const&, SMsgWriter&);
     void update(PlotUpdateData const&);
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
 };
 
 } // namespace noo

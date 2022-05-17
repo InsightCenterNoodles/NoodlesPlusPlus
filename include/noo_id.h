@@ -71,6 +71,16 @@ struct ID {
     QCborValue to_cbor() const { return QCborArray({ id_slot, id_gen }); }
 };
 
+template <class Tag>
+bool operator<(ID<Tag> a, ID<Tag> b) {
+    union glue {
+        ID<Tag>  id;
+        uint64_t packed;
+    };
+
+    return glue { .id = a }.packed < glue { .id = b }.packed;
+}
+
 template <class T>
 static T id_from_message(QCborMap const& m) {
     return T(m[QStringLiteral("id")]);
@@ -164,11 +174,6 @@ struct TagToString<PlotIDTag> {
 struct InvokeID
     : public std::variant<std::monostate, EntityID, TableID, PlotID> {
     using variant::variant;
-
-    InvokeID() = default;
-    InvokeID(QCborMap);
-
-    QCborMap to_cbor() const;
 };
 
 ///

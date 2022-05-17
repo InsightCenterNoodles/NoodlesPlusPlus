@@ -20,8 +20,8 @@ class MeshT : public ComponentMixin<MeshT, MeshList, GeometryID> {
 public:
     MeshT(IDType, MeshList*, MeshData const&);
 
-    void write_new_to(Writer&);
-    void write_delete_to(Writer&);
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
 };
 
 } // namespace noo

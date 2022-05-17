@@ -57,7 +57,7 @@ T _any_call_getter(QCborArray const& source, size_t& loc) {
     loc++;
 
     T ret;
-    convert_from_cbor(at_i, ret);
+    from_cbor(at_i, ret);
     return ret;
 
     //    if constexpr (std::is_same_v<T, int64_t>) {
@@ -148,20 +148,20 @@ auto any_call_helper(Func&&               f,
 /// This should only be thrown inside code that handles method requests, and is
 /// used to communicate disappointment to calling clients.
 struct MethodException : public std::exception {
-    int         m_code;
-    std::string m_reason;
-    QCborValue  m_data;
+    int        m_code;
+    QString    m_reason;
+    QCborValue m_data;
 
 public:
-    MethodException(int code, std::string_view message, QCborValue data = {});
+    MethodException(int code, QString message, QCborValue data = {});
 
     int               code() const { return m_code; }
-    std::string_view  reason() const { return m_reason; }
+    auto              reason() const { return m_reason; }
     QCborValue const& data() const { return m_data; }
 
     char const* what() const noexcept override;
 
-    std::string to_string() const;
+    QString to_string() const;
 };
 
 // Methods =====================================================================
@@ -183,19 +183,18 @@ struct MethodContext
 };
 
 struct Arg {
-    std::string name;
-    std::string documentation;
-    std::string hint;
-    std::string editor_hint;
+    QString name;
+    QString documentation;
+    QString editor_hint;
 };
 
 ///
 /// \brief The MethodData struct defines a noodles method.
 ///
 struct MethodData {
-    std::string      method_name;
-    std::string      documentation;
-    std::string      return_documentation;
+    QString          method_name;
+    QString          documentation;
+    QString          return_documentation;
     std::vector<Arg> argument_documentation;
 
     std::function<QCborValue(MethodContext const&, QCborArray const&)> code;
@@ -227,8 +226,8 @@ MethodTPtr create_method(DocumentT*, MethodData const&);
 /// \brief The SignalData struct describes a new signal
 ///
 struct SignalData {
-    std::string      signal_name;
-    std::string      documentation;
+    QString          signal_name;
+    QString          documentation;
     std::vector<Arg> argument_documentation;
 };
 
@@ -257,8 +256,8 @@ std::shared_ptr<DocumentT> get_document(ServerT*);
 /// \brief The DocumentData struct is used to update the noodles document
 ///
 struct DocumentData {
-    std::vector<MethodTPtr> method_list;
-    std::vector<SignalTPtr> signal_list;
+    std::optional<QVector<MethodTPtr>> method_list;
+    std::optional<QVector<SignalTPtr>> signal_list;
 };
 
 /// Update the document with new methods and signals
@@ -271,8 +270,8 @@ void issue_signal_direct(DocumentT*, std::string const&, QCborArray);
 // Buffer ======================================================================
 
 /// Instruct the buffer system to own the given bytes
-struct BufferOwningSource {
-    QByteArray to_move;
+struct BufferInlineSource {
+    QByteArray data;
 };
 
 /// Instruct the buffer system to reference the URL for a buffer
@@ -282,12 +281,9 @@ struct BufferURLSource {
 };
 
 struct BufferData {
+    QString name;
 
-    std::string name;
-
-    bool force_inline = false;
-
-    std::variant<BufferOwningSource, BufferURLSource> source;
+    std::variant<BufferInlineSource, BufferURLSource> source;
 };
 
 class BufferT;
@@ -295,6 +291,9 @@ using BufferTPtr = std::shared_ptr<BufferT>;
 
 /// Create a new buffer
 BufferTPtr create_buffer(DocumentTPtrRef, BufferData const&);
+
+/// Create a new buffer from a file
+BufferTPtr create_buffer(DocumentTPtrRef, QString path);
 
 // Buffer ======================================================================
 
@@ -305,7 +304,7 @@ enum class ViewType : uint8_t {
 };
 
 struct BufferViewData {
-    std::string name;
+    QString name;
 
     BufferTPtr source_buffer;
 
@@ -323,7 +322,7 @@ BufferViewTPtr create_bufferview(DocumentTPtrRef, BufferViewData const&);
 // Image =======================================================================
 
 struct ImageData {
-    std::string name;
+    QString name;
 
     std::variant<QUrl, BufferViewTPtr> source;
 };
@@ -344,9 +343,6 @@ enum class MagFilter : uint8_t {
 enum class MinFilter : uint8_t {
     NEAREST,
     LINEAR,
-    NEAREST_MIPMAP_NEAREST,
-    LINEAR_MIPMAP_NEAREST,
-    NEAREST_MIPMAP_LINEAR,
     LINEAR_MIPMAP_LINEAR,
 };
 
@@ -357,10 +353,10 @@ enum class SamplerMode : uint8_t {
 };
 
 struct SamplerData {
-    std::string name;
+    QString name;
 
-    MagFilter mag_filter;
-    MinFilter min_filter;
+    MagFilter mag_filter = MagFilter::LINEAR;
+    MinFilter min_filter = MinFilter::LINEAR_MIPMAP_LINEAR;
 
     SamplerMode wrap_s = SamplerMode::REPEAT;
     SamplerMode wrap_t = SamplerMode::REPEAT;
@@ -379,7 +375,7 @@ SamplerTPtr create_sampler(DocumentTPtrRef, SamplerData const&);
 /// given buffer.
 ///
 struct TextureData {
-    std::string name;
+    QString     name;
     ImageTPtr   image;   // may not be blank.
     SamplerTPtr sampler; // may be blank.
 };
@@ -392,7 +388,7 @@ TextureTPtr create_texture(DocumentTPtrRef, TextureData const&);
 
 /// Create a new texture from a span of bytes. Bytes should be the disk
 /// representation of an image, A new buffer will be automatically created.
-TextureTPtr create_texture_from_file(DocumentTPtrRef, std::span<std::byte>);
+TextureTPtr create_texture_from_file(DocumentTPtrRef, QString path);
 
 /// Update a texture with a new byte range.
 void update_texture(TextureTPtr, TextureData const&);
@@ -419,8 +415,8 @@ struct PBRInfo {
 /// \brief The MaterialData struct defines a new material.
 ///
 struct MaterialData {
-    std::string               name;
-    std::optional<PBRInfo>    pbr_info;
+    QString                   name;
+    PBRInfo                   pbr_info;
     std::optional<TextureRef> normal_texture;
 
     std::optional<TextureRef> occlusion_texture;
@@ -465,9 +461,9 @@ struct DirectionLight {
 /// \brief The LightData struct defines a new light
 ///
 struct LightData {
-    std::string name;
-    QColor      color     = Qt::white;
-    float       intensity = 1;
+    QString name;
+    QColor  color     = Qt::white;
+    float   intensity = 1;
 
     std::variant<PointLight, SpotLight, DirectionLight> type;
 };
@@ -532,8 +528,8 @@ struct Attribute {
     uint64_t stride = 0;
     Format   format;
 
-    glm::vec4 minimum_value;
-    glm::vec4 maximum_value;
+    QVector<float> minimum_value;
+    QVector<float> maximum_value;
 
     bool normalized = false;
 };
@@ -560,7 +556,7 @@ struct MeshPatch {
 /// components
 ///
 struct MeshData {
-    std::string name;
+    QString name;
 
     std::vector<MeshPatch> patches;
 };
@@ -632,21 +628,21 @@ pack_image_to_vector(std::filesystem::path const& path,
 
 // Plot ========================================================================
 
-using PlotDef = std::variant<std::string, QUrl>;
+using PlotDef = std::variant<QString, QUrl>;
 
 struct PlotData {
-    std::string             name;
-    PlotDef                 definition;
-    TableTPtr               table_link;
-    std::vector<MethodTPtr> method_list;
-    std::vector<SignalTPtr> signal_list;
+    QString                            name;
+    std::optional<PlotDef>             definition;
+    std::optional<TableTPtr>           table_link;
+    std::optional<QVector<MethodTPtr>> method_list;
+    std::optional<QVector<SignalTPtr>> signal_list;
 };
 
 struct PlotUpdateData {
-    std::optional<PlotDef>                 definition;
-    std::optional<TableTPtr>               table_link;
-    std::optional<std::vector<MethodTPtr>> method_list;
-    std::optional<std::vector<SignalTPtr>> signal_list;
+    std::optional<PlotDef>             definition;
+    std::optional<TableTPtr>           table_link;
+    std::optional<QVector<MethodTPtr>> method_list;
+    std::optional<QVector<SignalTPtr>> signal_list;
 };
 
 /// Create a new plot.
@@ -667,7 +663,7 @@ struct TableQuery {
     virtual bool is_column_string(size_t col) const; // either real or string
 
     virtual bool get_reals_to(size_t col, std::span<double>) const;
-    virtual bool get_cell_to(size_t col, size_t row, std::string_view&) const;
+    virtual bool get_cell_to(size_t col, size_t row, QString&) const;
 
     virtual bool get_keys_to(std::span<int64_t>) const;
 };
@@ -675,27 +671,27 @@ struct TableQuery {
 using TableQueryPtr = std::shared_ptr<TableQuery const>;
 
 
-class TableColumn
-    : public std::variant<std::vector<double>, std::vector<std::string>> {
+class TableColumn : public std::variant<std::vector<double>, QStringList> {
 public:
-    std::string name;
+    QString name;
 
     using variant::variant;
 
     size_t size() const;
     bool   is_string() const;
 
-    std::span<double const>      as_doubles() const;
-    std::span<std::string const> as_string() const;
+    std::span<double const> as_doubles() const;
+    QStringList const&      as_string() const;
 
     void append(std::span<double const>);
+    void append(QStringList const&);
     void append(QCborArray const&);
     void append(double);
-    void append(std::string_view);
+    void append(QString);
 
     void set(size_t row, double);
     void set(size_t row, QCborValue);
-    void set(size_t row, std::string_view);
+    void set(size_t row, QString);
 
     void erase(size_t row);
 
@@ -717,7 +713,7 @@ protected:
     std::vector<int64_t>                  m_row_to_key_map;
 
     // how should selections handle key deletion?
-    std::unordered_map<std::string, Selection> m_selections;
+    QHash<QString, Selection> m_selections;
 
 protected:
     virtual TableQueryPtr handle_insert(QCborArray const& cols);
@@ -725,14 +721,14 @@ protected:
                                         QCborArray const& cols);
     virtual TableQueryPtr handle_deletion(QCborValue const& keys);
     virtual bool          handle_reset();
-    virtual bool handle_set_selection(std::string_view, SelectionRef const&);
+    virtual bool          handle_set_selection(QString, Selection const&);
 
 public:
     TableSource(QObject* p) : QObject(p) { }
     virtual ~TableSource();
 
-    std::vector<std::string> get_headers();
-    TableQueryPtr            get_all_data();
+    QStringList   get_headers();
+    TableQueryPtr get_all_data();
 
     auto const& get_columns() const { return m_columns; }
     auto const& get_all_selections() const { return m_selections; }
@@ -745,11 +741,11 @@ public:
                     QCborArray const&); // list of lists
     bool ask_delete(QCborValue const& keys);
     bool ask_clear();
-    bool ask_update_selection(std::string_view, SelectionRef const&);
+    bool ask_update_selection(QString, Selection const&);
 
 signals:
     void table_reset();
-    void table_selection_updated(std::string, SelectionRef const&);
+    void table_selection_updated(QString, Selection const&);
     void table_row_updated(TableQueryPtr);
     void table_row_deleted(TableQueryPtr);
 };
@@ -758,8 +754,8 @@ signals:
 /// \brief The TableData struct helps define a new table
 ///
 struct TableData {
-    std::string name;
-    std::string meta;
+    QString name;
+    QString meta;
 
     std::shared_ptr<TableSource> source;
 };
@@ -771,7 +767,7 @@ void issue_signal_direct(TableT*, SignalT*, QCborArray);
 
 // Object ======================================================================
 
-class ObjectCallbacks : public QObject {
+class EntityCallbacks : public QObject {
     Q_OBJECT
 
 protected:
@@ -795,17 +791,17 @@ public:
         bool attention_signals  = false;
     };
 
-    ObjectCallbacks(ObjectT*, EnableCallback);
+    EntityCallbacks(ObjectT*, EnableCallback);
 
     EnableCallback const& callbacks_enabled() const;
 
-    virtual void                     on_activate_str(std::string_view);
-    virtual void                     on_activate_int(int);
-    virtual std::vector<std::string> get_activation_choices();
+    virtual void        on_activate_str(QString);
+    virtual void        on_activate_int(int);
+    virtual QStringList get_activation_choices();
 
-    virtual std::vector<std::string> get_option_choices();
-    virtual std::string              get_current_option();
-    virtual void                     set_current_option(std::string_view);
+    virtual QStringList get_option_choices();
+    virtual std::string get_current_option();
+    virtual void        set_current_option(QString);
 
     virtual void set_position(glm::vec3);
     virtual void set_rotation(glm::quat);
@@ -820,13 +816,13 @@ public:
                              std::span<int64_t const>   index_list,
                              SelAction                  select);
 
-    virtual std::pair<std::string, glm::vec3> probe_at(glm::vec3);
+    virtual std::pair<QString, glm::vec3> probe_at(glm::vec3);
 
 signals:
     // Issue these signals to emit attention getting
     void signal_attention_plain();
     void signal_attention_at(glm::vec3);
-    void signal_attention_anno(glm::vec3, std::string);
+    void signal_attention_anno(glm::vec3, QString);
 
 private:
     ObjectT*       m_host;
@@ -834,10 +830,10 @@ private:
 };
 
 struct ObjectTextDefinition {
-    std::string text;
-    std::string font;
-    float       height;
-    float       width = -1;
+    QString text;
+    QString font;
+    float   height;
+    float   width = -1;
 };
 
 struct ObjectWebpageDefinition {
@@ -846,11 +842,16 @@ struct ObjectWebpageDefinition {
     float width;
 };
 
-struct ObjectRenderableDefinition {
-    MaterialTPtr               material;
-    MeshTPtr                   mesh;
-    std::vector<glm::mat4>     instances;
+struct InstanceInfo {
+    BufferViewTPtr             view;
+    uint64_t                   stride = 0;
     std::optional<BoundingBox> instance_bb;
+};
+
+struct ObjectRenderableDefinition {
+    MeshTPtr mesh;
+
+    std::optional<InstanceInfo> instances;
 };
 
 using ObjectDefinition = std::variant<std::monostate,
@@ -860,52 +861,49 @@ using ObjectDefinition = std::variant<std::monostate,
 
 
 struct ObjectData {
-    ObjectTPtr                 parent;
-    std::string                name;
-    glm::mat4                  transform = glm::mat4(1);
-    ObjectDefinition           definition;
-    std::vector<LightTPtr>     lights;
-    std::vector<TableTPtr>     tables;
-    std::vector<PlotTPtr>      plots;
-    std::vector<std::string>   tags;
-    std::vector<MethodTPtr>    method_list;
-    std::vector<SignalTPtr>    signal_list;
-    std::optional<BoundingBox> influence;
-    bool                       visibility = true;
+    QString                                   name;
+    std::optional<ObjectTPtr>                 parent;
+    std::optional<glm::mat4>                  transform;
+    std::optional<ObjectDefinition>           definition;
+    std::optional<QVector<LightTPtr>>         lights;
+    std::optional<QVector<TableTPtr>>         tables;
+    std::optional<QVector<PlotTPtr>>          plots;
+    std::optional<QStringList>                tags;
+    std::optional<QVector<MethodTPtr>>        method_list;
+    std::optional<QVector<SignalTPtr>>        signal_list;
+    std::optional<std::optional<BoundingBox>> influence;
 
-    std::function<std::unique_ptr<ObjectCallbacks>(ObjectT*)> create_callbacks;
+    std::function<std::unique_ptr<EntityCallbacks>(ObjectT*)> create_callbacks;
 };
 
 struct ObjectUpdateData {
     std::optional<ObjectTPtr>                 parent;
-    std::optional<std::string>                name;
     std::optional<glm::mat4>                  transform;
     std::optional<ObjectDefinition>           definition;
-    std::optional<std::vector<LightTPtr>>     lights;
-    std::optional<std::vector<TableTPtr>>     tables;
-    std::optional<std::vector<PlotTPtr>>      plots;
-    std::optional<std::vector<std::string>>   tags;
-    std::optional<std::vector<MethodTPtr>>    method_list;
-    std::optional<std::vector<SignalTPtr>>    signal_list;
+    std::optional<QVector<LightTPtr>>         lights;
+    std::optional<QVector<TableTPtr>>         tables;
+    std::optional<QVector<PlotTPtr>>          plots;
+    std::optional<QStringList>                tags;
+    std::optional<QVector<MethodTPtr>>        method_list;
+    std::optional<QVector<SignalTPtr>>        signal_list;
     std::optional<std::optional<BoundingBox>> influence;
-    std::optional<bool>                       visibility;
 };
 
 ObjectTPtr create_object(DocumentTPtrRef, ObjectData const&);
 
 void             update_object(ObjectT*, ObjectUpdateData&);
 void             update_object(ObjectTPtr, ObjectUpdateData&);
-ObjectCallbacks* get_callbacks_from(ObjectT*);
+EntityCallbacks* get_callbacks_from(ObjectT*);
 
 void issue_signal_direct(ObjectT*, SignalT*, QCborArray);
-void issue_signal_direct(ObjectT*, std::string const&, QCborArray);
+void issue_signal_direct(ObjectT*, QString const&, QCborArray);
 
 // Other =======================================================================
 
 template <class C, class S, class... Args>
 void issue_signal(C* ctx, S const& s, Args&&... args) {
     return issue_signal_direct(
-        ctx, s, marshall_to_any(std::forward<Args>(args)...));
+        ctx, s, convert_to_cbor_array(std::forward<Args>(args)...));
 }
 
 } // namespace noo

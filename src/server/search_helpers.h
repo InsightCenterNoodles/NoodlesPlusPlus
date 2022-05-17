@@ -37,7 +37,7 @@ public:
     }
 
     template <class T>
-    AttachedMethodList& operator=(std::vector<T> const& v) {
+    AttachedMethodList& operator=(QVector<T> const& v) {
         m_sptrs.clear();
         m_ptrs.clear();
         for (auto const& t : v) {
@@ -75,7 +75,7 @@ public:
 
     bool has(SignalT* ptr) const { return m_ptrs.count(ptr); }
 
-    SignalT* find_by_name(std::string const& name) const {
+    SignalT* find_by_name(QString const& name) const {
         for (SignalT* p : m_ptrs) {
             if (p->name() == name) return p;
         }
@@ -83,7 +83,7 @@ public:
     }
 
     template <class T>
-    AttachedSignalList& operator=(std::vector<T> const& v) {
+    AttachedSignalList& operator=(QVector<T> const& v) {
         m_sptrs.clear();
         m_ptrs.clear();
         for (auto const& t : v) {

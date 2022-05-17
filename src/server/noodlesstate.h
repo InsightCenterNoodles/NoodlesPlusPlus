@@ -7,6 +7,7 @@
 #include "meshlist.h"
 #include "methodlist.h"
 #include "objectlist.h"
+#include "plotlist.h"
 #include "search_helpers.h"
 #include "tablelist.h"
 #include "texturelist.h"
@@ -62,18 +63,22 @@ class DocumentT {
     MethodList m_method_list;
     SignalList m_signal_list;
 
-    BufferList m_buffer_list;
-    LightList  m_light_list;
+    BufferList     m_buffer_list;
+    BufferViewList m_buffer_view_list;
+    ImageList      m_image_list;
+    LightList      m_light_list;
 
     MaterialList m_mat_list;
     MeshList     m_mesh_list;
     ObjectList   m_obj_list;
+    SamplerList  m_sampler_list;
     TextureList  m_tex_list;
     TableList    m_table_list;
+    PlotList     m_plot_list;
 
 
-    std::vector<MethodTPtr> m_doc_method_list;
-    std::vector<SignalTPtr> m_doc_signal_list;
+    QVector<MethodTPtr> m_doc_method_list;
+    QVector<SignalTPtr> m_doc_signal_list;
 
 
     AttachedMethodList m_att_method_list_search;
@@ -88,24 +93,29 @@ class DocumentT {
 public:
     DocumentT(ServerT*);
 
-    MethodList&   method_list();
-    SignalList&   signal_list();
-    BufferList&   buffer_list();
-    LightList&    light_list();
-    MaterialList& mat_list();
-    MeshList&     mesh_list();
-    ObjectList&   obj_list();
-    TextureList&  tex_list();
-    TableList&    table_list();
+
+    MethodList&     method_list();
+    SignalList&     signal_list();
+    BufferList&     buffer_list();
+    BufferViewList& buffer_view_list();
+    ImageList&      image_list();
+    SamplerList&    sampler_list();
+    LightList&      light_list();
+    MaterialList&   mat_list();
+    MeshList&       mesh_list();
+    ObjectList&     obj_list();
+    TextureList&    tex_list();
+    PlotList&       plot_list();
+    TableList&      table_list();
 
 
     AttachedMethodList& att_method_list();
     AttachedSignalList& att_signal_list();
 
-    void update(DocumentData const&, Writer&);
+    void update(DocumentData const&, SMsgWriter&);
     void update(DocumentData const&);
 
-    void write_refresh(Writer&);
+    void write_refresh(SMsgWriter&);
 
     // ==
 

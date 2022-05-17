@@ -22,8 +22,8 @@ class MethodT : public ComponentMixin<MethodT, MethodList, MethodID> {
 public:
     MethodT(IDType, MethodList*, MethodData const&);
 
-    void write_new_to(Writer&);
-    void write_delete_to(Writer&);
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
 
     auto const& function() const { return m_data.code; }
 };
@@ -46,14 +46,13 @@ class SignalT : public ComponentMixin<SignalT, SignalList, SignalID> {
 public:
     SignalT(IDType, SignalList*, SignalData const&);
 
-    std::string const& name() const { return m_data.signal_name; }
+    QString const& name() const { return m_data.signal_name; }
 
-    void write_new_to(Writer&);
-    void write_delete_to(Writer&);
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
 
 
-    void fire(std::variant<std::monostate, TableID, EntityID, PlotID> id,
-              AnyVarList&&);
+    void fire(InvokeID id, QCborArray&&);
 };
 
 // void write_to(NoodlesSignalTPtr const&,

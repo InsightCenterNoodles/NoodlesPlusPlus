@@ -2,22 +2,23 @@
 
 #include "include/noo_include_glm.h"
 #include "src/common/variant_tools.h"
+#include "src/server/bufferlist.h"
 #include "src/server/noodlesserver.h"
 #include "src/server/noodlesstate.h"
 
+#include <glm/gtx/component_wise.hpp>
+
 #include <QDebug>
+#include <QFile>
 
 #include <fstream>
 #include <sstream>
 
-#include <glm/gtx/component_wise.hpp>
 
 namespace noo {
 
 
-MethodException::MethodException(int              code,
-                                 std::string_view message,
-                                 AnyVar           data)
+MethodException::MethodException(int code, QString message, QCborValue data)
     : m_code(code), m_reason(message), m_data(data) { }
 
 static char const* code_to_name(int code) {
@@ -36,16 +37,12 @@ char const* MethodException::what() const noexcept {
     return code_to_name(m_code);
 }
 
-std::string MethodException::to_string() const {
-    std::stringstream ss;
-
-    ss << "Code " << m_code << " " << code_to_name(m_code) << ": ";
-    ss << m_reason;
-    if (m_data.index() != 0) {
-        ss << " Additional data: " << m_data.dump_string();
-    }
-
-    return ss.str();
+QString MethodException::to_string() const {
+    return QString("Code %2(%1): %3 Additional: %4")
+        .arg(m_code)
+        .arg(code_to_name(m_code))
+        .arg(m_reason)
+        .arg(m_data.toDiagnosticNotation());
 }
 
 // =============================================================================
@@ -73,7 +70,7 @@ MethodTPtr create_method(DocumentT* server, MethodData const& data) {
         return nullptr;
     }
     if (!data.code) {
-        qWarning() << "No code attached to method" << data.method_name.c_str();
+        qWarning() << "No code attached to method" << data.method_name;
         return nullptr;
     }
     return server->method_list().provision_next(data);
@@ -136,7 +133,8 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
         extent_max = glm::max(extent_max, p);
     }
 
-    ret.bounding_box = { extent_min, extent_max };
+    ret.bounding_box.aabb_max = extent_max;
+    ret.bounding_box.aabb_min = extent_min;
 
     //    qDebug() << "Mesh extents" << ret.extent_min.x << ret.extent_min.y
     //             << ret.extent_min.z << "|" << ret.extent_max.x <<
@@ -275,8 +273,36 @@ pack_image_to_vector(std::filesystem::path const& path,
 }
 
 
-BufferTPtr create_buffer(DocumentTPtrRef doc, BufferData data) {
+BufferTPtr create_buffer(DocumentTPtrRef doc, BufferData const& data) {
     return doc->buffer_list().provision_next(data);
+}
+
+BufferTPtr create_buffer(DocumentTPtrRef doc, QString path) {
+    QFile file(path);
+
+    if (!file.open(QFile::ReadOnly)) { return {}; }
+
+    auto all_bytes = file.readAll();
+#error need asset storage
+}
+
+// BufferView ==================================================================
+
+BufferViewTPtr create_buffer_view(DocumentTPtrRef       doc,
+                                  BufferViewData const& data) {
+    return doc->buffer_view_list().provision_next(data);
+}
+
+// Image =======================================================================
+
+ImageTPtr create_image(DocumentTPtrRef doc, ImageData const& data) {
+    return doc->image_list().provision_next(data);
+}
+
+// Sampler =====================================================================
+
+SamplerTPtr create_sampler(DocumentTPtrRef doc, SamplerData const& data) {
+    return doc->sampler_list().provision_next(data);
 }
 
 // Texture =====================================================================
@@ -284,17 +310,32 @@ TextureTPtr create_texture(DocumentTPtrRef doc, TextureData const& data) {
     return doc->tex_list().provision_next(data);
 }
 
-TextureTPtr create_texture_from_file(DocumentTPtrRef      doc,
-                                     std::span<std::byte> data) {
-    auto new_buffer = create_buffer(doc, BufferCopySource { .to_copy = data });
+TextureTPtr create_texture_from_file(DocumentTPtrRef doc, QString path) {
 
-    TextureData td { .buffer = new_buffer, .start = 0, .size = data.size() };
+    auto new_buffer = create_buffer(doc, path);
 
-    return create_texture(doc, td);
-}
+    auto size = VMATCH(
+        new_buffer->data().source,
+        VCASE(BufferInlineSource const& s) { return uint64_t(s.data.size()); },
+        VCASE(BufferURLSource const& s) {
+            return uint64_t(s.source_byte_size);
+        });
 
-void update_texture(TextureTPtr item, TextureData const& data) {
-    item->update(data);
+    auto new_view = create_bufferview(doc,
+                                      BufferViewData {
+                                          .source_buffer = new_buffer,
+                                          .type          = ViewType::IMAGE_INFO,
+                                          .offset        = 0,
+                                          .length        = size,
+                                      });
+
+    auto new_image = create_image(doc,
+                                  ImageData {
+                                      .source = new_view,
+                                  });
+
+
+    return create_texture(doc, TextureData { .image = new_image });
 }
 
 
@@ -320,54 +361,40 @@ void update_light(LightTPtr const& item, LightUpdateData const& data) {
 
 // Mesh ========================================================================
 
-MeshData::MeshData(PackedMeshDataResult const& res, BufferTPtr ptr) {
-    auto set_from = [&ptr](auto const& src, auto& out) {
-        qDebug() << "HERE";
-        if (!src) return;
-        auto& l  = *src;
-        auto& d  = out.emplace();
-        d.buffer = ptr;
-        d.start  = l.start;
-        d.size   = l.size;
-        d.stride = l.stride;
+// MeshData::MeshData(PackedMeshDataResult const& res, BufferTPtr ptr) {
+//     auto set_from = [&ptr](auto const& src, auto& out) {
+//         qDebug() << "HERE";
+//         if (!src) return;
+//         auto& l  = *src;
+//         auto& d  = out.emplace();
+//         d.buffer = ptr;
+//         d.start  = l.start;
+//         d.size   = l.size;
+//         d.stride = l.stride;
 
-        qDebug() << d.start << d.stride << d.size;
-    };
+//        qDebug() << d.start << d.stride << d.size;
+//    };
 
-    bounding_box = res.bounding_box;
+//    bounding_box = res.bounding_box;
 
-    positions.buffer = ptr;
-    positions.start  = res.positions.start;
-    positions.size   = res.positions.size;
-    positions.stride = res.positions.stride;
+//    positions.buffer = ptr;
+//    positions.start  = res.positions.start;
+//    positions.size   = res.positions.size;
+//    positions.stride = res.positions.stride;
 
-    set_from(res.normals, normals);
-    set_from(res.textures, textures);
-    set_from(res.colors, colors);
-    set_from(res.lines, lines);
-    set_from(res.triangles, triangles);
-}
+//    set_from(res.normals, normals);
+//    set_from(res.textures, textures);
+//    set_from(res.colors, colors);
+//    set_from(res.lines, lines);
+//    set_from(res.triangles, triangles);
+//}
 
 MeshTPtr create_mesh(DocumentTPtrRef doc, MeshData const& data) {
     return doc->mesh_list().provision_next(data);
 }
 
 MeshTPtr create_mesh(DocumentTPtrRef doc, BufferMeshDataRef const& ref) {
-    std::vector<std::byte> bytes;
-
-    auto result = pack_mesh_to_vector(ref, bytes);
-
-    BufferData bd = BufferCopySource { .to_copy = bytes };
-
-    auto buffer = create_buffer(doc, bd);
-
-    auto md = MeshData(result, buffer);
-
-    return create_mesh(doc, md);
-}
-
-void update_mesh(MeshT* item, MeshData const& data) {
-    item->update(data);
+    __builtin_unreachable();
 }
 
 
@@ -391,7 +418,7 @@ bool TableQuery::get_reals_to(size_t, std::span<double>) const {
     return false;
 }
 
-bool TableQuery::get_cell_to(size_t, size_t, std::string_view&) const {
+bool TableQuery::get_cell_to(size_t, size_t, QString&) const {
     return false;
 }
 
@@ -402,11 +429,11 @@ bool TableQuery::get_keys_to(std::span<int64_t>) const {
 // =============
 
 size_t TableColumn::size() const {
-    return std::visit([&](auto const& a) { return a.size(); }, *this);
+    return std::visit([&](auto const& a) { return uint64_t(a.size()); }, *this);
 }
 
 bool TableColumn::is_string() const {
-    return std::holds_alternative<std::vector<std::string>>(*this);
+    return std::holds_alternative<QStringList>(*this);
 }
 
 std::span<double const> TableColumn::as_doubles() const {
@@ -414,11 +441,14 @@ std::span<double const> TableColumn::as_doubles() const {
 
     return p ? std::span<double const>(*p) : std::span<double const> {};
 }
-std::span<std::string const> TableColumn::as_string() const {
-    auto* p = std::get_if<std::vector<std::string>>(this);
+QStringList const& TableColumn::as_string() const {
+    auto* p = std::get_if<QStringList>(this);
 
-    return p ? std::span<std::string const>(*p)
-             : std::span<std::string const> {};
+    if (p) return *p;
+
+    static const QStringList blank;
+
+    return blank;
 }
 
 void TableColumn::append(std::span<double const> d) {
@@ -427,24 +457,25 @@ void TableColumn::append(std::span<double const> d) {
         VCASE(std::vector<double> & a) {
             a.insert(a.end(), d.begin(), d.end());
         },
-        VCASE(std::vector<std::string> & a) {
+        VCASE(QStringList & a) {
             for (auto value : d) {
-                a.push_back(std::to_string(value));
+                a.push_back(QString::number(value));
             }
         });
 }
 
-void TableColumn::append(AnyVarListRef const& d) {
+void TableColumn::append(QCborArray const& d) {
     VMATCH(
         *this,
         VCASE(std::vector<double> & a) {
-            d.for_each(
-                [&](auto, auto const& ref) { a.push_back(ref.to_real()); });
+            for (auto const& s : d) {
+                a.push_back(s.toDouble());
+            }
         },
-        VCASE(std::vector<std::string> & a) {
-            d.for_each([&](auto, auto const& ref) {
-                a.push_back(std::string(ref.to_string()));
-            });
+        VCASE(QStringList & a) {
+            for (auto const& s : d) {
+                a.push_back(s.toString());
+            }
         });
 }
 
@@ -452,38 +483,32 @@ void TableColumn::append(double d) {
     VMATCH(
         *this,
         VCASE(std::vector<double> & a) { a.push_back(d); },
-        VCASE(std::vector<std::string> & a) {
-            a.push_back(std::to_string(d));
-        });
+        VCASE(QStringList & a) { a.push_back(QString::number(d)); });
 }
-void TableColumn::append(std::string_view d) {
+void TableColumn::append(QString d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) {
-            a.push_back(std::stod(std::string(d))); // UGH
-        },
-        VCASE(std::vector<std::string> & a) { a.push_back(std::string(d)); });
+        VCASE(std::vector<double> & a) { a.push_back(d.toDouble()); },
+        VCASE(QStringList & a) { a.push_back(d); });
 }
 
 void TableColumn::set(size_t row, double d) {
     VMATCH(
         *this,
         VCASE(std::vector<double> & a) { a[row] = d; },
-        VCASE(std::vector<std::string> & a) { a[row] = std::to_string(d); });
+        VCASE(QStringList & a) { a[row] = QString::number(d); });
 }
-void TableColumn::set(size_t row, AnyVarRef d) {
+void TableColumn::set(size_t row, QCborValue d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) { a[row] = d.to_real(); },
-        VCASE(std::vector<std::string> & a) {
-            a[row] = std::string(d.to_string());
-        });
+        VCASE(std::vector<double> & a) { a[row] = d.toDouble(); },
+        VCASE(QStringList & a) { a[row] = d.toString(); });
 }
-void TableColumn::set(size_t row, std::string_view d) {
+void TableColumn::set(size_t row, QString d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) { a[row] = std::stod(std::string(d)); },
-        VCASE(std::vector<std::string> & a) { a[row] = std::string(d); });
+        VCASE(std::vector<double> & a) { a[row] = d.toDouble(); },
+        VCASE(QStringList & a) { a[row] = d; });
 }
 
 void TableColumn::erase(size_t row) {
@@ -523,8 +548,7 @@ struct WholeTableQuery : TableQuery {
         return true;
     }
 
-    bool
-    get_cell_to(size_t col, size_t row, std::string_view& s) const override {
+    bool get_cell_to(size_t col, size_t row, QString& s) const override {
         try {
             auto& column = source->get_columns().at(col);
 
@@ -532,7 +556,7 @@ struct WholeTableQuery : TableQuery {
 
             if (row >= sp.size()) return false;
 
-            s = std::string_view(sp[row]);
+            s = sp[row];
 
             return true;
 
@@ -580,8 +604,7 @@ struct InsertQuery : TableQuery {
         return true;
     }
 
-    bool
-    get_cell_to(size_t col, size_t row, std::string_view& s) const override {
+    bool get_cell_to(size_t col, size_t row, QString& s) const override {
         try {
             auto& column = source->get_columns().at(col);
 
@@ -589,7 +612,7 @@ struct InsertQuery : TableQuery {
 
             if (row >= sp.size()) return false;
 
-            s = std::string_view(sp[row + start_at]);
+            s = sp[row + start_at];
 
             return true;
 
@@ -642,8 +665,7 @@ struct UpdateQuery : TableQuery {
         return true;
     }
 
-    bool
-    get_cell_to(size_t col, size_t row, std::string_view& s) const override {
+    bool get_cell_to(size_t col, size_t row, QString& s) const override {
         try {
             auto& column = source->get_columns().at(col);
 
@@ -691,9 +713,7 @@ struct DeleteQuery : TableQuery {
         return false;
     }
 
-    bool get_cell_to(size_t /*col*/,
-                     size_t /*row*/,
-                     std::string_view&) const override {
+    bool get_cell_to(size_t /*col*/, size_t /*row*/, QString&) const override {
         return false;
     }
 
@@ -706,7 +726,7 @@ struct DeleteQuery : TableQuery {
 
 } // namespace
 
-TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
+TableQueryPtr TableSource::handle_insert(QCborArray const& cols) {
     // get dimensions of insert
 
     size_t num_cols = cols.size();
@@ -719,15 +739,12 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
 
     for (size_t ci = 0; ci < num_cols; ci++) {
         auto r = cols[ci];
-        switch (r.type()) {
-        case AnyVarRef::AnyType::RealList:
-            if (m_columns.at(ci).is_string()) ok = false;
-            num_rows = std::max(num_rows, r.to_real_list().size());
+        if (r.isArray()) {
+            auto la  = r.toArray();
+            num_rows = std::max(num_rows, static_cast<size_t>(la.size()));
+        } else {
+            ok = false;
             break;
-        case AnyVarRef::AnyType::AnyList:
-            num_rows = std::max(num_rows, r.to_vector().size());
-            break;
-        default: ok = false; break;
         }
     }
 
@@ -761,31 +778,11 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
     for (size_t ci = 0; ci < num_cols; ci++) {
         auto  source_col = cols[ci];
         auto& dest_col   = m_columns.at(ci);
-        VMATCH_W(
-            visit,
-            source_col,
-            VCASE(std::span<double> data) { dest_col.append(data); },
-            VCASE(AnyVarListRef const& ref) { dest_col.append(ref); },
-            VCASE(auto const&) {
-                // do nothing, should not get here
-                qFatal("Unable to insert this data type");
-            })
 
-        if (dest_col.is_string()) {
-            QVector<QString> sl;
+        if (source_col.isArray()) {
+            auto la = source_col.toArray();
 
-            for (auto const& s : dest_col.as_string()) {
-                sl.push_back(noo::to_qstring(s));
-            }
-            qDebug() << "Col " << ci << "is now" << sl;
-
-        } else {
-            QVector<double> sl;
-
-            for (auto const& s : dest_col.as_doubles()) {
-                sl.push_back(s);
-            }
-            qDebug() << "Col " << ci << "is now" << sl;
+            dest_col.append(la);
         }
     }
 
@@ -794,8 +791,8 @@ TableQueryPtr TableSource::handle_insert(AnyVarListRef const& cols) {
     return std::make_shared<InsertQuery>(this, current_row_count, num_rows);
 }
 
-TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
-                                         AnyVarListRef const& cols) {
+TableQueryPtr TableSource::handle_update(QCborValue const& keys,
+                                         QCborArray const& cols) {
     // get dimensions of update
 
     size_t const num_cols = cols.size();
@@ -808,15 +805,12 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
 
     for (size_t ci = 0; ci < num_cols; ci++) {
         auto r = cols[ci];
-        switch (r.type()) {
-        case AnyVarRef::AnyType::RealList:
-            if (m_columns.at(ci).is_string()) ok = false;
-            num_rows = std::max(num_rows, r.to_real_list().size());
+
+        if (r.isArray()) {
+            num_rows = std::max<size_t>(num_rows, r.toArray().size());
+        } else {
+            ok = false;
             break;
-        case AnyVarRef::AnyType::AnyList:
-            num_rows = std::max(num_rows, r.to_vector().size());
-            break;
-        default: ok = false; break;
         }
     }
 
@@ -826,12 +820,12 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
 
     // lets get some keys
 
-    auto key_list      = keys.coerce_int_list();
-    auto key_list_span = key_list.span();
+    auto key_list      = coerce_to_int_list(keys);
+    auto key_list_span = std::span(key_list);
 
     // now lets update
 
-    for (size_t key_i = 0; key_i < key_list.size(); key_i++) {
+    for (size_t key_i = 0; key_i < key_list_span.size(); key_i++) {
         auto key = key_list_span[key_i];
 
         auto iter = m_key_to_row_map.find(key);
@@ -843,30 +837,19 @@ TableQueryPtr TableSource::handle_update(AnyVarRef const&     keys,
         for (size_t ci = 0; ci < num_cols; ci++) {
             auto  source_col = cols[ci];
             auto& dest_col   = m_columns.at(ci);
-            VMATCH_W(
-                visit,
-                source_col,
-                VCASE(std::span<double> data) {
-                    dest_col.set(update_at, data[key_i]);
-                },
-                VCASE(AnyVarListRef const& ref) {
-                    dest_col.set(update_at, ref[key_i]);
-                },
-                VCASE(auto const&) {
-                    // do nothing, should not get here
-                    qFatal("Unable to insert this data type");
-                })
+
+            dest_col.set(update_at, source_col[key_i]);
         }
     }
 
     // now return a query to the data
 
-    return std::make_shared<UpdateQuery>(this, span_to_vector(key_list.span()));
+    return std::make_shared<UpdateQuery>(this, span_to_vector(key_list_span));
 }
 
-TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
+TableQueryPtr TableSource::handle_deletion(QCborValue const& keys) {
     qDebug() << Q_FUNC_INFO;
-    auto key_list = keys.coerce_int_list();
+    auto key_list = coerce_to_int_list(keys);
 
     qDebug() << QVector<int64_t>(key_list.begin(), key_list.end());
 
@@ -907,7 +890,8 @@ TableQueryPtr TableSource::handle_deletion(AnyVarRef const& keys) {
     }
 
 
-    return std::make_shared<DeleteQuery>(this, span_to_vector(key_list.span()));
+    return std::make_shared<DeleteQuery>(this,
+                                         span_to_vector(std::span(key_list)));
 }
 
 bool TableSource::handle_reset() {
@@ -917,10 +901,8 @@ bool TableSource::handle_reset() {
     return true;
 }
 
-bool TableSource::handle_set_selection(std::string_view    s,
-                                       SelectionRef const& ref) {
-
-    m_selections[std::string(s)] = ref.to_selection();
+bool TableSource::handle_set_selection(QString s, Selection const& ref) {
+    m_selections[s] = ref;
 
     return true;
 }
@@ -928,10 +910,10 @@ bool TableSource::handle_set_selection(std::string_view    s,
 
 TableSource::~TableSource() = default;
 
-std::vector<std::string> TableSource::get_headers() {
-    std::vector<std::string> ret;
+QStringList TableSource::get_headers() {
+    QStringList ret;
     for (auto const& c : m_columns) {
-        ret.push_back(c.name);
+        ret << c.name;
     }
     return ret;
 }
@@ -942,7 +924,7 @@ TableQueryPtr TableSource::get_all_data() {
 }
 
 
-bool TableSource::ask_insert(AnyVarListRef const& cols) {
+bool TableSource::ask_insert(QCborArray const& cols) {
     auto b = handle_insert(cols);
 
     if (b) { emit table_row_updated(b); }
@@ -951,8 +933,8 @@ bool TableSource::ask_insert(AnyVarListRef const& cols) {
 }
 
 
-bool TableSource::ask_update(AnyVarRef const&     keys,
-                             AnyVarListRef const& columns) {
+bool TableSource::ask_update(QCborValue const& keys,
+                             QCborArray const& columns) {
     auto b = handle_update(keys, columns);
 
     if (b) { emit table_row_updated(b); }
@@ -960,7 +942,7 @@ bool TableSource::ask_update(AnyVarRef const&     keys,
     return !!b;
 }
 
-bool TableSource::ask_delete(AnyVarRef const& keys) {
+bool TableSource::ask_delete(QCborValue const& keys) {
     auto b = handle_deletion(keys);
 
     if (b) { emit table_row_deleted(b); }
@@ -976,11 +958,10 @@ bool TableSource::ask_clear() {
     return b;
 }
 
-bool TableSource::ask_update_selection(std::string_view    k,
-                                       SelectionRef const& s) {
+bool TableSource::ask_update_selection(QString k, Selection const& s) {
     auto b = handle_set_selection(k, s);
 
-    if (b) emit table_selection_updated(std::string(k), s);
+    if (b) emit table_selection_updated(k, s);
 
     return b;
 }
@@ -1004,58 +985,58 @@ void update_object(ObjectTPtr item, ObjectUpdateData& data) {
 
 // Callbacks
 
-ObjectCallbacks::ObjectCallbacks(ObjectT* h, EnableCallback c)
+EntityCallbacks::EntityCallbacks(ObjectT* h, EnableCallback c)
     : m_host(h), m_enabled(c) { }
 
-ObjectT* ObjectCallbacks::get_host() {
+ObjectT* EntityCallbacks::get_host() {
     return m_host;
 }
 
-ObjectCallbacks::EnableCallback const&
-ObjectCallbacks::callbacks_enabled() const {
+EntityCallbacks::EnableCallback const&
+EntityCallbacks::callbacks_enabled() const {
     return m_enabled;
 }
 
-void                     ObjectCallbacks::on_activate_str(std::string_view) { }
-void                     ObjectCallbacks::on_activate_int(int) { }
-std::vector<std::string> ObjectCallbacks::get_activation_choices() {
+void        EntityCallbacks::on_activate_str(QString) { }
+void        EntityCallbacks::on_activate_int(int) { }
+QStringList EntityCallbacks::get_activation_choices() {
     return {};
 }
 
-std::vector<std::string> ObjectCallbacks::get_option_choices() {
+QStringList EntityCallbacks::get_option_choices() {
     return {};
 }
-std::string ObjectCallbacks::get_current_option() {
+std::string EntityCallbacks::get_current_option() {
     return {};
 }
-void ObjectCallbacks::set_current_option(std::string_view) { }
+void EntityCallbacks::set_current_option(QString) { }
 
-void ObjectCallbacks::set_position(glm::vec3) { }
-void ObjectCallbacks::set_rotation(glm::quat) { }
-void ObjectCallbacks::set_scale(glm::vec3) { }
+void EntityCallbacks::set_position(glm::vec3) { }
+void EntityCallbacks::set_rotation(glm::quat) { }
+void EntityCallbacks::set_scale(glm::vec3) { }
 
-void ObjectCallbacks::select_region(glm::vec3 /*min*/,
+void EntityCallbacks::select_region(glm::vec3 /*min*/,
                                     glm::vec3 /*max*/,
                                     SelAction /*select*/) { }
-void ObjectCallbacks::select_sphere(glm::vec3 /*point*/,
+void EntityCallbacks::select_sphere(glm::vec3 /*point*/,
                                     float /*distance*/,
                                     SelAction /*select*/) { }
-void ObjectCallbacks::select_plane(glm::vec3 /*point*/,
+void EntityCallbacks::select_plane(glm::vec3 /*point*/,
                                    glm::vec3 /*normal*/,
                                    SelAction /*select*/) { }
 
-void ObjectCallbacks::select_hull(std::span<glm::vec3 const> /*point_list*/,
+void EntityCallbacks::select_hull(std::span<glm::vec3 const> /*point_list*/,
                                   std::span<int64_t const> /*index_list*/,
                                   SelAction /*select*/) { }
 
-std::pair<std::string, glm::vec3> ObjectCallbacks::probe_at(glm::vec3) {
+std::pair<QString, glm::vec3> EntityCallbacks::probe_at(glm::vec3) {
     return {};
 }
 
 
 // Other =======================================================================
 
-void issue_signal_direct(DocumentT* doc, SignalT* signal, AnyVarList var) {
+void issue_signal_direct(DocumentT* doc, SignalT* signal, QCborArray var) {
     if (!doc or !signal) return;
 
     if (!doc->att_signal_list().has(signal)) return;
@@ -1063,14 +1044,14 @@ void issue_signal_direct(DocumentT* doc, SignalT* signal, AnyVarList var) {
     signal->fire({}, std::move(var));
 }
 
-void issue_signal_direct(DocumentT*         doc,
-                         std::string const& signal,
-                         AnyVarList         var) {
+void issue_signal_direct(DocumentT*     doc,
+                         QString const& signal,
+                         QCborArray     var) {
     auto* sig = doc->att_signal_list().find_by_name(signal);
     return issue_signal_direct(doc, sig, std::move(var));
 }
 
-void issue_signal_direct(TableT* tbl, SignalT* signal, AnyVarList var) {
+void issue_signal_direct(TableT* tbl, SignalT* signal, QCborArray var) {
     if (!tbl or !signal) return;
 
     if (!tbl->att_signal_list().has(signal)) return;
@@ -1078,15 +1059,13 @@ void issue_signal_direct(TableT* tbl, SignalT* signal, AnyVarList var) {
     signal->fire(tbl->id(), std::move(var));
 }
 
-void issue_signal_direct(TableT*            tbl,
-                         std::string const& signal,
-                         AnyVarList         var) {
+void issue_signal_direct(TableT* tbl, QString const& signal, QCborArray var) {
 
     auto* sig = tbl->att_signal_list().find_by_name(signal);
     return issue_signal_direct(tbl, sig, std::move(var));
 }
 
-void issue_signal_direct(ObjectT* obj, SignalT* signal, AnyVarList var) {
+void issue_signal_direct(ObjectT* obj, SignalT* signal, QCborArray var) {
     if (!obj or !signal) return;
 
     if (!obj->att_signal_list().has(signal)) return;
@@ -1094,9 +1073,7 @@ void issue_signal_direct(ObjectT* obj, SignalT* signal, AnyVarList var) {
     signal->fire(obj->id(), std::move(var));
 }
 
-void issue_signal_direct(ObjectT*           obj,
-                         std::string const& signal,
-                         AnyVarList         var) {
+void issue_signal_direct(ObjectT* obj, QString const& signal, QCborArray var) {
 
     auto* sig = obj->att_signal_list().find_by_name(signal);
     return issue_signal_direct(obj, sig, std::move(var));

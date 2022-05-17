@@ -21,10 +21,10 @@ class MaterialT : public ComponentMixin<MaterialT, MaterialList, MaterialID> {
 public:
     MaterialT(IDType, MaterialList*, MaterialData const&);
 
-    void write_new_to(Writer&);
-    void update(MaterialData const&, Writer&);
+    void write_new_to(SMsgWriter&);
+    void update(MaterialData const&, SMsgWriter&);
     void update(MaterialData const&);
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
 };
 
 } // namespace noo

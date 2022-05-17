@@ -1,7 +1,10 @@
 #include "bufferlist.h"
 
+#include "src/common/serialize.h"
 #include "src/common/variant_tools.h"
 #include "src/generated/interface_tools.h"
+
+#include <magic_enum.hpp>
 
 namespace noo {
 
@@ -11,49 +14,30 @@ BufferList::~BufferList() = default;
 BufferT::BufferT(IDType id, BufferList* host, BufferData const& d)
     : ComponentMixin(id, host), m_data(d) { }
 
-void BufferT::write_new_to(Writer& w) {
-    auto lid = convert_id(id(), w);
+void BufferT::write_new_to(SMsgWriter& w) {
+    messages::MsgBufferCreate create;
+    create.id = id();
+
+    if (m_data.name.size()) { create.name = m_data.name; }
 
     VMATCH(
         m_data.source,
-        VCASE(BufferOwningSource const& source) {
-            auto byte_handle = w->CreateVectorScalarCast<int8_t>(
-                source.to_move.data(), source.to_move.size());
-
-            auto x = noodles::CreateBufferCreateDirect(
-                w,
-                lid,
-                m_data.name.size() ? m_data.name.c_str() : nullptr,
-                source.to_move.size(),
-                noodles::BufferSource::InlineSource,
-                byte_handle.Union());
-
-            w.complete_message(x);
+        VCASE(BufferInlineSource const& source) {
+            create.inline_bytes = source.data;
+            create.size         = source.data.size();
         },
         VCASE(BufferURLSource const& source) {
-            auto url_string = source.url_source.toString().toStdString();
-            auto size       = source.source_byte_size;
-
-            auto s = noodles::CreateURLSourceDirect(w, url_string.c_str());
-
-            auto x = noodles::CreateBufferCreateDirect(
-                w,
-                lid,
-                m_data.name.size() ? m_data.name.c_str() : nullptr,
-                size,
-                noodles::BufferSource::URLSource,
-                s.Union());
-
-            w.complete_message(x);
+            create.uri_bytes = source.url_source;
+            create.size      = source.source_byte_size;
         });
+
+    w.add(create);
 }
 
-void BufferT::write_delete_to(Writer& w) {
-    auto lid = convert_id(id(), w);
-
-    auto x = noodles::CreateBufferDelete(w, lid);
-
-    w.complete_message(x);
+void BufferT::write_delete_to(SMsgWriter& w) {
+    messages::MsgBufferDelete deletion;
+    deletion.id = id();
+    w.add(deletion);
 }
 
 // =============================================================================
@@ -66,30 +50,20 @@ BufferViewT::BufferViewT(IDType                id,
                          BufferViewData const& d)
     : ComponentMixin(id, host), m_data(d) { }
 
-void BufferViewT::write_new_to(Writer& w) {
-    auto lid = convert_id(id(), w);
+void BufferViewT::write_new_to(SMsgWriter& w) {
+    messages::MsgBufferViewCreate create {
+        .id            = id(),
+        .source_buffer = m_data.source_buffer->id(),
+        .type   = QString::fromLocal8Bit(magic_enum::enum_name(m_data.type)),
+        .offset = m_data.offset,
+        .length = m_data.length,
+    };
 
-    auto nh = m_data.name.size() ? w->CreateString(m_data.name)
-                                 : flatbuffers::Offset<flatbuffers::String>();
-
-    auto x = noodles::CreateBufferViewCreate(
-        w,
-        lid,
-        nh,
-        convert_id(m_data.source_buffer->id(), w),
-        noodles::ViewType(m_data.type),
-        m_data.offset,
-        m_data.length);
-
-    w.complete_message(x);
+    w.add(create);
 }
 
-void BufferViewT::write_delete_to(Writer& w) {
-    auto lid = convert_id(id(), w);
-
-    auto x = noodles::CreateBufferViewDelete(w, lid);
-
-    w.complete_message(x);
+void BufferViewT::write_delete_to(SMsgWriter& w) {
+    w.add(messages::MsgBufferViewDelete { .id = id() });
 }
 
 // =============================================================================
@@ -101,57 +75,47 @@ LightList::~LightList() = default;
 LightT::LightT(IDType id, LightList* host, LightData const& d)
     : ComponentMixin<LightT, LightList, LightID>(id, host), m_data(d) { }
 
-void LightT::write_new_to(Writer& w) {
-    auto lid = convert_id(id(), w);
+void LightT::write_new_to(SMsgWriter& w) {
+    messages::MsgLightCreate m {
+        .id        = id(),
+        .name      = m_data.name.size() ? m_data.name : QString(),
+        .color     = m_data.color,
+        .intensity = m_data.intensity,
+    };
 
-    auto ncol = convert(m_data.color);
-
-    noodles::LightType light_enum;
-
-    auto ltype = VMATCH(
+    VMATCH(
         m_data.type,
         VCASE(PointLight const& pl) {
-            auto l     = noodles::CreatePointLight(w, pl.range);
-            light_enum = noodles::LightType::PointLight;
-            return l.Union();
+            m.point = messages::PointLight {
+                .range = pl.range,
+            };
         },
         VCASE(SpotLight const& sl) {
-            auto l = noodles::CreateSpotLight(
-                w, sl.range, sl.inner_cone_angle_rad, sl.outer_cone_angle_rad);
-            light_enum = noodles::LightType::SpotLight;
-            return l.Union();
+            m.spot = messages::SpotLight {
+                .range                = sl.range,
+                .inner_cone_angle_rad = sl.inner_cone_angle_rad,
+                .outer_cone_angle_rad = sl.outer_cone_angle_rad,
+            };
         },
         VCASE(DirectionLight const& dl) {
-            auto l     = noodles::CreateDirectionLight(w, dl.range);
-            light_enum = noodles::LightType::DirectionLight;
-            return l.Union();
+            m.directional = messages::DirectionalLight {
+                .range = dl.range,
+            };
         });
 
-    auto x = noodles::CreateLightCreateUpdateDirect(
-        w,
-        lid,
-        m_data.name.size() ? m_data.name.data() : nullptr,
-        &ncol,
-        m_data.intensity,
-        light_enum,
-        ltype);
-
-    w.complete_message(x);
+    w.add(m);
 }
 
-void LightT::update(LightUpdateData const& d, Writer& w) {
+void LightT::update(LightUpdateData const& d, SMsgWriter& w) {
+    if (d.color) m_data.color = *d.color;
+    if (d.intensity) m_data.intensity = *d.intensity;
 
-    auto lid = convert_id(id(), w);
+    messages::MsgLightUpdate m {
+        .color     = m_data.color,
+        .intensity = m_data.intensity,
+    };
 
-    if (d.color) { m_data.color = *d.color; }
-    if (d.intensity) { m_data.intensity = *d.intensity; }
-
-    auto ncol = convert(m_data.color);
-
-    auto x = noodles::CreateLightCreateUpdate(
-        w, lid, 0, d.color ? &ncol : nullptr, m_data.intensity);
-
-    w.complete_message(x);
+    w.add(m);
 }
 
 void LightT::update(LightUpdateData const& d) {
@@ -159,12 +123,8 @@ void LightT::update(LightUpdateData const& d) {
 
     update(d, *w);
 }
-void LightT::write_delete_to(Writer& w) {
-    auto lid = convert_id(id(), w);
-
-    auto x = noodles::CreateLightDelete(w, lid);
-
-    w.complete_message(x);
+void LightT::write_delete_to(SMsgWriter& w) {
+    w.add(messages::MsgLightDelete { .id = id() });
 }
 
 } // namespace noo

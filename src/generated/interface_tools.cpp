@@ -2,7 +2,7 @@
 
 #include "include/noo_interface_types.h"
 #include "src/common/variant_tools.h"
-#include "src/generated/noodles_generated.h"
+
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -13,6 +13,8 @@
 #include <QDebug>
 
 namespace noo {
+
+#if 0
 
 template <class T, class Function, class U>
 auto set_from(Function f, U u, flatbuffers::FlatBufferBuilder& b) {
@@ -553,5 +555,6 @@ PlotID convert_id(::noodles::PlotID const* p) {
     return {};
 }
 
+#endif
 
 } // namespace noo

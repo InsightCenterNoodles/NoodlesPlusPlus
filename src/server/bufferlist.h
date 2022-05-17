@@ -21,9 +21,11 @@ class BufferT : public ComponentMixin<BufferT, BufferList, BufferID> {
 public:
     BufferT(IDType, BufferList*, BufferData const&);
 
-    void write_new_to(Writer&);
+    void write_new_to(SMsgWriter&);
 
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
+
+    BufferData const& data() const { return m_data; }
 };
 
 
@@ -44,9 +46,9 @@ class BufferViewT
 public:
     BufferViewT(IDType, BufferViewList*, BufferViewData const&);
 
-    void write_new_to(Writer&);
+    void write_new_to(SMsgWriter&);
 
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
 };
 
 // =============================================================================
@@ -64,10 +66,10 @@ class LightT : public ComponentMixin<LightT, LightList, LightID> {
 public:
     LightT(IDType, LightList*, LightData const&);
 
-    void write_new_to(Writer&);
-    void update(LightUpdateData const&, Writer&);
+    void write_new_to(SMsgWriter&);
+    void update(LightUpdateData const&, SMsgWriter&);
     void update(LightUpdateData const&);
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
 };
 
 } // namespace noo

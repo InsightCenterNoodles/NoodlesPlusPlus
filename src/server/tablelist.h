@@ -33,8 +33,8 @@ public:
     AttachedMethodList& att_method_list();
     AttachedSignalList& att_signal_list();
 
-    void write_new_to(Writer&);
-    void write_delete_to(Writer&);
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
 
     TableSource* get_source() const;
 
@@ -43,7 +43,7 @@ signals:
 
 private slots:
     void on_table_reset();
-    void on_table_selection_updated(std::string, SelectionRef const&);
+    void on_table_selection_updated(QString, Selection const&);
     void on_table_row_updated(TableQueryPtr);
     void on_table_row_deleted(TableQueryPtr);
 };

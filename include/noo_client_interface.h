@@ -4,18 +4,73 @@
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
-#include <qcbormap.h>
 #include <qimage.h>
 #include <qline.h>
 #include <qnetworkaccessmanager.h>
 #include <qsslerror.h>
 #include <span>
 
+#include <QCborMap>
 #include <QCborValue>
 #include <QImage>
 #include <QObject>
 #include <QPointer>
 #include <QUrl>
+
+namespace noo::messages {
+struct MethodArg;
+struct MsgMethodCreate;
+struct MsgMethodDelete;
+struct MsgSignalCreate;
+struct MsgSignalDelete;
+struct TextRepresentation;
+struct WebRepresentation;
+struct InstanceSource;
+struct RenderRepresentation;
+struct MsgEntityCreate;
+struct MsgEntityUpdate;
+struct MsgEntityDelete;
+struct MsgPlotCreate;
+struct MsgPlotUpdate;
+struct MsgPlotDelete;
+struct MsgBufferCreate;
+struct MsgBufferDelete;
+struct MsgBufferViewCreate;
+struct MsgBufferViewDelete;
+struct TextureRef;
+struct PBRInfo;
+struct MsgMaterialCreate;
+struct MsgMaterialUpdate;
+struct MsgMaterialDelete;
+struct MsgImageCreate;
+struct MsgImageDelete;
+struct MsgTextureCreate;
+struct MsgTextureDelete;
+struct MsgSamplerCreate;
+struct MsgSamplerDelete;
+struct PointLight;
+struct SpotLight;
+struct DirectionalLight;
+struct MsgLightCreate;
+struct MsgLightUpdate;
+struct MsgLightDelete;
+struct Attribute;
+struct Index;
+struct GeometryPatch;
+struct MsgGeometryCreate;
+struct MsgGeometryDelete;
+struct MsgTableCreate;
+struct MsgTableUpdate;
+struct MsgTableDelete;
+struct MsgDocumentUpdate;
+struct MsgDocumentReset;
+struct MsgSignalInvoke;
+struct MethodException;
+struct MsgMethodReply;
+struct ServerMessage;
+struct MsgIntroduction;
+struct MsgInvokeMethod;
+} // namespace noo::messages
 
 namespace nooc {
 
@@ -66,7 +121,8 @@ struct MethodException {
     QCborValue additional;
 
     MethodException() = default;
-    MethodException(QCborMap);
+    MethodException(noo::messages::MethodException const&,
+                    InternalClientState&);
 };
 
 QString to_string(MethodException const&);
@@ -106,7 +162,7 @@ public:
     template <class... Args>
     void call(Args&&... args) {
         QCborArray arr;
-        (arr.push_back(convert_to_cbor(std::forward<Args>(args))), ...);
+        (arr.push_back(noo::to_cbor(std::forward<Args>(args))), ...);
         call_direct(arr);
     }
 
@@ -183,7 +239,7 @@ signals:
 template <class T>
 T _any_call_getter(QCborValue& source) {
     T ret;
-    noo::convert_from_cbor(source, ret);
+    noo::from_cbor(source, ret);
     return ret;
 }
 
@@ -236,8 +292,8 @@ auto reply_call_helper(Func&& f, QCborValue& source) {
 
 /// Contains methods attached to an object/table/document.
 class AttachedMethodList {
-    MethodContextPtr             m_context;
-    std::vector<MethodDelegate*> m_list;
+    MethodContextPtr         m_context;
+    QVector<MethodDelegate*> m_list;
 
     MethodDelegate* find_direct_by_name(QString) const;
     bool            check_direct_by_delegate(MethodDelegate*) const;
@@ -247,12 +303,12 @@ public:
     AttachedMethodList(MethodContextPtr);
 
     /// Internal use only
-    AttachedMethodList& operator=(std::vector<MethodDelegate*> const& l) {
+    AttachedMethodList& operator=(QVector<MethodDelegate*> const& l) {
         m_list = l;
         return *this;
     }
 
-    std::vector<MethodDelegate*> const& list() const { return m_list; }
+    QVector<MethodDelegate*> const& list() const { return m_list; }
 
 
     /// Find a method by name. This returns a reply object that is actually used
@@ -310,15 +366,15 @@ signals:
 
 /// Contains signals attached to an object/table/document.
 class AttachedSignalList {
-    MethodContextPtr                             m_context;
-    std::vector<std::unique_ptr<AttachedSignal>> m_list;
+    MethodContextPtr                         m_context;
+    QVector<std::shared_ptr<AttachedSignal>> m_list;
 
 public:
     // Internal use
     AttachedSignalList(MethodContextPtr);
 
     // Internal use
-    AttachedSignalList& operator=(std::vector<SignalDelegate*> const& l);
+    AttachedSignalList& operator=(QVector<SignalDelegate*> const& l);
 
     /// Find the attached signal by a name. Returns null if name is not found.
     AttachedSignal* find_by_name(QString) const;
@@ -337,7 +393,7 @@ struct ArgDoc {
     QString editor_hint;
 
     ArgDoc() = default;
-    ArgDoc(QCborMap);
+    ArgDoc(noo::messages::MethodArg const&, InternalClientState&);
 };
 
 /// Describes a noodles method
@@ -348,7 +404,7 @@ struct MethodInit {
     QVector<ArgDoc> argument_documentation;
 
     MethodInit();
-    MethodInit(QCborMap);
+    MethodInit(noo::messages::MsgMethodCreate const&, InternalClientState&);
 };
 
 /// The base delegate class for methods. Users can inherit from this to add
@@ -379,12 +435,12 @@ signals:
 // =============================================================================
 
 struct SignalInit {
-    QString             name;
-    QString             documentation;
-    std::vector<ArgDoc> argument_documentation;
+    QString         name;
+    QString         documentation;
+    QVector<ArgDoc> argument_documentation;
 
     SignalInit() = default;
-    SignalInit(QCborMap);
+    SignalInit(noo::messages::MsgSignalCreate const&, InternalClientState&);
 };
 
 /// The base delegate class for signals. Users can inherit from this to add
@@ -419,7 +475,7 @@ struct BufferInit {
     QByteArray inline_bytes;
     QUrl       url;
 
-    BufferInit(QCborMap);
+    BufferInit(noo::messages::MsgBufferCreate const&, InternalClientState&);
 };
 
 /// The base delegate class for buffers. Users can inherit from this to add
@@ -471,7 +527,8 @@ struct BufferViewInit {
     uint64_t                 offset;
     uint64_t                 length;
 
-    BufferViewInit(QCborMap, InternalClientState&);
+    BufferViewInit(noo::messages::MsgBufferViewCreate const&,
+                   InternalClientState&);
 };
 
 /// The base delegate class for buffers. Users can inherit from this to add
@@ -510,10 +567,10 @@ struct ImageInit {
     QPointer<BufferViewDelegate> local_image;
     QUrl                         remote_image;
 
-    ImageInit(QCborMap, InternalClientState&);
+    ImageInit(noo::messages::MsgImageCreate const&, InternalClientState&);
 };
 
-struct ImageDelegate : public QObject {
+class ImageDelegate : public QObject {
     Q_OBJECT
     noo::ImageID m_id;
     ImageInit    m_init;
@@ -571,10 +628,10 @@ struct SamplerInit {
     SamplerMode wrap_s = SamplerMode::REPEAT;
     SamplerMode wrap_t = SamplerMode::REPEAT;
 
-    SamplerInit(QCborMap, InternalClientState&);
+    SamplerInit(noo::messages::MsgSamplerCreate const&, InternalClientState&);
 };
 
-struct SamplerDelegate : public QObject {
+class SamplerDelegate : public QObject {
     Q_OBJECT
     noo::SamplerID m_id;
     SamplerInit    m_init;
@@ -595,7 +652,7 @@ struct TextureInit {
     QPointer<ImageDelegate>   image;
     QPointer<SamplerDelegate> sampler;
 
-    TextureInit(QCborMap, InternalClientState&);
+    TextureInit(noo::messages::MsgTextureCreate const&, InternalClientState&);
 };
 
 
@@ -628,7 +685,7 @@ struct TextureRef {
     glm::mat3                 transform          = glm::mat3(1);
     uint8_t                   texture_coord_slot = 0;
 
-    TextureRef(QCborMap, InternalClientState&);
+    TextureRef(noo::messages::TextureRef const&, InternalClientState&);
 };
 
 struct PBRInfo {
@@ -639,7 +696,7 @@ struct PBRInfo {
     float                     roughness = 1.0;
     std::optional<TextureRef> metal_rough_texture;
 
-    PBRInfo(QCborMap, InternalClientState&);
+    PBRInfo(noo::messages::PBRInfo const&, InternalClientState&);
 };
 
 struct MaterialInit {
@@ -658,7 +715,7 @@ struct MaterialInit {
     float alpha_cutoff = .5;
     bool  double_sided = false;
 
-    MaterialInit(QCborMap, InternalClientState&);
+    MaterialInit(noo::messages::MsgMaterialCreate const&, InternalClientState&);
 };
 
 struct MaterialUpdate { };
@@ -698,16 +755,26 @@ signals:
 
 struct PointLight {
     float range = -1;
+
+    PointLight() = default;
+    PointLight(noo::messages::PointLight const&, InternalClientState&);
 };
 
 struct SpotLight {
     float range                = -1;
     float inner_cone_angle_rad = 0;
     float outer_cone_angle_rad = M_PI / 4.0;
+
+    SpotLight() = default;
+    SpotLight(noo::messages::SpotLight const&, InternalClientState&);
 };
 
 struct DirectionLight {
     float range = -1;
+
+    DirectionLight() = default;
+    DirectionLight(noo::messages::DirectionalLight const&,
+                   InternalClientState&);
 };
 
 
@@ -719,14 +786,14 @@ struct LightInit {
     QColor  color     = Qt::white;
     float   intensity = 1;
 
-    LightInit(QCborMap);
+    LightInit(noo::messages::MsgLightCreate const&, InternalClientState&);
 };
 
 struct LightUpdate {
     std::optional<QColor> color;
     std::optional<float>  intensity;
 
-    LightUpdate(QCborMap);
+    LightUpdate(noo::messages::MsgLightUpdate const&, InternalClientState&);
 };
 
 /// The base light class for buffers. Users can inherit from this to add
@@ -797,13 +864,13 @@ struct Attribute {
     uint64_t stride = 0;
     Format   format;
 
-    std::optional<glm::vec4> minimum_value;
-    std::optional<glm::vec4> maximum_value;
+    QVector<float> minimum_value;
+    QVector<float> maximum_value;
 
     bool normalized = false;
 
     Attribute() = default;
-    Attribute(QCborMap, InternalClientState&);
+    Attribute(noo::messages::Attribute const&, InternalClientState&);
 };
 
 struct Index {
@@ -813,27 +880,27 @@ struct Index {
     Format   format;
 
     Index() = default;
-    Index(QCborMap, InternalClientState&);
+    Index(noo::messages::Index const&, InternalClientState&);
 };
 
 struct MeshPatch {
-    std::vector<Attribute> attributes;
+    QVector<Attribute> attributes;
 
-    Index indicies;
+    std::optional<Index> indicies;
 
     PrimitiveType type;
 
     QPointer<MaterialDelegate> material;
 
     MeshPatch() = default;
-    MeshPatch(QCborMap, InternalClientState&);
+    MeshPatch(noo::messages::GeometryPatch const&, InternalClientState&);
 };
 
 struct MeshInit {
-    QString                name;
-    std::vector<MeshPatch> patches;
+    QString            name;
+    QVector<MeshPatch> patches;
 
-    MeshInit(QCborMap, InternalClientState&);
+    MeshInit(noo::messages::MsgGeometryCreate const&, InternalClientState&);
 };
 
 class MeshDelegate : public QObject {
@@ -860,7 +927,8 @@ struct EntityTextDefinition {
     float   height = .25;
     float   width  = -1;
 
-    EntityTextDefinition(QCborMap, InternalClientState&);
+    EntityTextDefinition(noo::messages::TextRepresentation const&,
+                         InternalClientState&);
 };
 
 struct EntityWebpageDefinition {
@@ -868,7 +936,8 @@ struct EntityWebpageDefinition {
     float height = .5;
     float width  = .5;
 
-    EntityWebpageDefinition(QCborMap, InternalClientState&);
+    EntityWebpageDefinition(noo::messages::WebRepresentation const&,
+                            InternalClientState&);
 };
 
 struct InstanceSource {
@@ -876,14 +945,15 @@ struct InstanceSource {
     uint64_t                        stride = 0;
     std::optional<noo::BoundingBox> instance_bb;
 
-    InstanceSource(QCborMap, InternalClientState&);
+    InstanceSource(noo::messages::InstanceSource const&, InternalClientState&);
 };
 
 struct EntityRenderableDefinition {
     QPointer<MeshDelegate>        mesh;
     std::optional<InstanceSource> instances;
 
-    EntityRenderableDefinition(QCborMap, InternalClientState&);
+    EntityRenderableDefinition(noo::messages::RenderRepresentation const&,
+                               InternalClientState&);
 };
 
 struct EntityDefinition : std::variant<std::monostate,
@@ -896,22 +966,23 @@ struct EntityDefinition : std::variant<std::monostate,
 struct EntityInit {
     QString name;
 
-    EntityInit(QCborMap);
+    EntityInit(noo::messages::MsgEntityCreate const&, InternalClientState&);
 };
 
 struct EntityUpdateData {
-    std::optional<EntityDelegate*>                 parent;
+    std::optional<QPointer<EntityDelegate>>        parent;
     std::optional<glm::mat4>                       transform;
     std::optional<EntityDefinition>                definition;
-    std::optional<std::vector<LightDelegate*>>     lights;
-    std::optional<std::vector<TableDelegate*>>     tables;
-    std::optional<std::vector<PlotDelegate*>>      plots;
-    std::optional<std::vector<QString>>            tags;
-    std::optional<std::vector<MethodDelegate*>>    methods_list;
-    std::optional<std::vector<SignalDelegate*>>    signals_list;
+    std::optional<QVector<LightDelegate*>>         lights;
+    std::optional<QVector<TableDelegate*>>         tables;
+    std::optional<QVector<PlotDelegate*>>          plots;
+    std::optional<QVector<QString>>                tags;
+    std::optional<QVector<MethodDelegate*>>        methods_list;
+    std::optional<QVector<SignalDelegate*>>        signals_list;
     std::optional<std::optional<noo::BoundingBox>> influence;
 
-    EntityUpdateData(QCborMap, InternalClientState&);
+    EntityUpdateData(noo::messages::MsgEntityUpdate const&,
+                     InternalClientState&);
 };
 
 
@@ -952,14 +1023,14 @@ signals:
 struct TableInit {
     QString name;
 
-    TableInit(QCborMap);
+    TableInit(noo::messages::MsgTableCreate const&, InternalClientState&);
 };
 
 struct TableUpdate {
-    std::optional<std::vector<MethodDelegate*>> methods_list;
-    std::optional<std::vector<SignalDelegate*>> signals_list;
+    std::optional<QVector<MethodDelegate*>> methods_list;
+    std::optional<QVector<SignalDelegate*>> signals_list;
 
-    TableUpdate(QCborMap, InternalClientState&);
+    TableUpdate(noo::messages::MsgTableUpdate const&, InternalClientState&);
 };
 
 /// The base delegate class for tables. Users can inherit from this to add
@@ -1036,17 +1107,17 @@ using PlotType = std::variant<QString, QUrl>;
 struct PlotInit {
     QString name;
 
-    PlotInit(QCborMap);
+    PlotInit(noo::messages::MsgPlotCreate const&, InternalClientState&);
 };
 
 struct PlotUpdate {
     std::optional<QPointer<TableDelegate>> table;
     std::optional<PlotType>                type;
 
-    std::optional<std::vector<MethodDelegate*>> methods_list;
-    std::optional<std::vector<SignalDelegate*>> signals_list;
+    std::optional<QVector<MethodDelegate*>> methods_list;
+    std::optional<QVector<SignalDelegate*>> signals_list;
 
-    PlotUpdate(QCborMap, InternalClientState&);
+    PlotUpdate(noo::messages::MsgPlotUpdate const&, InternalClientState&);
 };
 
 class PlotDelegate : public QObject {
@@ -1086,10 +1157,10 @@ signals:
 // =============================================================================
 
 struct DocumentData {
-    std::optional<std::vector<MethodDelegate*>> methods_list;
-    std::optional<std::vector<SignalDelegate*>> signals_list;
+    std::optional<QVector<MethodDelegate*>> methods_list;
+    std::optional<QVector<SignalDelegate*>> signals_list;
 
-    DocumentData(QCborMap, InternalClientState&);
+    DocumentData(noo::messages::MsgDocumentUpdate const&, InternalClientState&);
 };
 
 

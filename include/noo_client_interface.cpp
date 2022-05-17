@@ -4,6 +4,7 @@
 #include "noo_interface_types.h"
 #include "src/client/client_common.h"
 #include "src/client/clientstate.h"
+#include "src/common/serialize.h"
 #include "src/common/variant_tools.h"
 
 #include <QWebSocket>
@@ -69,7 +70,40 @@ bool decode_entity(InternalClientState& state,
     __builtin_unreachable();
 }
 
+template <class T, class U>
+void convert(T const& in, QVector<U>& out, InternalClientState& state) {
+    // input better be some array
+    for (auto const& v : in) {
+        out << U(v, state);
+    }
+}
+
+template <class T, class U>
+void convert(T id, QPointer<U>& out, InternalClientState& state) {
+    out = state.lookup(id);
+}
+
+template <class T, class U>
+void convert(std::optional<T>     id,
+             QPointer<U>&         out,
+             InternalClientState& state) {
+    if (id) out = state.lookup(*id);
+}
+
+template <class T>
+void convert(std::optional<T> const& in, T& out, InternalClientState&) {
+    out = in.value_or(T());
+}
+
+
 // =============================================================================
+
+MethodException::MethodException(noo::messages::MethodException const& m,
+                                 InternalClientState&) {
+    code    = m.code;
+    message = m.message.value_or(QString());
+    if (m.data) additional = m.data.value();
+}
 
 QString to_string(MethodException const& me) {
     auto str = me.additional.toDiagnosticNotation();
@@ -195,7 +229,7 @@ void GetStringReply::interpret() {
 void GetStringListReply::interpret() {
     QStringList list;
 
-    noo::convert_from_cbor(m_var, list);
+    noo::from_cbor(m_var, list);
 
     if (list.empty()) {
         auto s = m_var.toDiagnosticNotation();
@@ -256,7 +290,7 @@ SignalDelegate* AttachedSignal::delegate() const {
 AttachedSignalList::AttachedSignalList(MethodContextPtr c) : m_context(c) { }
 
 AttachedSignalList&
-AttachedSignalList::operator=(std::vector<SignalDelegate*> const& l) {
+AttachedSignalList::operator=(QVector<SignalDelegate*> const& l) {
     // we want to preserve signals already attached. so we want to check if the
     // new list has signals we already have.
 
@@ -267,13 +301,14 @@ AttachedSignalList::operator=(std::vector<SignalDelegate*> const& l) {
     }
 
 
-    std::vector<std::unique_ptr<AttachedSignal>> to_keep;
+    QVector<std::shared_ptr<AttachedSignal>> to_keep;
 
-    for (auto& p : m_list) {
-        auto* ptr = p->delegate();
+    for (int i = 0; i < m_list.size(); i++) {
+        auto const p   = m_list[i];
+        auto*      ptr = p->delegate();
         assert(ptr);
         if (new_list.contains(ptr)) {
-            to_keep.emplace_back(std::move(p));
+            to_keep.emplace_back(p);
             new_list.erase(ptr);
         }
     }
@@ -312,22 +347,19 @@ AttachedSignalList::find_by_delegate(SignalDelegate* ptr) const {
 
 // =============================================================================
 
-ArgDoc::ArgDoc(QCborMap m) {
-    noo::CborDecoder decoder(m);
-
-    decoder("name", name);
-    decoder("doc", doc);
-    decoder("editor_hint", editor_hint);
+ArgDoc::ArgDoc(noo::messages::MethodArg const& m, InternalClientState&) {
+    name        = m.name;
+    doc         = m.doc.value_or(QString());
+    editor_hint = m.editor_hint.value_or(QString());
 }
 
-MethodInit::MethodInit(QCborMap m) {
-    noo::CborDecoder decoder(m);
+MethodInit::MethodInit(noo::messages::MsgMethodCreate const& m,
+                       InternalClientState&                  state) {
+    method_name          = m.name;
+    documentation        = m.doc.value_or(QString());
+    return_documentation = m.return_doc.value_or(QString());
 
-    decoder("name", method_name);
-    decoder("doc", documentation);
-    decoder("return_doc", return_documentation);
-
-    decoder("arg_dog", argument_documentation);
+    convert(m.arg_doc, argument_documentation, state);
 }
 
 MethodDelegate::MethodDelegate(noo::MethodID i, MethodInit const& d)
@@ -342,12 +374,11 @@ QString MethodDelegate::name() const {
 
 // =============================================================================
 
-SignalInit::SignalInit(QCborMap m) {
-    noo::CborDecoder decoder(m);
-
-    decoder("name", name);
-    decoder("doc", documentation);
-    decoder("arg_dog", argument_documentation);
+SignalInit::SignalInit(noo::messages::MsgSignalCreate const& m,
+                       InternalClientState&                  state) {
+    name          = m.name;
+    documentation = m.doc.value_or(QString());
+    convert(m.arg_doc, argument_documentation, state);
 }
 
 SignalDelegate::SignalDelegate(noo::SignalID i, SignalInit const& d)
@@ -362,20 +393,14 @@ QString SignalDelegate::name() const {
 
 // =============================================================================
 
-BufferInit::BufferInit(QCborMap m) {
-    noo::CborDecoder decoder(m);
+BufferInit::BufferInit(noo::messages::MsgBufferCreate const& m,
+                       InternalClientState&) {
 
-    decoder("name", name);
-    decoder("size", byte_count);
+    name       = m.name.value_or(QString());
+    byte_count = m.size;
 
-    auto inline_name  = QStringLiteral("inline_bytes");
-    auto outline_name = QStringLiteral("uri_bytes");
-
-    if (m.contains(inline_name)) {
-        decoder(inline_name, inline_bytes);
-    } else {
-        decoder(outline_name, url);
-    }
+    if (m.uri_bytes) url = m.uri_bytes.value();
+    if (m.inline_bytes) inline_bytes = m.inline_bytes.value();
 }
 
 BufferDelegate::BufferDelegate(noo::BufferID i, BufferInit const& data)
@@ -426,13 +451,19 @@ void BufferDelegate::on_ssl_error(QList<QSslError> const& errs) {
 
 // =============================================================================
 
-BufferViewInit::BufferViewInit(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder decoder(m);
+BufferViewInit::BufferViewInit(noo::messages::MsgBufferViewCreate const& m,
+                               InternalClientState& state) {
+    convert(m.name, name, state);
+    convert(m.source_buffer, source_buffer, state);
+    offset = m.offset;
+    length = m.length;
 
-    decoder(QStringLiteral("name"), name);
-    decode_entity(state, m[QStringLiteral("source_buffer")], source_buffer);
-    decoder(QStringLiteral("offset"), offset);
-    decoder(QStringLiteral("length"), length);
+    static const QHash<QString, ViewType> type_hash = {
+        { "UNK", UNKNOWN },
+        { "GEOMETRY", GEOMETRY_INFO },
+        { "IMAGE", IMAGE_INFO },
+    };
+    type = type_hash.value(m.type);
 }
 
 BufferViewDelegate::BufferViewDelegate(noo::BufferViewID     i,
@@ -450,18 +481,16 @@ noo::BufferViewID BufferViewDelegate::id() const {
 
 // =============================================================================
 
-ImageInit::ImageInit(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder decoder(m);
+ImageInit::ImageInit(noo::messages::MsgImageCreate const& m,
+                     InternalClientState&                 state) {
+    convert(m.name, name, state);
 
-    decoder(QStringLiteral("name"), name);
-
-    auto buffer_source_name = QStringLiteral("buffer_source");
-    auto uri_source_name    = QStringLiteral("uri_source");
-
-    if (m.contains(buffer_source_name)) {
-        decode_entity(state, m[buffer_source_name], local_image);
+    if (m.buffer_source) {
+        convert(*m.buffer_source, local_image, state);
+    } else if (m.uri_source) {
+        remote_image = *m.uri_source;
     } else {
-        decoder(uri_source_name, remote_image);
+        //
     }
 }
 
@@ -525,15 +554,26 @@ void ImageDelegate::on_buffer_ready() {
 
 // =============================================================================
 
-SamplerInit::SamplerInit(QCborMap m, InternalClientState&) {
-    noo::CborDecoder d(m);
+SamplerInit::SamplerInit(noo::messages::MsgSamplerCreate const& m,
+                         InternalClientState&                   state) {
+    convert(m.name, name, state);
 
-    d(QStringLiteral("name"), name);
-    d.conditional("mag_filter", mag_filter);
-    d.conditional("min_filter", min_filter);
+    static const QHash<QString, MagFilter> mag_hash = {
+        { "NEAREST", MagFilter::NEAREST },
+        { "LINEAR", MagFilter::LINEAR },
+    };
 
-    d.conditional("wrap_s", wrap_s);
-    d.conditional("wrap_t", wrap_t);
+    static const QHash<QString, MinFilter> min_hash = {
+        { "NEAREST", MinFilter::NEAREST },
+        { "LINEAR", MinFilter::LINEAR },
+        { "LINEAR_MIPMAP_LINEAR", MinFilter::LINEAR_MIPMAP_LINEAR },
+    };
+
+    static const QHash<QString, SamplerMode> samp_hash = {
+        { "CLAMP_TO_EDGE", SamplerMode::CLAMP_TO_EDGE },
+        { "MIRRORED_REPEAT", SamplerMode::MIRRORED_REPEAT },
+        { "REPEAT", SamplerMode::REPEAT },
+    };
 }
 
 SamplerDelegate::SamplerDelegate(noo::SamplerID i, SamplerInit const& data)
@@ -545,13 +585,11 @@ noo::SamplerID SamplerDelegate::id() const {
 
 // =============================================================================
 
-TextureInit::TextureInit(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder d(m);
-
-    d(QStringLiteral("name"), name);
-
-    decode_entity(state, m[QStringLiteral("image")], image);
-    decode_entity(state, m[QStringLiteral("sampler")], sampler);
+TextureInit::TextureInit(noo::messages::MsgTextureCreate const& m,
+                         InternalClientState&                   state) {
+    convert(m.name, name, state);
+    convert(m.image, image, state);
+    convert(m.sampler, sampler, state);
 }
 
 TextureDelegate::TextureDelegate(noo::TextureID i, TextureInit const& data)
@@ -570,48 +608,50 @@ noo::TextureID TextureDelegate::id() const {
 
 // =============================================================================
 
-TextureRef::TextureRef(QCborMap m, InternalClientState& state) {
-    decode_entity(state, m[QStringLiteral("texture")], texture);
-
-    noo::CborDecoder d(m);
-    d.conditional("transform", transform);
-    d.conditional("texture_coord_slot", texture_coord_slot);
+template <class T>
+void convert(T const&                   opt,
+             std::optional<TextureRef>& out,
+             InternalClientState&       state) {
+    if (opt) { out.emplace(*opt, state); }
 }
 
-PBRInfo::PBRInfo(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder d(m);
-    d.conditional("base_color", base_color);
-
-    decode_entity(
-        state, m[QStringLiteral("base_color_texture")], base_color_texture);
-
-    d.conditional("metallic", metallic);
-    d.conditional("roughness", roughness);
-
-    decode_entity(
-        state, m[QStringLiteral("metal_rough_texture")], metal_rough_texture);
+TextureRef::TextureRef(noo::messages::TextureRef const& m,
+                       InternalClientState&             state) {
+    convert(m.texture, texture, state);
+    convert(m.transform, transform, state);
+    texture_coord_slot = m.texture_coord_slot.value_or(texture_coord_slot);
 }
 
-MaterialInit::MaterialInit(QCborMap m, InternalClientState& state)
-    : pbr_info(m[QStringLiteral("pbr_info")].toMap(), state) {
-    noo::CborDecoder d(m);
+PBRInfo::PBRInfo(noo::messages::PBRInfo const& m, InternalClientState& state) {
+    base_color = m.base_color;
 
-    d(QStringLiteral("name"), name);
+    convert(m.base_color_texture, base_color_texture, state);
 
-    decode_entity(state, m[QStringLiteral("normal_texture")], normal_texture);
+    metallic  = m.metallic;
+    roughness = m.roughness;
 
-    decode_entity(
-        state, m[QStringLiteral("occlusion_texture")], occlusion_texture);
-    d.conditional(QStringLiteral("occlusion_texture_factor"),
-                  occlusion_texture_factor);
+    convert(m.metal_rough_texture, metal_rough_texture, state);
+}
 
-    decode_entity(
-        state, m[QStringLiteral("emissive_texture")], emissive_texture);
-    d.conditional(QStringLiteral("emissive_factor"), emissive_factor);
+MaterialInit::MaterialInit(noo::messages::MsgMaterialCreate const& m,
+                           InternalClientState&                    state)
+    : pbr_info(m.pbr_info, state) {
 
-    d.conditional(QStringLiteral("use_alpha"), use_alpha);
-    d.conditional(QStringLiteral("alpha_cutoff"), alpha_cutoff);
-    d.conditional(QStringLiteral("double_sided"), double_sided);
+    convert(m.name, name, state);
+
+    convert(m.normal_texture, normal_texture, state);
+
+    convert(m.occlusion_texture, occlusion_texture, state);
+    if (m.occlusion_texture_factor) {
+        occlusion_texture_factor = m.occlusion_texture_factor.value();
+    }
+
+    convert(m.emissive_texture, emissive_texture, state);
+    if (m.emissive_factor) { emissive_factor = m.emissive_factor.value(); }
+
+    use_alpha    = m.use_alpha.value_or(false);
+    alpha_cutoff = m.alpha_cutoff.value_or(.5);
+    double_sided = m.double_sided.value_or(false);
 }
 
 MaterialDelegate::MaterialDelegate(noo::MaterialID i, MaterialInit const& data)
@@ -664,36 +704,43 @@ void MaterialDelegate::texture_ready(QImage) {
 
 // =============================================================================
 
-LightInit::LightInit(QCborMap m) {
-    noo::CborDecoder d(m);
-
-    d(QStringLiteral("name"), name);
-
-    auto point_name = QStringLiteral("point");
-    auto spot_name  = QStringLiteral("spot");
-    auto dir_name   = QStringLiteral("directional");
-
-    if (m.contains(dir_name)) {
-        DirectionLight& l = type.emplace<DirectionLight>();
-        d(dir_name, l);
-    } else if (m.contains(spot_name)) {
-        SpotLight& l = type.emplace<SpotLight>();
-        d(spot_name, l);
-    } else {
-        // default to point
-        PointLight& l = type.emplace<PointLight>();
-        d(point_name, l);
-    }
-
-    d.conditional("color", color);
-    d.conditional("intensity", intensity);
+PointLight::PointLight(noo::messages::PointLight const& pl,
+                       InternalClientState&) {
+    range = pl.range;
 }
 
-LightUpdate::LightUpdate(QCborMap m) {
-    noo::CborDecoder d(m);
+SpotLight::SpotLight(noo::messages::SpotLight const& sl, InternalClientState&) {
+    range                = sl.range;
+    inner_cone_angle_rad = sl.inner_cone_angle_rad;
+    outer_cone_angle_rad = sl.outer_cone_angle_rad;
+}
 
-    d.conditional("color", color);
-    d.conditional("intensity", intensity);
+DirectionLight::DirectionLight(noo::messages::DirectionalLight const& dl,
+                               InternalClientState&) {
+    range = dl.range;
+}
+
+LightInit::LightInit(noo::messages::MsgLightCreate const& m,
+                     InternalClientState&                 state) {
+    convert(m.name, name, state);
+
+    if (m.point) {
+        this->type = PointLight(*m.point, state);
+    } else if (m.spot) {
+        this->type = SpotLight(*m.spot, state);
+    } else if (m.directional) {
+        this->type = DirectionLight(*m.directional, state);
+    }
+
+    color     = m.color;
+    intensity = m.intensity;
+}
+
+LightUpdate::LightUpdate(noo::messages::MsgLightUpdate const& m,
+                         InternalClientState&) {
+
+    if (m.color) { color = m.color; }
+    if (m.intensity) { intensity = m.intensity; }
 }
 
 LightDelegate::LightDelegate(noo::LightID i, LightInit const& data)
@@ -714,57 +761,75 @@ void LightDelegate::on_update(LightUpdate const&) { }
 
 // =============================================================================
 
-Attribute::Attribute(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder d(m);
+static QHash<QString, Format> fmt_hash = {
+    { "U8", Format::U8 },           { "U16", Format::U16 },
+    { "U32", Format::U32 },         { "U8VEC4", Format::U8VEC4 },
+    { "U16VEC2", Format::U16VEC2 }, { "VEC2", Format::VEC2 },
+    { "VEC3", Format::VEC3 },       { "VEC4", Format::VEC4 },
+    { "MAT3", Format::MAT3 },       { "MAT4", Format::MAT4 },
+};
 
-    decode_entity(state, m[QStringLiteral("view")], view);
+Attribute::Attribute(noo::messages::Attribute const& m,
+                     InternalClientState&            state) {
+    convert(m.view, view, state);
 
-    d(QStringLiteral("semantic"), semantic);
-    d.conditional(QStringLiteral("channel"), channel);
-    d.conditional(QStringLiteral("stride"), stride);
-    d(QStringLiteral("format"), format);
+    static QHash<QString, AttributeSemantic> attrib_hash = {
+        { "POSITION", AttributeSemantic::POSITION },
+        { "NORMAL", AttributeSemantic::NORMAL },
+        { "TANGENT", AttributeSemantic::TANGENT },
+        { "TEXTURE", AttributeSemantic::TEXTURE },
+        { "COLOR", AttributeSemantic::COLOR },
+    };
 
-    d(QStringLiteral("minimum_value"), minimum_value);
-    d(QStringLiteral("maximum_value"), maximum_value);
+    semantic = attrib_hash.value(m.semantic);
 
-    d.conditional(QStringLiteral("normalized"), normalized);
+    if (m.channel) channel = *m.channel;
+    if (m.stride) stride = *m.stride;
+    format = fmt_hash.value(m.format);
+
+    if (m.maximum_value) maximum_value = *m.maximum_value;
+    if (m.minimum_value) minimum_value = *m.minimum_value;
+
+    normalized = m.normalized;
 }
 
-Index::Index(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder d(m);
+Index::Index(noo::messages::Index const& m, InternalClientState& state) {
+    convert(m.view, view, state);
+    if (m.stride) stride = m.stride.value();
 
-    decode_entity(state, m[QStringLiteral("view")], view);
-    d.conditional(QStringLiteral("stride"), stride);
-    d(QStringLiteral("format"), format);
+    format = fmt_hash.value(m.format);
 }
 
-MeshPatch::MeshPatch(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder d(m);
+MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
+                     InternalClientState&                state) {
 
-    {
-        auto attrib_arr = m[QStringLiteral("attributes")].toArray();
-
-        for (auto attrib : attrib_arr) {
-            attributes.emplace_back(attrib.toMap(), state);
-        }
+    for (auto const& lm : m.attributes) {
+        attributes << Attribute(lm, state);
     }
 
-    indicies = Index(m[QStringLiteral("indicies")].toMap(), state);
+    if (m.indicies) { indicies = Index(m.indicies.value(), state); }
 
-    d(QStringLiteral("type"), type);
+    static QHash<QString, PrimitiveType> prim_hash = {
+        { "POINTS", PrimitiveType::POINTS },
+        { "LINES", PrimitiveType::LINES },
+        { "LINE_LOOP", PrimitiveType::LINE_LOOP },
+        { "LINE_STRIP", PrimitiveType::LINE_STRIP },
+        { "TRIANGLES", PrimitiveType::TRIANGLES },
+        { "TRIANGLE_STRIP", PrimitiveType::TRIANGLE_STRIP },
+        { "TRIANGLE_FAN", PrimitiveType::TRIANGLE_FAN },
+    };
 
-    decode_entity(state, m[QStringLiteral("material")], material);
+    type = prim_hash.value(m.type);
+
+    convert(m.material, material, state);
 }
 
-MeshInit::MeshInit(QCborMap m, InternalClientState& state) {
-    noo::CborDecoder d(m);
+MeshInit::MeshInit(noo::messages::MsgGeometryCreate const& m,
+                   InternalClientState&                    state) {
+    convert(m.name, name, state);
 
-    d(QStringLiteral("name"), name);
-
-    auto patch_arr = m[QStringLiteral("patches")].toArray();
-
-    for (auto sp : patch_arr) {
-        patches.emplace_back(sp.toMap(), state);
+    for (auto const& lm : m.patches) {
+        patches << MeshPatch(lm, state);
     }
 }
 
@@ -782,15 +847,28 @@ void MeshDelegate::prepare_delete() { }
 
 // =============================================================================
 
-TableInit::TableInit(QCborMap m) {
-    noo::CborDecoder d(m);
+template <class T, class U>
+void convert(std::optional<QVector<T>> const& in_id_list,
+             std::optional<QVector<U*>>&      out_list,
+             InternalClientState&             state) {
+    if (!in_id_list) return;
 
-    d(QStringLiteral("name"), name);
+    auto& out_unpacked = out_list.emplace();
+
+    for (auto const& lv : in_id_list.value()) {
+        out_unpacked << state.lookup(lv);
+    }
 }
 
-TableUpdate::TableUpdate(QCborMap m, InternalClientState& state) {
-    decode_entity(state, m[QStringLiteral("methods_list")], methods_list);
-    decode_entity(state, m[QStringLiteral("signals_list")], signals_list);
+TableInit::TableInit(noo::messages::MsgTableCreate const& m,
+                     InternalClientState&                 state) {
+    convert(m.name, name, state);
+}
+
+TableUpdate::TableUpdate(noo::messages::MsgTableUpdate const& m,
+                         InternalClientState&                 state) {
+    convert(m.methods_list, methods_list, state);
+    convert(m.signals_list, signals_list, state);
 }
 
 TableDelegate::TableDelegate(noo::TableID i, TableInit const& data)
@@ -889,7 +967,7 @@ PendingMethodReply*
 TableDelegate::request_rows_insert(QCborArray&& columns) const {
     auto* p = attached_methods().new_call_by_name("tbl_insert");
 
-    p->call(columns);
+    p->call_direct(columns);
 
     return p;
 }
@@ -937,7 +1015,7 @@ TableDelegate::request_selection_update(QString        name,
                                         noo::Selection selection) const {
     auto* p = attached_methods().new_call_by_name("tbl_update_selection");
 
-    p->call(name, selection.to_any());
+    p->call(name, selection.to_cbor());
 
     return p;
 }
@@ -983,78 +1061,72 @@ void TableDelegate::interp_table_sel_update(QCborArray const& ref) {
 
 // =============================================================================
 
-EntityTextDefinition::EntityTextDefinition(QCborMap m, InternalClientState&) {
-    auto d = noo::CborDecoder(m);
-
-    d("txt", text);
-
-    d.conditional("font", font);
-    d.conditional("height", height);
-    d.conditional("width", width);
+EntityTextDefinition::EntityTextDefinition(
+    noo::messages::TextRepresentation const& m,
+    InternalClientState&) {
+    text   = m.txt;
+    font   = m.font;
+    height = m.height;
+    width  = m.width;
 }
 
-EntityWebpageDefinition::EntityWebpageDefinition(QCborMap m,
-                                                 InternalClientState&) {
-    auto d = noo::CborDecoder(m);
+EntityWebpageDefinition::EntityWebpageDefinition(
+    noo::messages::WebRepresentation const& m,
+    InternalClientState&) {
+    url = m.source;
 
-    d("source", url);
-
-    d.conditional("height", height);
-    d.conditional("width", width);
+    height = m.height;
+    width  = m.width;
 }
 
-InstanceSource::InstanceSource(QCborMap m, InternalClientState& state) {
+InstanceSource::InstanceSource(noo::messages::InstanceSource const& m,
+                               InternalClientState&                 state) {
 
-    auto d = noo::CborDecoder(m);
-
-    decode_entity(state, m[QStringLiteral("view")], view);
-    d.conditional("stride", stride);
-    d("bb", instance_bb);
+    convert(m.view, view, state);
+    stride = m.stride;
+    if (m.bb) instance_bb = m.bb.value();
 }
 
 EntityRenderableDefinition::EntityRenderableDefinition(
-    QCborMap             m,
-    InternalClientState& state) {
+    noo::messages::RenderRepresentation const& m,
+    InternalClientState&                       state) {
 
-    decode_entity(state, m[QStringLiteral("mesh")], mesh);
-    decode_entity(state, m[QStringLiteral("instances")], instances);
+    convert(m.mesh, mesh, state);
+
+    if (m.instances) instances = InstanceSource(*m.instances, state);
 }
 
-EntityInit::EntityInit(QCborMap m) {
-    auto decoder = noo::CborDecoder(m);
-
-    decoder("name", name);
+EntityInit::EntityInit(noo::messages::MsgEntityCreate const& m,
+                       InternalClientState&                  state) {
+    convert(m.name, name, state);
 }
 
-static auto e_null_rep   = QStringLiteral("null_rep");
-static auto e_text_rep   = QStringLiteral("text_rep");
-static auto e_web_rep    = QStringLiteral("web_rep");
-static auto e_render_rep = QStringLiteral("render_rep");
 
-EntityUpdateData::EntityUpdateData(QCborMap value, InternalClientState& state) {
-    auto d = noo::CborDecoder(value);
+EntityUpdateData::EntityUpdateData(noo::messages::MsgEntityUpdate const& m,
+                                   InternalClientState& state) {
 
-    decode_entity(state, value[QStringLiteral("parent")], parent);
-    d("transform", transform);
+    if (m.parent) convert(*m.parent, parent.emplace(), state);
+    if (m.transform) transform = *m.transform;
 
-    if (value.contains(e_null_rep)) {
+    if (m.null_rep) {
         definition = std::monostate();
-    } else if (value.contains(e_text_rep)) {
-        definition = EntityTextDefinition(value[e_text_rep].toMap(), state);
-    } else if (value.contains(e_web_rep)) {
-        definition = EntityWebpageDefinition(value[e_web_rep].toMap(), state);
-    } else if (value.contains(e_render_rep)) {
-        definition =
-            EntityRenderableDefinition(value[e_render_rep].toMap(), state);
+    } else if (m.text_rep) {
+        definition = EntityTextDefinition(*m.text_rep, state);
+    } else if (m.web_rep) {
+        definition = EntityWebpageDefinition(*m.web_rep, state);
+    } else if (m.render_rep) {
+        definition = EntityRenderableDefinition(*m.render_rep, state);
     }
 
-    decode_entity(state, value[QStringLiteral("lights")], lights);
-    decode_entity(state, value[QStringLiteral("tables")], tables);
-    decode_entity(state, value[QStringLiteral("plots")], plots);
-    d("tags", tags);
-    decode_entity(state, value[QStringLiteral("methods_list")], methods_list);
-    decode_entity(state, value[QStringLiteral("signals_list")], signals_list);
-    d("influence", influence);
+    convert(m.lights, lights, state);
+    convert(m.tables, tables, state);
+    convert(m.plots, plots, state);
+
+    if (m.tags) tags = *m.tags;
+
+    convert(m.methods_list, methods_list, state);
+    convert(m.signals_list, signals_list, state);
+    if (m.influence) influence = m.influence.value();
 }
 
 EntityDelegate::EntityDelegate(noo::EntityID i, EntityUpdateData const& data)
@@ -1084,37 +1156,28 @@ void EntityDelegate::prepare_delete() { }
 
 // =============================================================================
 
-PlotInit::PlotInit(QCborMap m) {
-    auto d = noo::CborDecoder(m);
-
-    d("name", name);
+PlotInit::PlotInit(noo::messages::MsgPlotCreate const& m,
+                   InternalClientState&                state) {
+    convert(m.name, name, state);
 }
 
-PlotUpdate::PlotUpdate(QCborMap m, InternalClientState& state) {
-    auto d = noo::CborDecoder(m);
+PlotUpdate::PlotUpdate(noo::messages::MsgPlotUpdate const& m,
+                       InternalClientState&                state) {
 
-    decode_entity(state, m[QStringLiteral("table")], table);
+    if (m.table) convert(*m.table, table.emplace(), state);
 
-    auto simple_name = QStringLiteral("simple_plot");
-    auto url_name    = QStringLiteral("url_plot");
-
-    if (m.contains(simple_name)) {
-        QString def;
-        d(simple_name, def);
-        type = def;
-    } else {
-        QUrl url;
-        d(url_name, url);
-        type = url;
+    if (m.simple_plot) {
+        type = *m.simple_plot;
+    } else if (m.url_plot) {
+        type = *m.url_plot;
     }
 
-    decode_entity(state, m[QStringLiteral("methods_list")], methods_list);
-    decode_entity(state, m[QStringLiteral("signals_list")], signals_list);
+    convert(m.methods_list, methods_list, state);
+    convert(m.signals_list, signals_list, state);
 }
 
 PlotDelegate::PlotDelegate(noo::PlotID i, PlotInit const& data)
     : m_id(i), m_attached_methods(this), m_attached_signals(this) {
-
     m_name = data.name;
 }
 PlotDelegate::~PlotDelegate() = default;
@@ -1143,9 +1206,10 @@ void PlotDelegate::prepare_delete() { }
 
 // =============================================================================
 
-DocumentData::DocumentData(QCborMap m, InternalClientState& state) {
-    decode_entity(state, m[QStringLiteral("methods_list")], methods_list);
-    decode_entity(state, m[QStringLiteral("signals_list")], signals_list);
+DocumentData::DocumentData(noo::messages::MsgDocumentUpdate const& m,
+                           InternalClientState&                    state) {
+    convert(m.methods_list, methods_list, state);
+    convert(m.signals_list, signals_list, state);
 }
 
 DocumentDelegate::DocumentDelegate()
@@ -1286,7 +1350,6 @@ create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
             return std::make_unique<DEL>(id, d);                               \
         };                                                                     \
     }
-
     CREATE_DEFAULT(tex_maker, TextureID, TextureInit, TextureDelegate);
     CREATE_DEFAULT(buffer_maker, BufferID, BufferInit, BufferDelegate);
     CREATE_DEFAULT(

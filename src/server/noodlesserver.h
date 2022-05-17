@@ -13,7 +13,11 @@ class QWebSocket;
 
 namespace noo {
 
-class Writer;
+namespace messages {
+class ClientMessage;
+}
+
+class SMsgWriter;
 class NoodlesState;
 class TableT;
 class DocumentT;
@@ -27,7 +31,7 @@ class ClientT : public QObject {
 
     QString     m_name;
     QWebSocket* m_socket;
-    bool        m_use_binary = true;
+    // bool        m_use_binary = true;
 
     size_t m_bytes_counter = 0;
 
@@ -35,7 +39,7 @@ public:
     ClientT(QWebSocket*, QObject*);
     ~ClientT();
 
-    void set_name(std::string const&);
+    void set_name(QString);
 
     void kill();
 
@@ -48,7 +52,7 @@ private slots:
 
 signals:
     void finished();
-    void message_recvd(std::shared_ptr<IncomingMessage>);
+    void message_recvd(QVector<messages::ClientMessage> const&);
 };
 
 // =============================================================================
@@ -68,9 +72,9 @@ public:
 
     NoodlesState* state();
 
-    std::unique_ptr<Writer> get_broadcast_writer();
-    std::unique_ptr<Writer> get_single_client_writer(ClientT&);
-    std::unique_ptr<Writer> get_table_subscribers_writer(TableT&);
+    std::unique_ptr<SMsgWriter> get_broadcast_writer();
+    std::unique_ptr<SMsgWriter> get_single_client_writer(ClientT&);
+    std::unique_ptr<SMsgWriter> get_table_subscribers_writer(TableT&);
 
 public slots:
     void broadcast(QByteArray);
@@ -79,7 +83,7 @@ private slots:
     void on_new_connection();
     void on_client_done();
 
-    void on_client_message(std::shared_ptr<IncomingMessage>);
+    void on_client_message(QVector<messages::ClientMessage> const&);
 
 signals:
 };

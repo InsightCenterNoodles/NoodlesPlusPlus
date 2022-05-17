@@ -45,15 +45,16 @@ InternalClientState::InternalClientState(QWebSocket& s, ClientDelegates& makers)
 
     // send introduction message
 
-    ClientWriter writer(m_socket);
 
     QString cname = makers.client_name.isEmpty() ? QString("Noodles C++ Client")
                                                  : makers.client_name;
 
-    QCborMap message;
-    message[QStringLiteral("client_name")] = cname;
+    noo::messages::MsgIntroduction intro;
+    intro.client_name = cname;
 
-    writer.add(message, 0);
+    ClientWriter writer(m_socket);
+
+    writer.add(intro);
 
     qDebug() << Q_FUNC_INFO;
 }
@@ -97,6 +98,8 @@ void InternalClientState::on_method_ask_invoke(noo::MethodID       method_id,
     Q_ASSERT(reply->parent() != this);
     reply->setParent(this);
 
+    noo::messages::MsgInvokeMethod invoke;
+
     // generate an invoke id
     m_last_invoke_id++;
     auto id = QString("%1").arg(m_last_invoke_id);
@@ -105,28 +108,20 @@ void InternalClientState::on_method_ask_invoke(noo::MethodID       method_id,
 
     m_in_flight_methods[id] = reply;
 
-    QCborMap message;
-    message[QStringLiteral("method")]    = method_id.to_cbor();
-    message[QStringLiteral("invoke_id")] = id;
-    message[QStringLiteral("args")]      = args;
-
-    auto context_name = QStringLiteral("context");
+    invoke.invoke_id = id;
+    invoke.args      = args;
+    invoke.method    = method_id;
 
     VMATCH(
         context,
         VCASE(std::monostate) {
             // do nothing
         },
-        VCASE(auto const& ptr) {
-            noo::InvokeID inv_id;
-            inv_id                = ptr->id();
-            message[context_name] = inv_id.to_cbor();
-        }, );
-
+        VCASE(auto const& ptr) { invoke.context = ptr->id(); }, );
 
     ClientWriter writer(m_socket);
 
-    writer.add(message, 1);
+    writer.add(invoke);
 }
 
 } // namespace nooc

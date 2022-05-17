@@ -1,8 +1,6 @@
 #ifndef INTERFACE_TYPES_H
 #define INTERFACE_TYPES_H
 
-#include "noo_any.h"
-#include "noo_anyref.h"
 #include "noo_id.h"
 #include "noo_include_glm.h"
 
@@ -23,22 +21,47 @@
 
 namespace noo {
 
-// convert to a CBOR
+struct Selection;
 
-QVector<double>  coerce_to_real_list(QCborValue);
-QVector<int64_t> coerce_to_int_list(QCborValue);
-
-
-// Convert from a CBOR
 
 template <class...>
 constexpr std::false_type always_false {};
 
-template <class T>
-QCborValue convert_to_cbor(T);
+// =============================================================================
+// convert to a CBOR
+
+QCborValue to_cbor(std::span<double>);
+QCborValue to_cbor(std::span<int64_t>);
+QCborValue to_cbor(QVector<int64_t>);
+
+QCborValue to_cbor(glm::vec3);
+QCborValue to_cbor(glm::vec4);
+
+inline QCborValue to_cbor(QCborValue v) {
+    return v;
+}
+inline QCborValue to_cbor(QCborArray v) {
+    return v;
+}
+inline QCborValue to_cbor(QString v) {
+    return v;
+}
+
+QCborValue to_cbor(Selection const& t);
+
+template <class... Args>
+QCborArray convert_to_cbor_array(Args... args) {
+    return QCborArray { to_cbor(args)... };
+}
+
+// =============================================================================
+// Convert from a CBOR
+
+QVector<double>  coerce_to_real_list(QCborValue);
+QVector<int64_t> coerce_to_int_list(QCborValue);
 
 template <class T>
-bool convert_from_cbor(QCborValue v, T& t) {
+bool from_cbor(QCborValue v, T& t) {
     if constexpr (std::is_constructible_v<T, QCborMap>) {
         t = T(v.toMap());
         return true;
@@ -47,61 +70,90 @@ bool convert_from_cbor(QCborValue v, T& t) {
     }
 }
 
-inline bool convert_from_cbor(QCborValue v, QCborArray& array) {
+inline bool from_cbor(QCborValue v, QCborArray& array) {
     array = v.toArray();
     return true;
 }
 
-inline bool convert_from_cbor(QCborValue v, QString& s) {
+inline bool from_cbor(QCborValue v, bool& s) {
+    s = v.toBool();
+    return true;
+}
+
+inline bool from_cbor(QCborValue v, int64_t& s) {
+    s = v.toInteger();
+    return true;
+}
+
+inline bool from_cbor(QCborValue v, double& s) {
+    s = v.toDouble();
+    return true;
+}
+
+inline bool from_cbor(QCborValue v, QString& s) {
     s = v.toString();
     return true;
 }
 
-inline bool convert_from_cbor(QCborValue v, glm::vec4& s) {
+inline bool from_cbor(QCborValue v, glm::vec3& s) {
     auto arr = v.toArray();
-    s.x      = arr[0].toDouble(1);
-    s.y      = arr[1].toDouble(1);
-    s.z      = arr[2].toDouble(1);
-    s.w      = arr[3].toDouble(1);
+    s.x      = arr[0].toDouble(0);
+    s.y      = arr[1].toDouble(0);
+    s.z      = arr[2].toDouble(0);
     return true;
 }
 
-inline bool convert_from_cbor(QCborValue v, QColor& s) {
-    glm::vec4 col;
-    convert_from_cbor(v, col);
-    s = QColor(col.r, col.g, col.b, col.a);
+inline bool from_cbor(QCborValue v, glm::vec4& s) {
+    auto arr = v.toArray();
+    s.x      = arr[0].toDouble(0);
+    s.y      = arr[1].toDouble(0);
+    s.z      = arr[2].toDouble(0);
+    s.w      = arr[3].toDouble(0);
+    return true;
+}
+
+inline bool from_cbor(QCborValue v, QColor& s) {
+    auto arr = v.toArray();
+    s.setRedF(arr[0].toDouble(1));
+    s.setGreenF(arr[1].toDouble(1));
+    s.setBlueF(arr[2].toDouble(1));
+    s.setAlphaF(arr[3].toDouble());
     return true;
 }
 
 template <class T>
-bool convert_from_cbor(QCborValue v, QVector<T>& out) {
+bool from_cbor(QCborValue v, QVector<T>& out) {
     out.clear();
     auto arr = v.toArray();
     for (auto const& arr_v : arr) {
         T item;
-        if (!convert_from_cbor(arr_v, item)) return false;
+        if (!from_cbor(arr_v, item)) return false;
         out.push_back(std::move(item));
     }
+    return true;
 }
 
 template <class T>
-bool convert_from_cbor(QCborValue v, std::vector<T>& out) {
+bool from_cbor(QCborValue v, std::vector<T>& out) {
     out.clear();
     auto arr = v.toArray();
     for (auto const& arr_v : arr) {
         T item;
-        if (!convert_from_cbor(arr_v, item)) return false;
+        if (!from_cbor(arr_v, item)) return false;
         out.push_back(std::move(item));
     }
+    return true;
 }
 
 template <class T>
-bool convert_from_cbor(QCborValue v, std::optional<T>& out) {
+bool from_cbor(QCborValue v, std::optional<T>& out) {
     out.reset();
     if (v.isUndefined()) { return true; }
     T& lt = out.emplace();
-    return convert_from_cbor(v, lt);
+    return from_cbor(v, lt);
 }
+
+// =============================================================================
 
 struct CborDecoder {
     QCborMap map;
@@ -112,13 +164,13 @@ struct CborDecoder {
     template <class T>
     bool operator()(QString n, T& t) {
         using namespace noo;
-        return convert_from_cbor(map[n], t);
+        return from_cbor(map[n], t);
     }
 
     template <class T>
     bool conditional(QString n, T& t) {
         using namespace noo;
-        if (map.contains(n)) { return convert_from_cbor(map[n], t); }
+        if (map.contains(n)) { return from_cbor(map[n], t); }
         return true;
     }
 };
@@ -132,13 +184,13 @@ struct Selection {
     using Pair = std::pair<int64_t, int64_t>;
     static_assert(sizeof(Pair) == 2 * sizeof(int64_t));
 
-    std::vector<int64_t> rows;
-    std::vector<Pair>    row_ranges;
+    QVector<int64_t> rows;
+    QVector<Pair>    row_ranges;
 
     Selection() = default;
     Selection(QCborMap);
 
-    QCborValue to_any() const;
+    QCborValue to_cbor() const;
 };
 
 // =============================================================================

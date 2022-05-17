@@ -1,128 +1,18 @@
 #include "noodlesserver.h"
 
 #include "noodlesstate.h"
-#include "serialize.h"
-#include "src/generated/noodles_bfbs.h"
-#include "src/generated/noodles_generated.h"
-
-#include <flatbuffers/idl.h>
-#include <flatbuffers/minireflect.h>
+#include "src/common/serialize.h"
+#include "src/common/variant_tools.h"
 
 #include <QDebug>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonParseError>
+#include <QJsonValue>
 #include <QWebSocket>
 #include <QWebSocketServer>
 
 namespace noo {
-
-// =============================================================================
-
-QString message_to_json(void const* table, std::string const& table_name) {
-
-    flatbuffers::Parser parser;
-    bool                ok =
-        parser.Deserialize(noodles::noodles_bfbs, noodles::noodles_bfbs_len);
-
-    if (!ok) {
-        qCritical() << "Internal error: Cannot load schema.";
-        return QString();
-    }
-
-    parser.opts.output_default_scalars_in_json = true;
-    parser.opts.indent_step                    = 0;
-
-    std::string text;
-
-    ok = flatbuffers::GenerateTextFromTable(parser, table, table_name, &text);
-
-    if (!ok) {
-        qCritical() << "Internal error: Cannot generate text!";
-        return QString();
-    }
-
-    return QString::fromStdString(text);
-}
-
-// =============================================================================
-
-class IncomingMessage {
-    QByteArray m_data_ref;
-
-    std::unique_ptr<flatbuffers::Parser> m_parser;
-
-    noodles::ClientMessages const* m_messages = nullptr;
-
-public:
-    IncomingMessage(QByteArray bytes) {
-        qDebug() << Q_FUNC_INFO << bytes.size();
-
-        // need to hold onto where our data is coming from
-        // as the reader uses refs to it.
-        m_data_ref = bytes;
-
-        {
-            flatbuffers::Verifier v((uint8_t*)bytes.data(), bytes.size());
-
-            if (!v.VerifyBuffer<noodles::ClientMessages>(nullptr)) {
-                qCritical() << "Unable to verify message from client!";
-                return;
-            }
-
-            qDebug() << "Message verified";
-        }
-
-        m_messages =
-            flatbuffers::GetRoot<noodles::ClientMessages>(m_data_ref.data());
-
-#ifndef NDEBUG
-        {
-            QString message =
-                message_to_json(m_messages, "noodles.ClientMessages");
-
-            qDebug() << "=> Decoded Message:" << message;
-        }
-#endif
-    }
-
-    IncomingMessage(QString text) {
-        qDebug() << Q_FUNC_INFO << text.size();
-
-        m_data_ref = text.toUtf8();
-
-        m_parser = std::make_unique<flatbuffers::Parser>();
-
-        bool ok = m_parser->Deserialize(noodles::noodles_bfbs,
-                                        noodles::noodles_bfbs_len);
-
-        if (!ok) {
-            qCritical() << "Internal error: Cannot load schema.";
-            return;
-        }
-
-        ok = m_parser->SetRootType("noodles.ServerMessages");
-
-        if (!ok) {
-            qCritical() << "Internal error: Cannot override root type.";
-            return;
-        }
-
-        ok = m_parser->ParseJson(m_data_ref.data());
-
-        if (!ok) {
-            qCritical() << "Unable to parse message from client!"
-                        << m_parser->error_.c_str();
-            return;
-        }
-
-        m_messages = flatbuffers::GetRoot<noodles::ClientMessages>(
-            m_parser->builder_.GetBufferPointer());
-    }
-
-    ~IncomingMessage() noexcept { }
-
-    noodles::ClientMessages const* get_root() { return m_messages; }
-};
-
 
 // =============================================================================
 
@@ -142,35 +32,41 @@ ClientT::~ClientT() {
 }
 
 void ClientT::on_text(QString text) {
-    m_use_binary = false;
+    qCritical() << "Unable to handle text messages!";
+    (void)text;
+    //    m_use_binary = false;
 
-    auto ptr = std::make_shared<IncomingMessage>(text);
+    //    QJsonParseError err;
 
-    if (!ptr->get_root()) {
-        qCritical() << "Bad message from ClientT" << this;
-        kill();
-        return;
-    }
+    //    auto doc = QJsonDocument::fromJson(text.toUtf8(), &err);
 
-    emit message_recvd(ptr);
+    //    auto ptr = std::make_shared<IncomingMessage>(text);
+
+    //    if (ptr->messages().empty()) {
+    //        qCritical() << "Bad message from ClientT" << this;
+    //        kill();
+    //        return;
+    //    }
+
+    //    emit message_recvd(ptr);
 }
 
 void ClientT::on_binary(QByteArray array) {
-    m_use_binary = true;
+    // m_use_binary = true;
 
-    auto ptr = std::make_shared<IncomingMessage>(array);
+    auto messages = messages::deserialize_client(array);
 
-    if (!ptr->get_root()) {
+    if (messages.empty()) {
         qCritical() << "Bad message from ClientT" << this;
         kill();
         return;
     }
 
-    emit message_recvd(ptr);
+    emit message_recvd(messages);
 }
 
-void ClientT::set_name(std::string const& s) {
-    m_name = QString::fromStdString(s);
+void ClientT::set_name(QString s) {
+    m_name = s;
     qDebug() << "Identifying ClientT" << m_socket << "as" << m_name;
 }
 
@@ -183,28 +79,14 @@ void ClientT::send(QByteArray data) {
     m_bytes_counter += data.size();
     if (data.isEmpty()) return;
 
-    if (m_use_binary) {
-        m_socket->sendBinaryMessage(data);
+    m_socket->sendBinaryMessage(data);
 
-#ifndef NDEBUG
-        {
-
-            auto const* t =
-                flatbuffers::GetRoot<noodles::ServerMessages>(data.data());
-
-            QString message = message_to_json(t, "noodles.ServerMessages");
-
-            qDebug() << "<= " << message;
-        }
-#endif
-
-    } else {
-
-        QString message =
-            message_to_json(data.data(), "noodles.ServerMessages");
-
-        m_socket->sendTextMessage(message);
-    }
+    //    if (m_use_binary) {
+    //        m_socket->sendBinaryMessage(data);
+    //    } else {
+    //        qCritical() << "NOT YET IMPLEMENTED";
+    //        // m_socket->sendTextMessage(message);
+    //    }
 }
 
 // =============================================================================
@@ -232,26 +114,26 @@ NoodlesState* ServerT::state() {
     return m_state;
 }
 
-std::unique_ptr<Writer> ServerT::get_broadcast_writer() {
-    auto p = std::make_unique<Writer>();
+std::unique_ptr<SMsgWriter> ServerT::get_broadcast_writer() {
+    auto p = std::make_unique<SMsgWriter>();
 
-    connect(p.get(), &Writer::data_ready, this, &ServerT::broadcast);
-
-    return p;
-}
-
-std::unique_ptr<Writer> ServerT::get_single_client_writer(ClientT& c) {
-    auto p = std::make_unique<Writer>();
-
-    connect(p.get(), &Writer::data_ready, &c, &ClientT::send);
+    connect(p.get(), &SMsgWriter::data_ready, this, &ServerT::broadcast);
 
     return p;
 }
 
-std::unique_ptr<Writer> ServerT::get_table_subscribers_writer(TableT& t) {
-    auto p = std::make_unique<Writer>();
+std::unique_ptr<SMsgWriter> ServerT::get_single_client_writer(ClientT& c) {
+    auto p = std::make_unique<SMsgWriter>();
 
-    connect(p.get(), &Writer::data_ready, &t, &TableT::send_data);
+    connect(p.get(), &SMsgWriter::data_ready, &c, &ClientT::send);
+
+    return p;
+}
+
+std::unique_ptr<SMsgWriter> ServerT::get_table_subscribers_writer(TableT& t) {
+    auto p = std::make_unique<SMsgWriter>();
+
+    connect(p.get(), &SMsgWriter::data_ready, &t, &TableT::send_data);
 
     return p;
 }
@@ -288,12 +170,6 @@ void ServerT::on_client_done() {
     c->deleteLater();
 }
 
-struct ErrorState {
-    int         code;
-    std::string message;
-    AnyVar      additional;
-};
-
 class MessageHandler {
     ServerT* m_server;
     ClientT& m_client;
@@ -311,11 +187,8 @@ class MessageHandler {
         });
     }
 
-    void handle_introduction(noodles::IntroductionMessage const* m) {
-        if (!m) return;
-        qDebug() << Q_FUNC_INFO;
-
-        m_client.set_name(m->client_name()->str());
+    void handle(messages::MsgIntroduction const& m) {
+        m_client.set_name(m.client_name);
 
         // we must now reply with all of the stuff
 
@@ -330,6 +203,9 @@ class MessageHandler {
         dump_list(d.signal_list());
         dump_list(d.light_list());
         dump_list(d.buffer_list());
+        dump_list(d.buffer_view_list());
+        dump_list(d.sampler_list());
+        dump_list(d.image_list());
         dump_list(d.tex_list());
         dump_list(d.mat_list());
         dump_list(d.mesh_list());
@@ -341,108 +217,113 @@ class MessageHandler {
     }
 
 
-    void send_method_ok_reply(std::string const& id, AnyVar const& var) {
-        if (id.empty()) return;
+    void send_method_ok_reply(QString const& id, QCborValue const& var) {
+        if (!id.size()) return;
 
         auto w = m_server->get_single_client_writer(m_client);
 
-        auto x =
-            noodles::CreateMethodReplyDirect(*w, id.c_str(), write_to(var, *w));
+        messages::MsgMethodReply m {
+            .invoke_id = id,
+            .result    = var,
+        };
 
-        w->complete_message(x);
+        w->add(m);
     }
 
-    void send_method_error_reply(std::string const& id,
-                                 ErrorState const&  state) {
-        if (id.empty()) return;
+    void send_method_error_reply(QString const&                   id,
+                                 messages::MethodException const& exception) {
+        if (!id.size()) return;
 
         auto w = m_server->get_single_client_writer(m_client);
 
-        auto e = noodles::CreateMethodExceptionDirect(
-            *w,
-            state.code,
-            state.message.data(),
-            write_to(state.additional, *w));
+        messages::MsgMethodReply m {
+            .invoke_id        = id,
+            .method_exception = exception,
+        };
 
-        auto x = noodles::CreateMethodReplyDirect(*w, id.c_str(), 0, e);
-
-        w->complete_message(x);
+        w->add(m);
     }
 
-    void send_table_reply(std::string const& id,
-                          TableT&            table,
-                          bool               exclusive,
-                          AnyVar const*      var,
-                          ErrorState const*  err) {
+    void send_table_reply(QString const&                   id,
+                          TableT&                          table,
+                          bool                             exclusive,
+                          QCborValue const*                var,
+                          messages::MethodException const* err) {
 
-        if (id.empty()) return;
+        if (!id.size()) return;
 
         auto w = exclusive ? m_server->get_single_client_writer(m_client)
                            : m_server->get_table_subscribers_writer(table);
 
-        flatbuffers::Offset<noodles::MethodReply> x;
+        messages::MsgMethodReply m {
+            .invoke_id = id,
+        };
 
         if (var) {
-            x = noodles::CreateMethodReplyDirect(
-                *w, id.c_str(), write_to(*var, *w));
-        } else if (err) {
-
-            auto e = noodles::CreateMethodExceptionDirect(
-                *w,
-                err->code,
-                err->message.data(),
-                write_to(err->additional, *w));
-
-            x = noodles::CreateMethodReplyDirect(*w, id.c_str(), 0, e);
+            m.result = *var;
         } else {
-            // uh oh
-            qFatal("Not supposed to get here");
+            m.method_exception = *err;
         }
 
-        w->complete_message(x);
+        w->add(m);
     }
 
-    void handle_invoke(noodles::MethodInvokeMessage const* message) {
-        if (!message) return;
+    void handle(messages::MsgInvokeMethod const& message) {
         qDebug() << Q_FUNC_INFO;
 
         MethodContext             context;
         AttachedMethodList const* target_list = nullptr;
         bool                      is_table    = false;
 
-        if (message->on_object()) {
-            qDebug() << "INVOKE on obj";
+        if (message.context) {
 
-            EntityID source = convert_id(*message->on_object());
+            VMATCH(
+                *message.context,
+                VCASE(std::monostate) {
+                    qDebug() << "INVOKE on doc";
+                    target_list = &(get_document().att_method_list());
+                },
+                VCASE(noo::EntityID id) {
+                    qDebug() << "INVOKE on obj";
 
-            auto const& obj_ptr = get_document().obj_list().get_at(source);
+                    auto const& obj_ptr = get_document().obj_list().get_at(id);
 
-            if (obj_ptr) {
-                context     = obj_ptr;
-                target_list = &(obj_ptr->att_method_list());
-            }
+                    if (obj_ptr) {
+                        context     = obj_ptr;
+                        target_list = &(obj_ptr->att_method_list());
+                    }
+                },
+                VCASE(noo::TableID id) {
+                    qDebug() << "INVOKE on table";
 
-        } else if (message->on_table()) {
-            qDebug() << "INVOKE on table";
+                    auto const& tbl_ptr =
+                        get_document().table_list().get_at(id);
 
-            TableID source = convert_id(*message->on_table());
+                    if (tbl_ptr) {
+                        context     = tbl_ptr;
+                        target_list = &(tbl_ptr->att_method_list());
+                        is_table    = true;
+                    }
+                },
+                VCASE(noo::PlotID id) {
+                    qDebug() << "INVOKE on table";
 
-            auto const& tbl_ptr = get_document().table_list().get_at(source);
+                    auto const& plt_ptr = get_document().plot_list().get_at(id);
 
-            if (tbl_ptr) {
-                context     = tbl_ptr;
-                target_list = &(tbl_ptr->att_method_list());
-                is_table    = true;
-            }
-
+                    if (plt_ptr) {
+                        context     = plt_ptr;
+                        target_list = &(plt_ptr->att_method_list());
+                    }
+                }, );
         } else {
             qDebug() << "INVOKE on doc";
             target_list = &(get_document().att_method_list());
         }
 
+
         context.client = &m_client;
 
-        std::string id = message->invoke_ident()->c_str();
+        QString id = message.invoke_id.value_or(QString());
 
         bool must_reply = id.size();
 
@@ -457,9 +338,8 @@ class MessageHandler {
             return;
         }
 
-        MethodID method_id = convert_id(message->method_id());
 
-        if (!method_id.valid()) {
+        if (!message.method.valid()) {
 
             if (must_reply) {
                 send_method_error_reply(
@@ -473,9 +353,10 @@ class MessageHandler {
             return;
         }
 
-        qDebug() << "METHOD ID" << method_id.id_slot << method_id.id_gen;
+        qDebug() << "METHOD ID" << message.method.id_slot
+                 << message.method.id_gen;
 
-        auto* method = target_list->find(method_id);
+        auto* method = target_list->find(message.method);
 
         if (!method) {
             if (must_reply) {
@@ -484,7 +365,7 @@ class MessageHandler {
                                           "Unable to find method on context",
                                           {} });
             }
-            qWarning() << "unable to find method" << method_id.id_slot;
+            qWarning() << "unable to find method" << message.method.id_slot;
             return;
         }
 
@@ -502,34 +383,28 @@ class MessageHandler {
             return;
         }
 
-        AnyVarListRef vars;
-
-        if (message->method_args()) {
-            vars = AnyVarListRef(message->method_args());
-        }
-
         {
             qDebug() << "Method arguments:"
-                     << QString::fromStdString(vars.dump_string());
+                     << message.method.to_cbor().toDiagnosticNotation();
         }
 
-        AnyVar                    ret_data;
-        std::optional<ErrorState> err_state;
+        QCborValue                               ret_data;
+        std::optional<messages::MethodException> err_state;
 
         try {
-            ret_data = function(context, vars);
+            ret_data = function(context, message.args);
         } catch (MethodException const& e) {
-            auto& estate      = err_state.emplace();
-            estate.code       = e.code();
-            estate.message    = e.reason();
-            estate.additional = e.data();
+            auto& estate   = err_state.emplace();
+            estate.code    = e.code();
+            estate.message = e.reason();
+            estate.data    = e.data();
         } catch (...) {
             auto& estate   = err_state.emplace();
             estate.code    = ErrorCodes::INTERNAL_ERROR;
             estate.message = "An internal error occured";
         }
 
-        qDebug() << "Method Done" << ret_data.dump_string().c_str()
+        qDebug() << "Method Done" << ret_data.toDiagnosticNotation()
                  << (err_state ? "ERROR" : "OK");
 
         if (is_table) {
@@ -552,57 +427,14 @@ class MessageHandler {
         }
     }
 
-    void handle_refresh(::noodles::AssetRefreshMessage const* message) {
-        if (!message) return;
-        qDebug() << Q_FUNC_INFO;
-
-        auto buffer_list = message->for_buffers();
-
-        for (auto buffer_ref : *buffer_list) {
-
-            BufferID bid = convert_id(buffer_ref);
-
-            if (!bid.valid()) return;
-
-            auto const& buffer_ptr = get_document().buffer_list().get_at(bid);
-
-            if (!buffer_ptr) continue;
-
-            auto w = m_server->get_single_client_writer(m_client);
-
-            buffer_ptr->write_refresh_to(*w);
-        }
-    }
-
 
 public:
     MessageHandler(ServerT* s, ClientT& c) : m_server(s), m_client(c) { }
 
-    void handle(IncomingMessage& message) {
+    void handle(messages::ClientMessage const& message) {
         try {
-            auto message_list = message.get_root();
 
-            if (!message_list) return;
-            if (!message_list->messages()) return;
-
-            for (auto this_msg_ptr : *message_list->messages()) {
-                switch (this_msg_ptr->content_type()) {
-                case noodles::ClientMessageType::NONE: break;
-                case noodles::ClientMessageType::IntroductionMessage:
-                    handle_introduction(
-                        this_msg_ptr->content_as_IntroductionMessage());
-                    break;
-                case noodles::ClientMessageType::MethodInvokeMessage:
-                    handle_invoke(
-                        this_msg_ptr->content_as_MethodInvokeMessage());
-                    break;
-                case noodles::ClientMessageType::AssetRefreshMessage:
-                    handle_refresh(
-                        this_msg_ptr->content_as_AssetRefreshMessage());
-                    break;
-                }
-            }
-
+            std::visit([this](auto const& m) { this->handle(m); }, message);
 
         } catch (std::exception const& e) {
             qCritical() << "Internal exception while handling client message!"
@@ -614,9 +446,8 @@ public:
 };
 
 
-void ServerT::on_client_message(std::shared_ptr<IncomingMessage> ptr) {
-
-    assert(ptr);
+void ServerT::on_client_message(QVector<messages::ClientMessage> const& list) {
+    if (list.empty()) return;
 
     ClientT* c = qobject_cast<ClientT*>(sender());
 
@@ -626,7 +457,9 @@ void ServerT::on_client_message(std::shared_ptr<IncomingMessage> ptr) {
 
     MessageHandler handler(this, *c);
 
-    handler.handle(*ptr);
+    for (auto const& cm : list) {
+        handler.handle(cm);
+    }
 }
 
 } // namespace noo
