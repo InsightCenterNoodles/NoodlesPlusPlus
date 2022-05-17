@@ -1,7 +1,17 @@
 #include "assetstorage.h"
 
+#include <QNetworkInterface>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <qglobal.h>
+#include <qhostaddress.h>
+#include <qobject.h>
+#include <qtcpsocket.h>
+#include <qurl.h>
+#include <quuid.h>
+
+
+// Request handling ============================================================
 
 struct HTTPRequest {
     QByteArray                    action;
@@ -38,6 +48,8 @@ HTTPRequest parse_headers(QByteArray request) {
     return ret;
 }
 
+// Response handling ===========================================================
+
 enum class ResponseCode {
     OK,
     BAD,
@@ -45,7 +57,7 @@ enum class ResponseCode {
 
 auto const line_ending = QByteArrayLiteral("\r\n");
 
-QByteArray code_to_string(ResponseCode c) {
+inline QByteArray code_to_string(ResponseCode c) {
     switch (c) {
     case ResponseCode::OK: return QByteArrayLiteral("200 OK");
     case ResponseCode::BAD: return QByteArrayLiteral("400 BAD REQUEST");
@@ -56,7 +68,6 @@ auto const mime_type =
     QByteArrayLiteral("Content-Type: application/octet-stream\r\n");
 
 struct HTTPResponse {
-    QString      proto;
     ResponseCode code;
     QByteArray   asset;
 };
@@ -76,8 +87,88 @@ void execute_reply(HTTPResponse response, QTcpSocket* socket) {
 
     socket->write(header);
     socket->write(response.asset);
+    socket->disconnect();
 }
 
+// =============================================================================
+
+AssetRequest::AssetRequest(QTcpSocket* socket, AssetStorage* p)
+    : QObject(socket), m_host(p) {
+    connect(socket, &QTcpSocket::readyRead, this, &AssetRequest::on_data);
+
+    // when the socket is disconnected, this will automatically be cleaned up
+    qInfo() << "Asset request started";
+}
+
+AssetRequest::~AssetRequest() {
+    qInfo() << "Asset request complete";
+}
+
+void AssetRequest::on_data() {
+    auto* p = qobject_cast<QTcpSocket*>(sender());
+
+    if (!p) return;
+
+    m_request += p->readAll();
+
+    if (!m_request.contains("\r\n\r\n")) {
+        // we dont have everything yet
+        if (m_request.size() > (8096)) {
+            // nope, we are not a storage server
+            p->abort();
+        }
+        return;
+    }
+
+    // should have the request packet now
+
+    auto info = parse_headers(m_request);
+
+    qInfo() << "New request" << info.action << info.path;
+
+    // action had better be...
+
+    if (info.action != "GET") {
+        // nope, we only handle gets
+        qWarning() << "Unable to handle request" << info.action;
+        execute_reply(HTTPResponse { .code = ResponseCode::BAD }, p);
+        return;
+    }
+
+    // and what asset do they want?
+
+    auto path = QUrl(info.path).path();
+
+    // we are handing out urls that give the asset at the root
+
+    path = path.mid(path.lastIndexOf("/"));
+
+    auto asset_id = QUuid(path);
+
+    if (asset_id.isNull()) {
+        qWarning() << "Asked for non-asset" << info.path;
+        execute_reply(HTTPResponse { .code = ResponseCode::BAD }, p);
+        return;
+    }
+
+    // start the asset search
+
+    if (!m_host) {
+        qCritical() << "No asset store";
+        execute_reply(HTTPResponse { .code = ResponseCode::BAD }, p);
+        return;
+    }
+
+    auto asset = m_host->fetch_asset(asset_id);
+
+    if (asset.isEmpty()) {
+        qCritical() << "Missing asset" << asset_id;
+        execute_reply(HTTPResponse { .code = ResponseCode::BAD }, p);
+        return;
+    }
+
+    execute_reply(HTTPResponse { .code = ResponseCode::OK, .asset = asset }, p);
+}
 
 AssetStorage::AssetStorage(quint16 port, QObject* parent)
     : QObject(parent), m_server(new QTcpServer(this)) {
@@ -94,14 +185,62 @@ AssetStorage::AssetStorage(quint16 port, QObject* parent)
         delete m_server;
         return;
     }
+
+    // determine an IP address for users
+
+    QString ip_address;
+
+    auto ip_list = QNetworkInterface::allAddresses();
+
+    for (auto const& ha : ip_list) {
+        if (ha != QHostAddress::LocalHost and ha.toIPv4Address()) {
+            ip_address = ha.toString();
+            break;
+        }
+    }
+
+    if (ip_address.isEmpty()) {
+        ip_address = QHostAddress(QHostAddress::LocalHost).toString();
+    }
+
+    m_host_info = QString("http://%1:%2/").arg(ip_address).arg(port);
 }
 
 bool AssetStorage::is_ready() const {
     return m_server;
 }
 
+std::pair<QUuid, QUrl> AssetStorage::register_asset(QByteArray arr) {
+    auto new_id = QUuid::createUuid();
+
+    Q_ASSERT(!m_assets.contains(new_id));
+
+    m_assets[new_id] = arr;
+
+    auto str = new_id.toString();
+
+    // only later versions of Qt have the no-bracket format
+
+    auto ref = str.midRef(1).chopped(1);
+
+    QUrl url(m_host_info + ref);
+
+    qDebug() << "New asset at" << new_id << url;
+
+    return { new_id, url };
+}
+
+void AssetStorage::destroy_asset(QUuid id) {
+    m_assets.remove(id);
+}
+QByteArray AssetStorage::fetch_asset(QUuid id) {
+    return m_assets.value(id);
+}
+
 void AssetStorage::handle_new_connection() {
     auto* socket = m_server->nextPendingConnection();
 
     connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+
+    auto* handler = new AssetRequest(socket, this);
 }

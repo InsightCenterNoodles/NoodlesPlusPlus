@@ -1,5 +1,4 @@
-#ifndef COMMON_H
-#define COMMON_H
+#pragma once
 
 #include <span>
 #include <string_view>
@@ -218,5 +217,3 @@ enum ErrorCodes {
 };
 
 } // namespace noo
-
-#endif // COMMON_H

@@ -9,6 +9,7 @@
 #include "objectlist.h"
 #include "plotlist.h"
 #include "search_helpers.h"
+#include "src/server/assetstorage.h"
 #include "tablelist.h"
 #include "texturelist.h"
 
@@ -60,6 +61,8 @@ class ServerT;
 class DocumentT {
     ServerT* m_server;
 
+    AssetStorage* m_storage;
+
     MethodList m_method_list;
     SignalList m_signal_list;
 
@@ -93,6 +96,7 @@ class DocumentT {
 public:
     DocumentT(ServerT*);
 
+    AssetStorage& storage();
 
     MethodList&     method_list();
     SignalList&     signal_list();

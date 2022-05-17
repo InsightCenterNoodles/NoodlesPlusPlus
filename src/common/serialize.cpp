@@ -3,6 +3,7 @@
 #include "src/common/variant_tools.h"
 
 #include <QDebug>
+#include <QtGlobal>
 
 namespace noo {
 
@@ -25,6 +26,7 @@ QCborValue serialize_f(uint64_t t);
 QCborValue serialize_f(float t);
 template <class T>
 QCborValue serialize_f(QVector<T>& t);
+QCborValue serialize_f(QStringList& t);
 QCborValue serialize_f(glm::vec3& t);
 QCborValue serialize_f(glm::vec4& t);
 QCborValue serialize_f(glm::mat3& t);
@@ -80,11 +82,11 @@ QCborValue serialize_f(int t) {
 }
 
 QCborValue serialize_f(int64_t t) {
-    return { (int64_t)t };
+    return { (::qint64)t };
 }
 
 QCborValue serialize_f(uint64_t t) {
-    return { (int64_t)t };
+    return { (::qint64)t };
 }
 
 QCborValue serialize_f(float t) {
@@ -200,6 +202,7 @@ bool deserialize_f(QCborValue v, uint64_t& t);
 bool deserialize_f(QCborValue v, float& t);
 template <class T>
 bool deserialize_f(QCborValue v, QVector<T>& t);
+bool deserialize_f(QCborValue v, QStringList& t);
 bool deserialize_f(QCborValue v, glm::vec3& t);
 bool deserialize_f(QCborValue v, glm::vec4& t);
 bool deserialize_f(QCborValue v, glm::mat3& t);
@@ -951,7 +954,7 @@ QByteArray serialize_server(std::span<ServerMessage> list) {
     QCborArray pack;
 
     for (auto& l : list) {
-        std::visit(
+        noo::visit(
             [&pack]<class T>(T& t) {
                 pack << (unsigned)T::MID;
                 pack << serialize(t);
@@ -1009,7 +1012,7 @@ QByteArray serialize_client(std::span<ClientMessage> list) {
     QCborArray pack;
 
     for (auto& l : list) {
-        std::visit(
+        noo::visit(
             [&pack]<class T>(T& t) {
                 pack << (unsigned)T::MID;
                 pack << serialize(t);

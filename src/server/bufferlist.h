@@ -4,6 +4,8 @@
 #include "componentlistbase.h"
 #include "include/noo_id.h"
 #include "include/noo_server_interface.h"
+#include <qurl.h>
+#include <quuid.h>
 
 namespace noo {
 
@@ -18,8 +20,12 @@ public:
 class BufferT : public ComponentMixin<BufferT, BufferList, BufferID> {
     BufferData m_data;
 
+    QUuid m_asset_id;
+    QUrl  m_asset_url;
+
 public:
     BufferT(IDType, BufferList*, BufferData const&);
+    ~BufferT() override;
 
     void write_new_to(SMsgWriter&);
 

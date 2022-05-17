@@ -1,7 +1,7 @@
-#ifndef NOO_ID_H
-#define NOO_ID_H
+#pragma once
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <qcborvalue.h>
@@ -212,5 +212,3 @@ struct hash<noo::ID<Tag>> {
 };
 
 } // namespace std
-
-#endif // ID_H

@@ -3,16 +3,54 @@
 #include "src/common/serialize.h"
 #include "src/common/variant_tools.h"
 #include "src/generated/interface_tools.h"
+#include "src/server/noodlesserver.h"
+#include "src/server/noodlesstate.h"
 
 #include <magic_enum.hpp>
+
+#include <cstdint>
+#include <variant>
 
 namespace noo {
 
 BufferList::BufferList(ServerT* s) : ComponentListBase(s) { }
 BufferList::~BufferList() = default;
 
+static constexpr uint64_t inline_threshold = 2 << 16;
+
+static bool is_oversized(QByteArray const& array) {
+    return array.size() > inline_threshold;
+}
+
 BufferT::BufferT(IDType id, BufferList* host, BufferData const& d)
-    : ComponentMixin(id, host), m_data(d) { }
+    : ComponentMixin(id, host), m_data(d) {
+
+    // if this is bytes we control, and they are large enough, register them for
+    // download
+
+    auto inline_src = std::get_if<BufferInlineSource>(&m_data.source);
+
+    if (inline_src) {
+        if (is_oversized(inline_src->data)) {
+            auto* state = host->server()->state();
+
+            auto doc = state->document();
+
+            std::tie(m_asset_id, m_asset_url) =
+                doc->storage().register_asset(inline_src->data);
+        }
+    }
+}
+
+BufferT::~BufferT() {
+    if (!m_asset_id.isNull()) {
+        auto* state = this->hosting_list()->server()->state();
+
+        auto doc = state->document();
+
+        doc->storage().destroy_asset(m_asset_id);
+    }
+}
 
 void BufferT::write_new_to(SMsgWriter& w) {
     messages::MsgBufferCreate create;
@@ -23,8 +61,13 @@ void BufferT::write_new_to(SMsgWriter& w) {
     VMATCH(
         m_data.source,
         VCASE(BufferInlineSource const& source) {
-            create.inline_bytes = source.data;
-            create.size         = source.data.size();
+            if (m_asset_url.isValid()) {
+                create.uri_bytes = m_asset_url;
+                create.size      = source.data.size();
+            } else {
+                create.inline_bytes = source.data;
+                create.size         = source.data.size();
+            }
         },
         VCASE(BufferURLSource const& source) {
             create.uri_bytes = source.url_source;

@@ -976,7 +976,7 @@ struct EntityUpdateData {
     std::optional<QVector<LightDelegate*>>         lights;
     std::optional<QVector<TableDelegate*>>         tables;
     std::optional<QVector<PlotDelegate*>>          plots;
-    std::optional<QVector<QString>>                tags;
+    std::optional<QStringList>                     tags;
     std::optional<QVector<MethodDelegate*>>        methods_list;
     std::optional<QVector<SignalDelegate*>>        signals_list;
     std::optional<std::optional<noo::BoundingBox>> influence;

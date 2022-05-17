@@ -308,7 +308,7 @@ AttachedSignalList::operator=(QVector<SignalDelegate*> const& l) {
         auto*      ptr = p->delegate();
         assert(ptr);
         if (new_list.contains(ptr)) {
-            to_keep.emplace_back(p);
+            to_keep << p;
             new_list.erase(ptr);
         }
     }
@@ -316,7 +316,7 @@ AttachedSignalList::operator=(QVector<SignalDelegate*> const& l) {
     m_list = std::move(to_keep);
 
     for (auto const& p : new_list) {
-        m_list.emplace_back(std::make_unique<AttachedSignal>(p));
+        m_list << std::make_shared<AttachedSignal>(p);
     }
     return *this;
 }

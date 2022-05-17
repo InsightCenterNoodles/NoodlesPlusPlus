@@ -11,6 +11,7 @@
 #include <QCborValue>
 #include <QColor>
 
+#include <optional>
 #include <span>
 #include <string>
 #include <type_traits>

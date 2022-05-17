@@ -403,7 +403,7 @@ void process_message(QWebSocket& s, InternalClientState& state, QByteArray m) {
     auto message_array = noo::messages::deserialize_server(m);
 
     for (auto const& m : message_array) {
-        std::visit([&ms](auto const& message) { process(message, ms); }, m);
+        noo::visit([&ms](auto const& message) { process(message, ms); }, m);
     }
 }
 
