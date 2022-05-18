@@ -601,7 +601,7 @@ bool TableColumn::is_string() const {
 }
 
 std::span<double const> TableColumn::as_doubles() const {
-    auto* p = std::get_if<std::vector<double>>(this);
+    auto* p = std::get_if<QVector<double>>(this);
 
     return p ? std::span<double const>(*p) : std::span<double const> {};
 }
@@ -618,8 +618,8 @@ QStringList const& TableColumn::as_string() const {
 void TableColumn::append(std::span<double const> d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) {
-            a.insert(a.end(), d.begin(), d.end());
+        VCASE(QVector<double> & a) {
+            a << QVector<double>(d.begin(), d.end());
         },
         VCASE(QStringList & a) {
             for (auto value : d) {
@@ -631,7 +631,7 @@ void TableColumn::append(std::span<double const> d) {
 void TableColumn::append(QCborArray const& d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) {
+        VCASE(QVector<double> & a) {
             for (auto const& s : d) {
                 a.push_back(s.toDouble());
             }
@@ -646,32 +646,32 @@ void TableColumn::append(QCborArray const& d) {
 void TableColumn::append(double d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) { a.push_back(d); },
+        VCASE(QVector<double> & a) { a.push_back(d); },
         VCASE(QStringList & a) { a.push_back(QString::number(d)); });
 }
 void TableColumn::append(QString d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) { a.push_back(d.toDouble()); },
+        VCASE(QVector<double> & a) { a.push_back(d.toDouble()); },
         VCASE(QStringList & a) { a.push_back(d); });
 }
 
 void TableColumn::set(size_t row, double d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) { a[row] = d; },
+        VCASE(QVector<double> & a) { a[row] = d; },
         VCASE(QStringList & a) { a[row] = QString::number(d); });
 }
 void TableColumn::set(size_t row, QCborValue d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) { a[row] = d.toDouble(); },
+        VCASE(QVector<double> & a) { a[row] = d.toDouble(); },
         VCASE(QStringList & a) { a[row] = d.toString(); });
 }
 void TableColumn::set(size_t row, QString d) {
     VMATCH(
         *this,
-        VCASE(std::vector<double> & a) { a[row] = d.toDouble(); },
+        VCASE(QVector<double> & a) { a[row] = d.toDouble(); },
         VCASE(QStringList & a) { a[row] = d; });
 }
 

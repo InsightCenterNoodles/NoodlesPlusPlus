@@ -37,6 +37,7 @@ void MeshT::write_new_to(SMsgWriter& w) {
         ind.format = QString::fromLocal8Bit(
             magic_enum::enum_name(patch.indicies.format));
         ind.stride = patch.indicies.stride;
+        ind.offset = patch.indicies.offset;
 
         for (auto const& attrib : patch.attributes) {
 
@@ -47,6 +48,7 @@ void MeshT::write_new_to(SMsgWriter& w) {
                 QString::fromLocal8Bit(magic_enum::enum_name(attrib.semantic));
 
             if (attrib.channel) new_attrib.channel = attrib.channel;
+            if (attrib.offset) new_attrib.offset = attrib.offset;
             if (attrib.stride) new_attrib.stride = attrib.stride;
 
             new_attrib.format =

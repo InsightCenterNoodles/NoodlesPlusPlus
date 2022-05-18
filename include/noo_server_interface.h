@@ -649,7 +649,7 @@ struct TableQuery {
 using TableQueryPtr = std::shared_ptr<TableQuery const>;
 
 
-class TableColumn : public std::variant<std::vector<double>, QStringList> {
+class TableColumn : public std::variant<QVector<double>, QStringList> {
 public:
     QString name;
 
