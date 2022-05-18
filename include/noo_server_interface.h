@@ -387,12 +387,8 @@ using TextureTPtr = std::shared_ptr<TextureT>;
 /// Create a new texture.
 TextureTPtr create_texture(DocumentTPtrRef, TextureData const&);
 
-/// Create a new texture from a span of bytes. Bytes should be the disk
-/// representation of an image, A new buffer will be automatically created.
-TextureTPtr create_texture_from_file(DocumentTPtrRef, QString path);
-
-/// Update a texture with a new byte range.
-void update_texture(TextureTPtr, TextureData const&);
+/// Create a new texture. Automatically creates buffers and views
+TextureTPtr create_texture(DocumentTPtrRef, QImage img);
 
 
 // Material ====================================================================

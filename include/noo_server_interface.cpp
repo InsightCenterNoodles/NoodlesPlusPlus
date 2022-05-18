@@ -18,6 +18,17 @@
 
 namespace noo {
 
+static QByteArray image_to_bytes(QImage img) {
+    QByteArray array;
+
+    QBuffer buf(&array);
+    buf.open(QIODevice::WriteOnly);
+    img.save(&buf, "PNG");
+
+    return array;
+}
+
+// =============================================================================
 
 MethodException::MethodException(int code, QString message, QCborValue data)
     : m_code(code), m_reason(message), m_data(data) { }
@@ -317,14 +328,7 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
             },
             VCASE(QImage const& b) {
                 r.type = ViewType::IMAGE_INFO;
-                QByteArray array;
-
-                {
-                    QBuffer buf(&array);
-                    buf.open(QIODevice::WriteOnly);
-                    b.save(&buf, "PNG");
-                }
-                return array;
+                return image_to_bytes(b);
             },
             VCASE(MeshSource const& b) {
                 r.type      = ViewType::GEOMETRY_INFO;
@@ -477,23 +481,20 @@ TextureTPtr create_texture(DocumentTPtrRef doc, TextureData const& data) {
     return doc->tex_list().provision_next(data);
 }
 
-TextureTPtr create_texture_from_file(DocumentTPtrRef doc, QString path) {
+TextureTPtr create_texture(DocumentTPtrRef doc, QImage img) {
 
-    auto new_buffer = create_buffer(doc, path);
+    auto bytes = image_to_bytes(img);
 
-    auto size = VMATCH(
-        new_buffer->data().source,
-        VCASE(BufferInlineSource const& s) { return uint64_t(s.data.size()); },
-        VCASE(BufferURLSource const& s) {
-            return uint64_t(s.source_byte_size);
-        });
+    auto new_buffer = create_buffer(
+        doc, BufferData { .source = BufferInlineSource { .data = bytes } });
+
 
     auto new_view = create_buffer_view(doc,
                                        BufferViewData {
                                            .source_buffer = new_buffer,
                                            .type   = ViewType::IMAGE_INFO,
                                            .offset = 0,
-                                           .length = size,
+                                           .length = (uint64_t)bytes.size(),
                                        });
 
     auto new_image = create_image(doc,
