@@ -6,6 +6,7 @@
 #include "noo_interface_types.h"
 
 #include <QColor>
+#include <QImage>
 #include <QObject>
 #include <QUrl>
 
@@ -317,7 +318,7 @@ class BufferViewT;
 using BufferViewTPtr = std::shared_ptr<BufferViewT>;
 
 /// Create a new view
-BufferViewTPtr create_bufferview(DocumentTPtrRef, BufferViewData const&);
+BufferViewTPtr create_buffer_view(DocumentTPtrRef, BufferViewData const&);
 
 // Image =======================================================================
 
@@ -525,6 +526,7 @@ struct Attribute {
     AttributeSemantic semantic;
     uint8_t           channel = 0;
 
+    uint64_t offset = 0;
     uint64_t stride = 0;
     Format   format;
 
@@ -537,6 +539,7 @@ struct Attribute {
 struct Index {
     BufferViewTPtr view;
 
+    uint64_t offset = 0;
     uint64_t stride = 0;
     Format   format;
 };
@@ -567,10 +570,7 @@ using MeshTPtr = std::shared_ptr<MeshT>;
 /// Create a new mesh.
 MeshTPtr create_mesh(DocumentTPtrRef, MeshData const&);
 
-/// Update a mesh
-void update_mesh(MeshT*, MeshData const&);
-
-// Geometry Construction =======================================================
+// Buffer Construction =========================================================
 
 ///
 /// \brief The BufferMeshDataRef struct is a helper type to define mesh
@@ -582,7 +582,9 @@ void update_mesh(MeshT*, MeshData const&);
 /// Index arrays: only lines OR triangles should be used. These are indexes of
 /// vertex information.
 ///
-struct BufferMeshDataRef {
+struct MeshSource {
+    MaterialTPtr material;
+
     // Vertex data
     std::span<glm::vec3 const>    positions;
     std::span<glm::vec3 const>    normals;
@@ -594,37 +596,17 @@ struct BufferMeshDataRef {
     std::span<glm::u16vec3 const> triangles;
 };
 
-///
-/// \brief The PackedMeshDataResult struct provides the result of a pack
-/// operation of mesh data. It can be used to help create a new mesh in a
-/// buffer.
-///
-struct PackedMeshDataResult {
-    BoundingBox bounding_box;
-
-    struct Ref {
-        size_t start  = 0;
-        size_t size   = 0;
-        size_t stride = 0;
-    };
-
-    Ref                positions;
-    std::optional<Ref> normals;
-    std::optional<Ref> textures;
-    std::optional<Ref> colors;
-    std::optional<Ref> lines;
-    std::optional<Ref> triangles;
+struct BuilderBytes {
+    QByteArray bytes;
+    ViewType   type;
 };
 
-/// Take your mesh data and pack it into a byte buffer.
-PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const&,
-                                         std::vector<std::byte>&);
+using BufferSources =
+    QHash<QString, std::variant<BuilderBytes, QImage, MeshSource>>;
 
+using BufferDirectory = QHash<QString, std::variant<BufferViewTPtr, MeshTPtr>>;
 
-/// Take an image from disk and pack it into a byte buffer.
-PackedMeshDataResult::Ref
-pack_image_to_vector(std::filesystem::path const& path,
-                     std::vector<std::byte>&);
+BufferDirectory create_directory(DocumentTPtrRef, BufferSources);
 
 // Plot ========================================================================
 

@@ -102,6 +102,10 @@ QCborValue serialize_f(QVector<T>& t) {
     return ret;
 }
 
+QCborValue serialize_f(QStringList& t) {
+    return QCborArray::fromStringList(t);
+}
+
 QCborValue serialize_f(glm::vec3& t) {
     QCborArray ret;
     ret << t.x << t.y << t.z;
@@ -294,6 +298,19 @@ bool deserialize_f(QCborValue v, QVector<T>& t) {
     for (auto lv : arr) {
         T    new_t;
         bool ok = deserialize(lv, new_t);
+        if (!ok) return false;
+        t << new_t;
+    }
+    return true;
+}
+
+bool deserialize_f(QCborValue v, QStringList& t) {
+    if (!v.isArray()) return false;
+    auto arr = v.toArray();
+
+    for (auto lv : arr) {
+        QString new_t;
+        bool    ok = deserialize(lv, new_t);
         if (!ok) return false;
         t << new_t;
     }
@@ -741,6 +758,7 @@ void Attribute::serialize(Archive& a) {
     NOONVP(semantic);
 
     NOONVP(channel);
+    NOONVP(offset);
     NOONVP(stride);
 
     NOONVP(format);
@@ -754,6 +772,7 @@ void Attribute::serialize(Archive& a) {
 template <class Archive>
 void Index::serialize(Archive& a) {
     NOONVP(view);
+    NOONVP(offset);
     NOONVP(stride);
 
     NOONVP(format);

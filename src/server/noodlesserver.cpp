@@ -110,6 +110,10 @@ ServerT::ServerT(quint16 port, QObject* parent) : QObject(parent) {
             &ServerT::on_new_connection);
 }
 
+quint16 ServerT::port() const {
+    return m_socket_server->serverPort();
+}
+
 NoodlesState* ServerT::state() {
     return m_state;
 }

@@ -221,7 +221,7 @@ std::pair<QUuid, QUrl> AssetStorage::register_asset(QByteArray arr) {
 
     // only later versions of Qt have the no-bracket format
 
-    auto ref = str.midRef(1).chopped(1);
+    auto ref = str.mid(1).chopped(1);
 
     QUrl url(m_host_info + ref);
 

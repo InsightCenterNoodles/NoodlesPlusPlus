@@ -57,7 +57,4 @@ public:
 
 private slots:
     void handle_new_connection();
-
-    void on_ask_asset(QUuid);
-signals:
 };

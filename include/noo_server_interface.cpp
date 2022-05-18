@@ -8,6 +8,7 @@
 
 #include <glm/gtx/component_wise.hpp>
 
+#include <QBuffer>
 #include <QDebug>
 #include <QFile>
 
@@ -100,7 +101,8 @@ void update_document(DocumentTPtrRef doc, DocumentData const& data) {
     return doc->update(data);
 }
 
-// Buffer ======================================================================
+// Buffer Construction =========================================================
+
 
 template <class T>
 struct is_optional : std::bool_constant<false> { };
@@ -108,20 +110,51 @@ struct is_optional : std::bool_constant<false> { };
 template <class T>
 struct is_optional<std::optional<T>> : std::bool_constant<true> { };
 
-PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
-                                         std::vector<std::byte>&  bytes) {
+struct Range {
+    QString  key;
+    uint64_t offset;
+    uint64_t length;
+    ViewType type;
+};
+
+struct PackedMeshDataResult {
+    QByteArray data;
+
+    MaterialTPtr material;
+
+    BoundingBox bounding_box;
+
+    struct Ref {
+        size_t start  = 0;
+        size_t size   = 0;
+        size_t stride = 0;
+    };
+
+    Ref                positions;
+    std::optional<Ref> normals;
+    std::optional<Ref> textures;
+    std::optional<Ref> colors;
+    std::optional<Ref> lines;
+    std::optional<Ref> triangles;
+};
+
+static std::optional<PackedMeshDataResult>
+pack_mesh_source(MeshSource const& refs) {
 
     qDebug() << Q_FUNC_INFO;
 
-    if (refs.triangles.empty() and refs.lines.empty()) return {};
-    if (!refs.triangles.empty() and !refs.lines.empty()) return {};
-    if (refs.positions.empty()) return {};
-
-    size_t start_byte = bytes.size();
-
-    qDebug() << "Starting at" << start_byte;
+    if (refs.triangles.empty() and refs.lines.empty()) return std::nullopt;
+    if (!refs.triangles.empty() and !refs.lines.empty()) return std::nullopt;
+    if (refs.positions.empty()) return std::nullopt;
 
     PackedMeshDataResult ret;
+
+    // compute cell size
+    const size_t cell_byte_size =
+        (refs.positions.empty() ? 0 : sizeof(glm::vec3)) +
+        (refs.normals.empty() ? 0 : sizeof(glm::vec3)) +
+        (refs.textures.empty() ? 0 : sizeof(glm::u16vec2)) +
+        (refs.colors.empty() ? 0 : sizeof(glm::u8vec4));
 
     // if the lists are not equal in size...well we can just duplicate
 
@@ -141,44 +174,37 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
     //             ret.extent_max.y
     //             << ret.extent_max.z;
 
-    // compute cell size
-    const size_t cell_byte_size =
-        (refs.positions.empty() ? 0 : sizeof(glm::vec3)) +
-        (refs.normals.empty() ? 0 : sizeof(glm::vec3)) +
-        (refs.textures.empty() ? 0 : sizeof(glm::u16vec2)) +
-        (refs.colors.empty() ? 0 : sizeof(glm::u8vec4));
-
 
     qDebug() << "Cell size" << cell_byte_size;
 
-    auto const num_verts =
-        std::max(refs.positions.size(),
-                 std::max(refs.normals.size(),
-                          std::max(refs.textures.size(), refs.colors.size())));
+    auto const num_verts = refs.positions.size();
 
     qDebug() << "Num verts" << num_verts;
 
+    QByteArray bytes;
 
     {
         size_t const total_vertex_bytes = num_verts * cell_byte_size;
 
         qDebug() << "New vert byte range" << total_vertex_bytes;
-        std::vector<std::byte> vertex_portion;
+        QByteArray vertex_portion;
         vertex_portion.resize(total_vertex_bytes);
 
-        std::byte* comp_start = vertex_portion.data();
+        char* comp_start = vertex_portion.data();
 
         auto add_component = [&]<class T, class U>(std::span<T const> vector,
                                                    U& dest_res) {
             if (vector.empty()) return;
 
-            std::byte* write_at = comp_start;
+            {
+                char* write_at = comp_start;
 
-            for (auto const& component : vector) {
-                assert((write_at - vertex_portion.data()) <
-                       vertex_portion.size());
-                memcpy(write_at, &component, sizeof(component));
-                write_at += cell_byte_size;
+                for (auto const& component : vector) {
+                    assert((write_at - vertex_portion.data()) <
+                           vertex_portion.size());
+                    memcpy(write_at, &component, sizeof(component));
+                    write_at += cell_byte_size;
+                }
             }
 
             static_assert(std::is_same_v<glm::vec3, T> or
@@ -195,7 +221,7 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
             }
 
 
-            ref->start  = (comp_start - vertex_portion.data()) + start_byte;
+            ref->start  = (comp_start - vertex_portion.data());
             ref->size   = vertex_portion.size();
             ref->stride = cell_byte_size;
 
@@ -210,11 +236,8 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
         add_component(refs.textures, ret.textures);
         add_component(refs.colors, ret.colors);
 
-        bytes.insert(bytes.end(), vertex_portion.begin(), vertex_portion.end());
+        bytes += vertex_portion;
     }
-
-    // reset to next append...
-    start_byte = bytes.size();
 
     PackedMeshDataResult::Ref index_ref;
     index_ref.start = bytes.size();
@@ -240,38 +263,176 @@ PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const& refs,
         ret.triangles = index_ref;
     }
 
-    bytes.insert(bytes.end(), index_copy_from.begin(), index_copy_from.end());
+    bytes.insert(index_copy_from.size(), index_copy_from.data());
+
+    ret.material = refs.material;
+    ret.data     = bytes;
 
     return ret;
 }
 
-PackedMeshDataResult::Ref
-pack_image_to_vector(std::filesystem::path const& path,
-                     std::vector<std::byte>&      out_bytes) {
+BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
+    QByteArray whole_array;
 
-    std::ifstream ifs(path, std::ios::binary | std::ios::ate);
+    { // estimate size
+        uint64_t sum = 0;
 
-    if (!ifs.good()) return {};
+        for (auto const& v : sources) {
 
-    auto size = ifs.tellg();
+            sum += VMATCH(
+                v,
+                VCASE(BuilderBytes const& b)->uint64_t {
+                    return b.bytes.size();
+                },
+                VCASE(QImage const& b)->uint64_t { return b.sizeInBytes(); },
+                VCASE(MeshSource const& b)->uint64_t {
+                    return b.positions.size_bytes() + b.normals.size_bytes() +
+                           b.textures.size_bytes() + b.colors.size_bytes() +
+                           b.lines.size_bytes() + b.triangles.size_bytes();
+                });
+        }
+
+        whole_array.reserve(sum);
+    }
+
+    // copy
+
+    std::vector<Range> ranges;
+    ranges.reserve(sources.size());
+
+    QHash<QString, PackedMeshDataResult> mesh_info;
+
+    for (auto iter = sources.begin(); iter != sources.end(); ++iter) {
+
+        Range r;
+
+        r.key    = iter.key();
+        r.offset = whole_array.size();
+
+        QByteArray bytes_to_insert = VMATCH(
+            iter.value(),
+            VCASE(BuilderBytes const& b) {
+                r.type = b.type;
+                return b.bytes;
+            },
+            VCASE(QImage const& b) {
+                r.type = ViewType::IMAGE_INFO;
+                QByteArray array;
+
+                {
+                    QBuffer buf(&array);
+                    buf.open(QIODevice::WriteOnly);
+                    b.save(&buf, "PNG");
+                }
+                return array;
+            },
+            VCASE(MeshSource const& b) {
+                r.type      = ViewType::GEOMETRY_INFO;
+                auto result = pack_mesh_source(b);
+                if (!result) { return QByteArray {}; }
+                mesh_info[r.key] = *result;
+                return result->data;
+            });
+
+        if (bytes_to_insert.isEmpty()) return {};
+
+        r.length = bytes_to_insert.size();
+        whole_array += bytes_to_insert;
+    }
+
+    auto buff = create_buffer(doc, whole_array);
+
+    BufferDirectory ret;
+
+    for (auto const& r : ranges) {
+
+        auto view = create_buffer_view(doc,
+                                       BufferViewData {
+                                           .source_buffer = buff,
+                                           .type          = r.type,
+                                           .offset        = r.offset,
+                                           .length        = r.length,
+                                       });
+
+        if (mesh_info.contains(r.key)) {
+            auto const& minfo = mesh_info[r.key];
+
+            MeshData mdata;
+
+            auto& patch = mdata.patches.emplace_back();
+
+            patch.material = minfo.material;
+
+            patch.indicies.view   = view;
+            patch.indicies.stride = 0; // we pack our indicies
+
+            if (minfo.lines) {
+                patch.indicies.offset = minfo.lines->start;
+                patch.indicies.format = Format::U16;
+                patch.type            = PrimitiveType::LINES;
+            } else {
+                patch.indicies.offset = minfo.triangles->start;
+                patch.indicies.format = Format::U16;
+                patch.type            = PrimitiveType::TRIANGLES;
+            }
 
 
-    PackedMeshDataResult::Ref ret;
-    ret.start  = out_bytes.size();
-    ret.stride = 1;
-    ret.size   = size;
+            auto add_comp =
+                [&](auto ref, AttributeSemantic as, Format f, bool normalized) {
+                    Attribute new_a {
+                        .view       = view,
+                        .semantic   = as,
+                        .offset     = ref.start,
+                        .stride     = ref.stride,
+                        .format     = f,
+                        .normalized = normalized,
+                    };
 
-    std::vector<char> buffer(size);
+                    if (as == AttributeSemantic::POSITION) {
+                        auto mins = minfo.bounding_box.aabb_min;
+                        auto maxs = minfo.bounding_box.aabb_max;
+                        new_a.minimum_value << mins.x << mins.y << mins.z;
+                        new_a.maximum_value << maxs.x << maxs.y << maxs.z;
+                    }
 
-    ifs.read(buffer.data(), size);
+                    patch.attributes.push_back(new_a);
+                };
 
-    auto sp = std::as_bytes(std::span(buffer));
+            add_comp(minfo.positions,
+                     AttributeSemantic::POSITION,
+                     Format::VEC3,
+                     false);
 
-    out_bytes.insert(out_bytes.end(), sp.begin(), sp.end());
+            if (minfo.normals) {
+                add_comp(*minfo.normals,
+                         AttributeSemantic::NORMAL,
+                         Format::VEC3,
+                         false);
+            }
+
+            if (minfo.textures) {
+                add_comp(*minfo.textures,
+                         AttributeSemantic::TEXTURE,
+                         Format::U16VEC2,
+                         true);
+            }
+
+            if (minfo.colors) {
+                add_comp(*minfo.colors,
+                         AttributeSemantic::TEXTURE,
+                         Format::U8VEC4,
+                         true);
+            }
+
+            ret[r.key] = create_mesh(doc, mdata);
+
+        } else {
+            ret[r.key] = view;
+        }
+    }
 
     return ret;
 }
-
 
 BufferTPtr create_buffer(DocumentTPtrRef doc, BufferData const& data) {
     return doc->buffer_list().provision_next(data);
@@ -282,8 +443,14 @@ BufferTPtr create_buffer(DocumentTPtrRef doc, QString path) {
 
     if (!file.open(QFile::ReadOnly)) { return {}; }
 
+
     auto all_bytes = file.readAll();
-#error need asset storage
+
+    return create_buffer(doc,
+                         {
+                             .name   = file.fileName(),
+                             .source = BufferInlineSource { .data = all_bytes },
+                         });
 }
 
 // BufferView ==================================================================
@@ -321,13 +488,13 @@ TextureTPtr create_texture_from_file(DocumentTPtrRef doc, QString path) {
             return uint64_t(s.source_byte_size);
         });
 
-    auto new_view = create_bufferview(doc,
-                                      BufferViewData {
-                                          .source_buffer = new_buffer,
-                                          .type          = ViewType::IMAGE_INFO,
-                                          .offset        = 0,
-                                          .length        = size,
-                                      });
+    auto new_view = create_buffer_view(doc,
+                                       BufferViewData {
+                                           .source_buffer = new_buffer,
+                                           .type   = ViewType::IMAGE_INFO,
+                                           .offset = 0,
+                                           .length = size,
+                                       });
 
     auto new_image = create_image(doc,
                                   ImageData {
@@ -391,10 +558,6 @@ void update_light(LightTPtr const& item, LightUpdateData const& data) {
 
 MeshTPtr create_mesh(DocumentTPtrRef doc, MeshData const& data) {
     return doc->mesh_list().provision_next(data);
-}
-
-MeshTPtr create_mesh(DocumentTPtrRef doc, BufferMeshDataRef const& ref) {
-    __builtin_unreachable();
 }
 
 

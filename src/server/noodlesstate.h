@@ -58,7 +58,9 @@ enum class BuiltinSignals {
 
 class ServerT;
 
-class DocumentT {
+class DocumentT : public QObject {
+    Q_OBJECT
+
     ServerT* m_server;
 
     AssetStorage* m_storage;

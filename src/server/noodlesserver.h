@@ -70,6 +70,8 @@ class ServerT : public QObject {
 public:
     explicit ServerT(quint16 port, QObject* parent = nullptr);
 
+    quint16 port() const;
+
     NoodlesState* state();
 
     std::unique_ptr<SMsgWriter> get_broadcast_writer();

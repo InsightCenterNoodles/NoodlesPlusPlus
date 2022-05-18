@@ -513,6 +513,7 @@ struct Attribute {
     QString      semantic;
 
     std::optional<uint64_t> channel;
+    std::optional<uint64_t> offset;
     std::optional<uint64_t> stride;
 
     QString format;
@@ -528,6 +529,7 @@ struct Attribute {
 
 struct Index {
     BufferViewID            view;
+    std::optional<uint64_t> offset;
     std::optional<uint64_t> stride;
     QString                 format;
 

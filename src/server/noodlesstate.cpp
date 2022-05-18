@@ -2,6 +2,7 @@
 
 #include "noodlesserver.h"
 #include "src/common/serialize.h"
+#include "src/server/assetstorage.h"
 
 #include <QDebug>
 
@@ -21,7 +22,14 @@ DocumentT::DocumentT(ServerT* s)
       m_sampler_list(s),
       m_tex_list(s),
       m_table_list(s),
-      m_plot_list(s) { }
+      m_plot_list(s) {
+
+    m_storage = new AssetStorage(s->port(), this);
+}
+
+AssetStorage& DocumentT::storage() {
+    return *m_storage;
+}
 
 BufferList& DocumentT::buffer_list() {
     return m_buffer_list;
