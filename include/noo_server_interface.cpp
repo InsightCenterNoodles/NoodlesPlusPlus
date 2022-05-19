@@ -283,6 +283,7 @@ pack_mesh_source(MeshSource const& refs) {
 }
 
 BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
+    qDebug() << "Creating buffer directory";
     QByteArray whole_array;
 
     { // estimate size
@@ -304,7 +305,10 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
         }
 
         whole_array.reserve(sum);
+
+        qDebug() << "Approx. buffer size" << sum;
     }
+
 
     // copy
 
@@ -323,14 +327,17 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
         QByteArray bytes_to_insert = VMATCH(
             iter.value(),
             VCASE(BuilderBytes const& b) {
+                qDebug() << "Adding bytes...";
                 r.type = b.type;
                 return b.bytes;
             },
             VCASE(QImage const& b) {
+                qDebug() << "Adding image...";
                 r.type = ViewType::IMAGE_INFO;
                 return image_to_bytes(b);
             },
             VCASE(MeshSource const& b) {
+                qDebug() << "Adding mesh...";
                 r.type      = ViewType::GEOMETRY_INFO;
                 auto result = pack_mesh_source(b);
                 if (!result) { return QByteArray {}; }
@@ -338,7 +345,10 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
                 return result->data;
             });
 
-        if (bytes_to_insert.isEmpty()) return {};
+        if (bytes_to_insert.isEmpty()) {
+            qDebug() << "No bytes for key" << r.key;
+            return {};
+        }
 
         r.length = bytes_to_insert.size();
         whole_array += bytes_to_insert;
@@ -350,6 +360,9 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
 
     for (auto const& r : ranges) {
 
+        qDebug() << "Creating view for buffer:" << r.key << r.offset
+                 << r.length;
+
         auto view = create_buffer_view(doc,
                                        BufferViewData {
                                            .source_buffer = buff,
@@ -359,6 +372,7 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
                                        });
 
         if (mesh_info.contains(r.key)) {
+            qDebug() << "Creating mesh objects...";
             auto const& minfo = mesh_info[r.key];
 
             MeshData mdata;
@@ -434,6 +448,8 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
             ret[r.key] = view;
         }
     }
+
+    qDebug() << "Done";
 
     return ret;
 }
