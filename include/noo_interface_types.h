@@ -76,6 +76,12 @@ inline bool from_cbor(QCborValue v, QCborArray& array) {
     return true;
 }
 
+inline bool from_cbor(QCborValue v, QByteArray& array) {
+    if (!v.isByteArray()) return false;
+    array = v.toByteArray();
+    return true;
+}
+
 inline bool from_cbor(QCborValue v, bool& s) {
     s = v.toBool();
     return true;
