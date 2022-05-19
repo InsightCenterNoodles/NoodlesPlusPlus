@@ -363,13 +363,13 @@ MethodInit::MethodInit(noo::messages::MsgMethodCreate const& m,
 }
 
 MethodDelegate::MethodDelegate(noo::MethodID i, MethodInit const& d)
-    : m_id(i), m_method_name(d.method_name) { }
+    : m_id(i), m_data(d) { }
 MethodDelegate::~MethodDelegate() = default;
 noo::MethodID MethodDelegate::id() const {
     return m_id;
 }
 QString MethodDelegate::name() const {
-    return m_method_name;
+    return m_data.method_name;
 }
 
 // =============================================================================
@@ -1177,9 +1177,10 @@ PlotUpdate::PlotUpdate(noo::messages::MsgPlotUpdate const& m,
 }
 
 PlotDelegate::PlotDelegate(noo::PlotID i, PlotInit const& data)
-    : m_id(i), m_attached_methods(this), m_attached_signals(this) {
-    m_name = data.name;
-}
+    : m_id(i),
+      m_init(data),
+      m_attached_methods(this),
+      m_attached_signals(this) { }
 PlotDelegate::~PlotDelegate() = default;
 void PlotDelegate::update(PlotUpdate const& data) {
     if (data.type) { m_type = *data.type; }

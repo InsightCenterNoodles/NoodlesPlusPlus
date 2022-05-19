@@ -413,11 +413,13 @@ struct MethodInit {
 class MethodDelegate : public QObject {
     Q_OBJECT
     noo::MethodID m_id;
-    QString       m_method_name;
+    MethodInit    m_data;
 
 public:
     MethodDelegate(noo::MethodID, MethodInit const&);
     virtual ~MethodDelegate();
+
+    MethodInit const& info() { return m_data; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -455,6 +457,8 @@ public:
     SignalDelegate(noo::SignalID, SignalInit const&);
     virtual ~SignalDelegate();
 
+    SignalInit const& info() { return m_data; }
+
     NOODLES_CAN_UPDATE(false)
 
     noo::SignalID id() const;
@@ -491,6 +495,8 @@ class BufferDelegate : public QObject {
 public:
     BufferDelegate(noo::BufferID, BufferInit const&);
     virtual ~BufferDelegate();
+
+    BufferInit const& info() { return m_data; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -543,6 +549,8 @@ public:
     BufferViewDelegate(noo::BufferViewID, BufferViewInit const&);
     virtual ~BufferViewDelegate();
 
+    BufferViewInit const& info() { return m_init; }
+
     NOODLES_CAN_UPDATE(false)
 
     noo::BufferViewID id() const;
@@ -580,6 +588,8 @@ class ImageDelegate : public QObject {
 public:
     ImageDelegate(noo::ImageID, ImageInit const&);
     virtual ~ImageDelegate();
+
+    ImageInit const& info() { return m_init; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -640,6 +650,8 @@ public:
     SamplerDelegate(noo::SamplerID, SamplerInit const&);
     virtual ~SamplerDelegate();
 
+    auto const& info() { return m_init; }
+
     NOODLES_CAN_UPDATE(false)
 
     noo::SamplerID id() const;
@@ -667,6 +679,8 @@ class TextureDelegate : public QObject {
 public:
     TextureDelegate(noo::TextureID, TextureInit const&);
     virtual ~TextureDelegate();
+
+    auto const& info() { return m_init; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -733,6 +747,8 @@ class MaterialDelegate : public QObject {
 public:
     MaterialDelegate(noo::MaterialID, MaterialInit const&);
     virtual ~MaterialDelegate();
+
+    auto const& info() { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
@@ -807,6 +823,8 @@ class LightDelegate : public QObject {
 public:
     LightDelegate(noo::LightID, LightInit const&);
     virtual ~LightDelegate();
+
+    auto const& info() { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
@@ -912,6 +930,8 @@ public:
     MeshDelegate(noo::GeometryID, MeshInit const&);
     virtual ~MeshDelegate();
 
+    auto const& info() { return m_init; }
+
     NOODLES_CAN_UPDATE(false)
 
     noo::GeometryID id() const;
@@ -1001,6 +1021,8 @@ public:
     EntityDelegate(noo::EntityID, EntityUpdateData const&);
     virtual ~EntityDelegate();
 
+    auto const& info() { return m_data; }
+
     NOODLES_CAN_UPDATE(true)
 
     noo::EntityID id() const;
@@ -1050,6 +1072,8 @@ class TableDelegate : public QObject {
 public:
     TableDelegate(noo::TableID, TableInit const&);
     virtual ~TableDelegate();
+
+    auto const& info() { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
@@ -1124,7 +1148,7 @@ class PlotDelegate : public QObject {
     Q_OBJECT
     noo::PlotID m_id;
 
-    QString m_name;
+    PlotInit m_init;
 
     QPointer<TableDelegate> m_table;
     PlotType                m_type;
@@ -1135,6 +1159,8 @@ class PlotDelegate : public QObject {
 public:
     PlotDelegate(noo::PlotID, PlotInit const&);
     virtual ~PlotDelegate();
+
+    auto const& info() { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
