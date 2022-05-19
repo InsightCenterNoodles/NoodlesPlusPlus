@@ -438,6 +438,15 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
     return ret;
 }
 
+noo::MeshTPtr create_mesh(DocumentTPtrRef doc, noo::MeshSource const& src) {
+    auto          key = QStringLiteral("mesh");
+    BufferSources sources { { key, src } };
+
+    auto dir = create_directory(doc, sources);
+
+    return std::get<MeshTPtr>(dir[key]);
+}
+
 BufferTPtr create_buffer(DocumentTPtrRef doc, BufferData const& data) {
     return doc->buffer_list().provision_next(data);
 }

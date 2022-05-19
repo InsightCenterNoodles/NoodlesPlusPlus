@@ -604,6 +604,8 @@ using BufferDirectory = QHash<QString, std::variant<BufferViewTPtr, MeshTPtr>>;
 
 BufferDirectory create_directory(DocumentTPtrRef, BufferSources);
 
+noo::MeshTPtr create_mesh(DocumentTPtrRef, noo::MeshSource const& src);
+
 // Plot ========================================================================
 
 using PlotDef = std::variant<QString, QUrl>;
