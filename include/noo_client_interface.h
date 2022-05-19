@@ -419,7 +419,7 @@ public:
     MethodDelegate(noo::MethodID, MethodInit const&);
     virtual ~MethodDelegate();
 
-    MethodInit const& info() { return m_data; }
+    auto const& info() const { return m_data; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -457,7 +457,7 @@ public:
     SignalDelegate(noo::SignalID, SignalInit const&);
     virtual ~SignalDelegate();
 
-    SignalInit const& info() { return m_data; }
+    auto const& info() const { return m_data; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -496,7 +496,7 @@ public:
     BufferDelegate(noo::BufferID, BufferInit const&);
     virtual ~BufferDelegate();
 
-    BufferInit const& info() { return m_data; }
+    auto const& info() const { return m_data; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -549,7 +549,7 @@ public:
     BufferViewDelegate(noo::BufferViewID, BufferViewInit const&);
     virtual ~BufferViewDelegate();
 
-    BufferViewInit const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -589,7 +589,7 @@ public:
     ImageDelegate(noo::ImageID, ImageInit const&);
     virtual ~ImageDelegate();
 
-    ImageInit const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -650,7 +650,7 @@ public:
     SamplerDelegate(noo::SamplerID, SamplerInit const&);
     virtual ~SamplerDelegate();
 
-    auto const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -680,7 +680,7 @@ public:
     TextureDelegate(noo::TextureID, TextureInit const&);
     virtual ~TextureDelegate();
 
-    auto const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -748,7 +748,7 @@ public:
     MaterialDelegate(noo::MaterialID, MaterialInit const&);
     virtual ~MaterialDelegate();
 
-    auto const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
@@ -824,7 +824,7 @@ public:
     LightDelegate(noo::LightID, LightInit const&);
     virtual ~LightDelegate();
 
-    auto const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
@@ -930,7 +930,7 @@ public:
     MeshDelegate(noo::GeometryID, MeshInit const&);
     virtual ~MeshDelegate();
 
-    auto const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(false)
 
@@ -1021,7 +1021,7 @@ public:
     EntityDelegate(noo::EntityID, EntityUpdateData const&);
     virtual ~EntityDelegate();
 
-    auto const& info() { return m_data; }
+    auto const& info() const { return m_data; }
 
     NOODLES_CAN_UPDATE(true)
 
@@ -1073,7 +1073,7 @@ public:
     TableDelegate(noo::TableID, TableInit const&);
     virtual ~TableDelegate();
 
-    auto const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
@@ -1160,7 +1160,7 @@ public:
     PlotDelegate(noo::PlotID, PlotInit const&);
     virtual ~PlotDelegate();
 
-    auto const& info() { return m_init; }
+    auto const& info() const { return m_init; }
 
     NOODLES_CAN_UPDATE(true)
 
