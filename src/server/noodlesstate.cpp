@@ -24,7 +24,7 @@ DocumentT::DocumentT(ServerT* s)
       m_table_list(s),
       m_plot_list(s) {
 
-    m_storage = new AssetStorage(s->port(), this);
+    m_storage = new AssetStorage(s->port() + 1, this);
 }
 
 AssetStorage& DocumentT::storage() {

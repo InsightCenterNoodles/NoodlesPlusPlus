@@ -204,6 +204,8 @@ AssetStorage::AssetStorage(quint16 port, QObject* parent)
     }
 
     m_host_info = QString("http://%1:%2/").arg(ip_address).arg(port);
+
+    qInfo() << "Asset storage on" << m_host_info;
 }
 
 bool AssetStorage::is_ready() const {
