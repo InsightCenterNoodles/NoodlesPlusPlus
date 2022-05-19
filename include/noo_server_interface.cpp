@@ -352,6 +352,7 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
 
         r.length = bytes_to_insert.size();
         whole_array += bytes_to_insert;
+        ranges.push_back(r);
     }
 
     auto buff = create_buffer(doc, whole_array);
