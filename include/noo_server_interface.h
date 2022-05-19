@@ -294,7 +294,7 @@ using BufferTPtr = std::shared_ptr<BufferT>;
 BufferTPtr create_buffer(DocumentTPtrRef, BufferData const&);
 
 /// Create a new buffer from a file
-BufferTPtr create_buffer(DocumentTPtrRef, QString path);
+BufferTPtr create_buffer_from_file(DocumentTPtrRef, QString path);
 
 // Buffer ======================================================================
 

@@ -355,7 +355,9 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
         ranges.push_back(r);
     }
 
-    auto buff = create_buffer(doc, whole_array);
+    auto buff = create_buffer(
+        doc,
+        BufferData { .source = BufferInlineSource { .data = whole_array } });
 
     BufferDirectory ret;
 
@@ -468,7 +470,7 @@ BufferTPtr create_buffer(DocumentTPtrRef doc, BufferData const& data) {
     return doc->buffer_list().provision_next(data);
 }
 
-BufferTPtr create_buffer(DocumentTPtrRef doc, QString path) {
+BufferTPtr create_buffer_from_file(DocumentTPtrRef doc, QString path) {
     QFile file(path);
 
     if (!file.open(QFile::ReadOnly)) { return {}; }
