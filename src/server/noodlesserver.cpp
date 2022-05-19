@@ -94,7 +94,7 @@ void ClientT::send(QByteArray data) {
 
 ServerT::ServerT(quint16 port, QObject* parent) : QObject(parent) {
 
-    m_state = new NoodlesState(this);
+    m_state = new NoodlesState(this, port + 1);
 
     m_socket_server = new QWebSocketServer(QStringLiteral("Noodles Server"),
                                            QWebSocketServer::NonSecureMode,

@@ -8,7 +8,7 @@
 
 namespace noo {
 
-DocumentT::DocumentT(ServerT* s)
+DocumentT::DocumentT(ServerT* s, uint16_t asset_port)
     : m_server(s),
       m_method_list(s),
       m_signal_list(s),
@@ -24,7 +24,7 @@ DocumentT::DocumentT(ServerT* s)
       m_table_list(s),
       m_plot_list(s) {
 
-    m_storage = new AssetStorage(s->port() + 1, this);
+    m_storage = new AssetStorage(asset_port, this);
 }
 
 AssetStorage& DocumentT::storage() {
@@ -895,9 +895,9 @@ void DocumentT::build_table_builtins() {
 }
 
 
-NoodlesState::NoodlesState(ServerT* parent)
+NoodlesState::NoodlesState(ServerT* parent, uint16_t asset_port)
     : QObject(parent), m_parent(parent) {
-    m_document = std::make_shared<DocumentT>(m_parent);
+    m_document = std::make_shared<DocumentT>(m_parent, asset_port);
 }
 
 std::shared_ptr<DocumentT> const& NoodlesState::document() {

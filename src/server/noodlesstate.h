@@ -96,7 +96,7 @@ class DocumentT : public QObject {
     void build_table_signals();
 
 public:
-    DocumentT(ServerT*);
+    DocumentT(ServerT*, uint16_t asset_port);
 
     AssetStorage& storage();
 
@@ -139,7 +139,7 @@ class NoodlesState : public QObject {
     std::shared_ptr<DocumentT> m_document;
 
 public:
-    NoodlesState(ServerT* parent);
+    NoodlesState(ServerT* parent, uint16_t asset_port);
 
     std::shared_ptr<DocumentT> const& document();
 };
