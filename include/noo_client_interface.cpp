@@ -31,6 +31,14 @@ bool decode_entity(InternalClientState& state, QCborValue rid, T*& out_ptr) {
     return true;
 }
 
+template <class T, class U>
+bool decode_entity(InternalClientState& state, U rid, T*& out_ptr) {
+    using IDType = decltype(out_ptr->id());
+    auto new_id  = IDType(rid);
+    out_ptr      = state.lookup(new_id);
+    return true;
+}
+
 template <class T>
 bool decode_entity(InternalClientState& state,
                    QCborValue           rid,
@@ -74,7 +82,15 @@ template <class T, class U>
 void convert(T const& in, QVector<U>& out, InternalClientState& state) {
     // input better be some array
     for (auto const& v : in) {
-        out << U(v, state);
+        if constexpr (std::is_constructible_v<U,
+                                              std::remove_cvref_t<decltype(v)>,
+                                              InternalClientState&>) {
+            out << U(v, state);
+        } else {
+            U u;
+            decode_entity(state, v, u);
+            out << u;
+        }
     }
 }
 
@@ -82,6 +98,15 @@ template <class T, class U>
 void convert(T id, QPointer<U>& out, InternalClientState& state) {
     out = state.lookup(id);
 }
+
+template <class T, class U>
+void convert(std::optional<T> const& in,
+             QVector<U>&             out,
+             InternalClientState&    state) {
+    if (!in) return;
+    convert(*in, out, state);
+}
+
 
 template <class T, class U>
 void convert(std::optional<T>     id,
@@ -863,6 +888,8 @@ void convert(std::optional<QVector<T>> const& in_id_list,
 TableInit::TableInit(noo::messages::MsgTableCreate const& m,
                      InternalClientState&                 state) {
     convert(m.name, name, state);
+    convert(m.methods_list, methods_list, state);
+    convert(m.signals_list, signals_list, state);
 }
 
 TableUpdate::TableUpdate(noo::messages::MsgTableUpdate const& m,
@@ -875,12 +902,22 @@ TableDelegate::TableDelegate(noo::TableID i, TableInit const& data)
     : m_id(i),
       m_init(data),
       m_attached_methods(this),
-      m_attached_signals(this) { }
+      m_attached_signals(this) {
+
+    m_attached_methods = m_init.methods_list;
+    m_attached_signals = m_init.signals_list;
+}
 TableDelegate::~TableDelegate() = default;
 
 void TableDelegate::update(TableUpdate const& data) {
-    if (data.methods_list) m_attached_methods = *data.methods_list;
+
+    if (data.methods_list) {
+        m_init.methods_list = *data.methods_list;
+        m_attached_methods  = *data.methods_list;
+    }
+
     if (data.signals_list) {
+        m_init.signals_list = *data.signals_list;
 
         for (auto c : m_spec_signals) {
             disconnect(c);
@@ -1099,6 +1136,29 @@ EntityRenderableDefinition::EntityRenderableDefinition(
 EntityInit::EntityInit(noo::messages::MsgEntityCreate const& m,
                        InternalClientState&                  state) {
     convert(m.name, name, state);
+
+    if (m.parent) convert(*m.parent, parent, state);
+    if (m.transform) transform = *m.transform;
+
+    if (m.null_rep) {
+        definition = std::monostate();
+    } else if (m.text_rep) {
+        definition = EntityTextDefinition(*m.text_rep, state);
+    } else if (m.web_rep) {
+        definition = EntityWebpageDefinition(*m.web_rep, state);
+    } else if (m.render_rep) {
+        definition = EntityRenderableDefinition(*m.render_rep, state);
+    }
+
+    convert(m.lights, lights, state);
+    convert(m.tables, tables, state);
+    convert(m.plots, plots, state);
+
+    if (m.tags) tags = *m.tags;
+
+    convert(m.methods_list, methods_list, state);
+    convert(m.signals_list, signals_list, state);
+    if (m.influence) influence = m.influence.value();
 }
 
 
@@ -1129,15 +1189,33 @@ EntityUpdateData::EntityUpdateData(noo::messages::MsgEntityUpdate const& m,
     if (m.influence) influence = m.influence.value();
 }
 
-EntityDelegate::EntityDelegate(noo::EntityID i, EntityUpdateData const& data)
+EntityDelegate::EntityDelegate(noo::EntityID i, EntityInit const& data)
     : m_id(i),
       m_data(data),
       m_attached_methods(this),
-      m_attached_signals(this) { }
+      m_attached_signals(this) {
+    m_attached_methods = m_data.methods_list;
+    m_attached_signals = m_data.signals_list;
+}
 EntityDelegate::~EntityDelegate() = default;
 void EntityDelegate::update(EntityUpdateData const& data) {
-    if (data.methods_list) m_attached_methods = *data.methods_list;
-    if (data.signals_list) m_attached_signals = *data.signals_list;
+
+    if (data.parent) m_data.parent = *data.parent;
+    if (data.transform) m_data.transform = *data.transform;
+    if (data.definition) m_data.definition = *data.definition;
+    if (data.lights) m_data.lights = *data.lights;
+    if (data.tables) m_data.tables = *data.tables;
+    if (data.plots) m_data.plots = *data.plots;
+    if (data.tags) m_data.tags = *data.tags;
+    if (data.methods_list) {
+        m_data.methods_list = *data.methods_list;
+        m_attached_methods  = *data.methods_list;
+    }
+    if (data.signals_list) {
+        m_data.signals_list = *data.signals_list;
+        m_attached_signals  = *data.signals_list;
+    }
+    if (data.influence) m_data.influence = *data.influence;
 
     this->on_update(data);
 }
@@ -1159,6 +1237,17 @@ void EntityDelegate::prepare_delete() { }
 PlotInit::PlotInit(noo::messages::MsgPlotCreate const& m,
                    InternalClientState&                state) {
     convert(m.name, name, state);
+
+    if (m.table) convert(*m.table, table, state);
+
+    if (m.simple_plot) {
+        type = *m.simple_plot;
+    } else if (m.url_plot) {
+        type = *m.url_plot;
+    }
+
+    convert(m.methods_list, methods_list, state);
+    convert(m.signals_list, signals_list, state);
 }
 
 PlotUpdate::PlotUpdate(noo::messages::MsgPlotUpdate const& m,
@@ -1180,14 +1269,24 @@ PlotDelegate::PlotDelegate(noo::PlotID i, PlotInit const& data)
     : m_id(i),
       m_init(data),
       m_attached_methods(this),
-      m_attached_signals(this) { }
+      m_attached_signals(this) {
+
+    m_attached_methods = data.methods_list;
+    m_attached_signals = data.signals_list;
+}
 PlotDelegate::~PlotDelegate() = default;
 void PlotDelegate::update(PlotUpdate const& data) {
     if (data.type) { m_type = *data.type; }
     if (data.table) { m_table = *data.table; }
 
-    if (data.methods_list) m_attached_methods = *data.methods_list;
-    if (data.signals_list) m_attached_signals = *data.signals_list;
+    if (data.methods_list) {
+        m_init.methods_list = *data.methods_list;
+        m_attached_methods  = *data.methods_list;
+    }
+    if (data.signals_list) {
+        m_init.signals_list = *data.signals_list;
+        m_attached_signals  = *data.signals_list;
+    }
 
     this->on_update(data);
     emit updated();
@@ -1361,7 +1460,7 @@ create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
     CREATE_DEFAULT(light_maker, LightID, LightInit, LightDelegate);
     CREATE_DEFAULT(mat_maker, MaterialID, MaterialInit, MaterialDelegate);
     CREATE_DEFAULT(mesh_maker, GeometryID, MeshInit, MeshDelegate);
-    CREATE_DEFAULT(object_maker, EntityID, EntityUpdateData, EntityDelegate);
+    CREATE_DEFAULT(object_maker, EntityID, EntityInit, EntityDelegate);
     CREATE_DEFAULT(sig_maker, SignalID, SignalInit, SignalDelegate);
     CREATE_DEFAULT(method_maker, MethodID, MethodInit, MethodDelegate);
 

@@ -135,10 +135,9 @@ class InternalClientState : public QObject {
     ComponentList<TextureDelegate, noo::TextureID, TextureInit> m_texture_list;
     ComponentList<LightDelegate, noo::LightID, LightInit>       m_light_list;
     ComponentList<MaterialDelegate, noo::MaterialID, MaterialInit>
-                                                           m_material_list;
-    ComponentList<MeshDelegate, noo::GeometryID, MeshInit> m_mesh_list;
-    ComponentList<EntityDelegate, noo::EntityID, EntityUpdateData>
-                                                                m_object_list;
+                                                                m_material_list;
+    ComponentList<MeshDelegate, noo::GeometryID, MeshInit>      m_mesh_list;
+    ComponentList<EntityDelegate, noo::EntityID, EntityInit>    m_object_list;
     ComponentList<PlotDelegate, noo::PlotID, PlotInit>          m_plot_list;
     ComponentList<SamplerDelegate, noo::SamplerID, SamplerInit> m_sampler_list;
     ComponentList<ImageDelegate, noo::ImageID, ImageInit>       m_image_list;

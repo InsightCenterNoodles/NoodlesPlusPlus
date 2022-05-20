@@ -986,20 +986,31 @@ struct EntityDefinition : std::variant<std::monostate,
 struct EntityInit {
     QString name;
 
+    QPointer<EntityDelegate> parent;
+    glm::mat4                transform;
+    EntityDefinition         definition;
+    QVector<LightDelegate*>  lights;
+    QVector<TableDelegate*>  tables;
+    QVector<PlotDelegate*>   plots;
+    QStringList              tags;
+    QVector<MethodDelegate*> methods_list;
+    QVector<SignalDelegate*> signals_list;
+    noo::BoundingBox         influence;
+
     EntityInit(noo::messages::MsgEntityCreate const&, InternalClientState&);
 };
 
 struct EntityUpdateData {
-    std::optional<QPointer<EntityDelegate>>        parent;
-    std::optional<glm::mat4>                       transform;
-    std::optional<EntityDefinition>                definition;
-    std::optional<QVector<LightDelegate*>>         lights;
-    std::optional<QVector<TableDelegate*>>         tables;
-    std::optional<QVector<PlotDelegate*>>          plots;
-    std::optional<QStringList>                     tags;
-    std::optional<QVector<MethodDelegate*>>        methods_list;
-    std::optional<QVector<SignalDelegate*>>        signals_list;
-    std::optional<std::optional<noo::BoundingBox>> influence;
+    std::optional<QPointer<EntityDelegate>> parent;
+    std::optional<glm::mat4>                transform;
+    std::optional<EntityDefinition>         definition;
+    std::optional<QVector<LightDelegate*>>  lights;
+    std::optional<QVector<TableDelegate*>>  tables;
+    std::optional<QVector<PlotDelegate*>>   plots;
+    std::optional<QStringList>              tags;
+    std::optional<QVector<MethodDelegate*>> methods_list;
+    std::optional<QVector<SignalDelegate*>> signals_list;
+    std::optional<noo::BoundingBox>         influence;
 
     EntityUpdateData(noo::messages::MsgEntityUpdate const&,
                      InternalClientState&);
@@ -1011,14 +1022,14 @@ struct EntityUpdateData {
 /// server. Object delegates can also be updated.
 class EntityDelegate : public QObject {
     Q_OBJECT
-    noo::EntityID    m_id;
-    EntityUpdateData m_data;
+    noo::EntityID m_id;
+    EntityInit    m_data;
 
     AttachedMethodList m_attached_methods;
     AttachedSignalList m_attached_signals;
 
 public:
-    EntityDelegate(noo::EntityID, EntityUpdateData const&);
+    EntityDelegate(noo::EntityID, EntityInit const&);
     virtual ~EntityDelegate();
 
     auto const& info() const { return m_data; }
@@ -1044,6 +1055,9 @@ signals:
 
 struct TableInit {
     QString name;
+
+    QVector<MethodDelegate*> methods_list;
+    QVector<SignalDelegate*> signals_list;
 
     TableInit(noo::messages::MsgTableCreate const&, InternalClientState&);
 };
@@ -1130,6 +1144,12 @@ using PlotType = std::variant<QString, QUrl>;
 
 struct PlotInit {
     QString name;
+
+    QPointer<TableDelegate> table;
+    PlotType                type;
+
+    QVector<MethodDelegate*> methods_list;
+    QVector<SignalDelegate*> signals_list;
 
     PlotInit(noo::messages::MsgPlotCreate const&, InternalClientState&);
 };
@@ -1239,7 +1259,7 @@ struct ClientDelegates {
     DispatchFn<LightDelegate, noo::LightID, LightInit> light_maker;
     DispatchFn<MaterialDelegate, noo::MaterialID, MaterialInit> mat_maker;
     DispatchFn<MeshDelegate, noo::GeometryID, MeshInit>         mesh_maker;
-    DispatchFn<EntityDelegate, noo::EntityID, EntityUpdateData> object_maker;
+    DispatchFn<EntityDelegate, noo::EntityID, EntityInit>       object_maker;
     DispatchFn<SignalDelegate, noo::SignalID, SignalInit>       sig_maker;
     DispatchFn<MethodDelegate, noo::MethodID, MethodInit>       method_maker;
     DispatchFn<PlotDelegate, noo::PlotID, PlotInit>             plot_maker;

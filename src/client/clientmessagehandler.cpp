@@ -96,6 +96,8 @@ static void process(noo::messages::MsgEntityCreate const& value,
     auto id = value.id;
 
     EntityInit init(value, ms.state);
+
+    ms.state.object_list().handle_new(id, std::move(init));
 }
 static void process(noo::messages::MsgEntityUpdate const& value,
                     MessageState&                         ms) {
@@ -103,7 +105,7 @@ static void process(noo::messages::MsgEntityUpdate const& value,
 
     EntityUpdateData data(value, ms.state);
 
-    ms.state.object_list().handle_new(id, std::move(data));
+    ms.state.object_list().handle_update(id, std::move(data));
 }
 static void process(noo::messages::MsgEntityDelete const& value,
                     MessageState&                         ms) {
