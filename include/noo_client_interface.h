@@ -879,6 +879,7 @@ struct Attribute {
     AttributeSemantic            semantic;
     uint8_t                      channel = 0;
 
+    uint64_t offset = 0;
     uint64_t stride = 0;
     Format   format;
 
@@ -894,6 +895,7 @@ struct Attribute {
 struct Index {
     QPointer<BufferViewDelegate> view;
 
+    uint64_t offset = 0;
     uint64_t stride = 0;
     Format   format;
 

@@ -809,6 +809,7 @@ Attribute::Attribute(noo::messages::Attribute const& m,
     semantic = attrib_hash.value(m.semantic);
 
     if (m.channel) channel = *m.channel;
+    if (m.offset) offset = *m.offset;
     if (m.stride) stride = *m.stride;
     format = fmt_hash.value(m.format);
 
@@ -820,6 +821,7 @@ Attribute::Attribute(noo::messages::Attribute const& m,
 
 Index::Index(noo::messages::Index const& m, InternalClientState& state) {
     convert(m.view, view, state);
+    if (m.offset) offset = *m.offset;
     if (m.stride) stride = m.stride.value();
 
     format = fmt_hash.value(m.format);
