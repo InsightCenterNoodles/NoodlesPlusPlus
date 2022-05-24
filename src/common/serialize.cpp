@@ -948,6 +948,8 @@ QVector<ServerMessage> deserialize_server(QByteArray bytes) {
         return {};
     }
 
+    qDebug() << message_list;
+
     QVector<ServerMessage> ret;
 
     for (int i = 0; i < message_list.size(); i += 2) {
@@ -1005,6 +1007,8 @@ QVector<ClientMessage> deserialize_client(QByteArray bytes) {
         qWarning() << "Bad client message:" << error.errorString();
         return {};
     }
+
+    qDebug() << message_list;
 
     QVector<ClientMessage> ret;
 

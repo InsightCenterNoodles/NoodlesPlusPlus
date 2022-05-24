@@ -400,6 +400,7 @@ static void process(noo::messages::MsgMethodReply const& value,
 
 
 void process_message(QWebSocket& s, InternalClientState& state, QByteArray m) {
+    qDebug() << Q_FUNC_INFO;
     MessageState ms { .socket = s, .state = state };
 
     auto message_array = noo::messages::deserialize_server(m);
