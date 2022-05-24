@@ -884,9 +884,9 @@ bool MsgInvokeMethod::operator==(MsgInvokeMethod const& o) const {
 // =============================================================================
 
 
-template <class T, class Union>
-bool extract_smsg(QCborValue const& value, Union& ret) {
-    auto t = ret.template emplace<T>();
+template <class T>
+bool extract_smsg(QCborValue const& value, ServerMessage& ret) {
+    auto t = ret.emplace<T>();
     return deserialize(value, t);
 }
 
@@ -965,7 +965,7 @@ QVector<ServerMessage> deserialize_server(QByteArray bytes) {
 
         if (!ok) continue;
 
-        ret.push_back(std::move(message));
+        ret.push_back(message);
     }
 
     return ret;
@@ -984,6 +984,12 @@ QByteArray serialize_server(std::span<ServerMessage> list) {
     }
 
     return pack.toCborValue().toCbor();
+}
+
+template <class T>
+bool extract_smsg(QCborValue const& value, ClientMessage& ret) {
+    auto t = ret.emplace<T>();
+    return deserialize(value, t);
 }
 
 static bool
