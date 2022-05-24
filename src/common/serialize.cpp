@@ -886,7 +886,7 @@ bool MsgInvokeMethod::operator==(MsgInvokeMethod const& o) const {
 
 template <class T>
 bool extract_smsg(QCborValue const& value, ServerMessage& ret) {
-    auto t = ret.emplace<T>();
+    auto& t = ret.emplace<T>();
     return deserialize(value, t);
 }
 
@@ -988,7 +988,7 @@ QByteArray serialize_server(std::span<ServerMessage> list) {
 
 template <class T>
 bool extract_smsg(QCborValue const& value, ClientMessage& ret) {
-    auto t = ret.emplace<T>();
+    auto& t = ret.emplace<T>();
     return deserialize(value, t);
 }
 
