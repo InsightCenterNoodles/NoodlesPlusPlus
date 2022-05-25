@@ -825,6 +825,14 @@ Index::Index(noo::messages::Index const& m, InternalClientState& state) {
     if (m.stride) stride = m.stride.value();
 
     format = fmt_hash.value(m.format);
+
+    if (view) {
+        connect(view, &BufferViewDelegate::data_ready, this, &Index::ready);
+    }
+}
+
+bool Index::is_ready() {
+    return view->is_data_ready();
 }
 
 MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
@@ -832,9 +840,28 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
 
     for (auto const& lm : m.attributes) {
         attributes << Attribute(lm, state);
+
+        auto& b = attributes.back();
+
+        if (!b.view->is_data_ready()) {
+            m_unready_buffers++;
+            connect(b.view,
+                    &BufferViewDelegate::data_ready,
+                    this,
+                    &MeshPatch::on_buffer_ready);
+        }
     }
 
-    if (m.indicies) { indicies = Index(m.indicies.value(), state); }
+    if (m.indicies) {
+        indicies = new Index(m.indicies.value(), state);
+        indicies->setParent(this);
+        m_unready_buffers += !indicies->view->is_data_ready();
+
+        connect(indicies->view,
+                &BufferViewDelegate::data_ready,
+                this,
+                &MeshPatch::on_buffer_ready);
+    }
 
     static QHash<QString, PrimitiveType> prim_hash = {
         { "POINTS", PrimitiveType::POINTS },
@@ -851,25 +878,33 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
     convert(m.material, material, state);
 }
 
+void MeshPatch::on_buffer_ready() {
+    Q_ASSERT(m_unready_buffers);
+    m_unready_buffers--;
+    if (!m_unready_buffers) { emit ready(); }
+}
+
 MeshInit::MeshInit(noo::messages::MsgGeometryCreate const& m,
                    InternalClientState&                    state) {
     convert(m.name, name, state);
 
     for (auto const& lm : m.patches) {
-        patches << MeshPatch(lm, state);
+        auto* p = new MeshPatch(lm, state);
+        p->setParent(this);
+        patches << p;
     }
 }
 
 MeshDelegate::MeshDelegate(noo::GeometryID i, MeshInit const& data)
-    : m_id(i), m_init(data) { }
+    : m_id(i),
+      m_init(&data) // gross, but we are doing it this way for consistency
+{ }
 
 MeshDelegate::~MeshDelegate() = default;
 
 noo::GeometryID MeshDelegate::id() const {
     return m_id;
 }
-
-void MeshDelegate::prepare_delete() { }
 
 
 // =============================================================================
@@ -963,8 +998,6 @@ AttachedSignalList const& TableDelegate::attached_signals() const {
 noo::TableID TableDelegate::id() const {
     return m_id;
 }
-
-void TableDelegate::prepare_delete() { }
 
 void TableDelegate::on_table_initialize(QCborArray const&,
                                         QCborValue,
@@ -1232,8 +1265,6 @@ noo::EntityID EntityDelegate::id() const {
     return m_id;
 }
 
-void EntityDelegate::prepare_delete() { }
-
 // =============================================================================
 
 PlotInit::PlotInit(noo::messages::MsgPlotCreate const& m,
@@ -1303,8 +1334,6 @@ AttachedSignalList const& PlotDelegate::attached_signals() const {
 noo::PlotID PlotDelegate::id() const {
     return m_id;
 }
-
-void PlotDelegate::prepare_delete() { }
 
 // =============================================================================
 

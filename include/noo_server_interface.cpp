@@ -128,6 +128,12 @@ struct Range {
     ViewType type;
 };
 
+struct PMDRef {
+    size_t start  = 0;
+    size_t size   = 0;
+    size_t stride = 0;
+};
+
 struct PackedMeshDataResult {
     QByteArray data;
 
@@ -135,18 +141,13 @@ struct PackedMeshDataResult {
 
     BoundingBox bounding_box;
 
-    struct Ref {
-        size_t start  = 0;
-        size_t size   = 0;
-        size_t stride = 0;
-    };
 
-    Ref                positions;
-    std::optional<Ref> normals;
-    std::optional<Ref> textures;
-    std::optional<Ref> colors;
-    std::optional<Ref> lines;
-    std::optional<Ref> triangles;
+    PMDRef                positions;
+    std::optional<PMDRef> normals;
+    std::optional<PMDRef> textures;
+    std::optional<PMDRef> colors;
+    std::optional<PMDRef> lines;
+    std::optional<PMDRef> triangles;
 };
 
 static std::optional<PackedMeshDataResult>
@@ -223,7 +224,7 @@ pack_mesh_source(MeshSource const& refs) {
                           std::is_same_v<glm::u16vec2, T> or
                           std::is_same_v<glm::u8vec4, T>);
 
-            PackedMeshDataResult::Ref* ref;
+            PMDRef* ref;
 
             if constexpr (is_optional<U>::value) {
                 ref = &(dest_res.emplace());
@@ -250,7 +251,7 @@ pack_mesh_source(MeshSource const& refs) {
         bytes += vertex_portion;
     }
 
-    PackedMeshDataResult::Ref index_ref;
+    PMDRef index_ref;
     index_ref.start = bytes.size();
 
     std::span<std::byte const> index_copy_from;
@@ -274,7 +275,7 @@ pack_mesh_source(MeshSource const& refs) {
         ret.triangles = index_ref;
     }
 
-    bytes.insert(index_copy_from.size(), index_copy_from.data());
+    bytes.insert(index_copy_from.size(), (const char*)index_copy_from.data());
 
     ret.material = refs.material;
     ret.data     = bytes;
@@ -621,7 +622,7 @@ bool TableQuery::get_keys_to(std::span<int64_t>) const {
 // =============
 
 size_t TableColumn::size() const {
-    return std::visit([&](auto const& a) { return uint64_t(a.size()); }, *this);
+    return noo::visit([&](auto const& a) { return uint64_t(a.size()); }, *this);
 }
 
 bool TableColumn::is_string() const {
@@ -704,11 +705,11 @@ void TableColumn::set(size_t row, QString d) {
 }
 
 void TableColumn::erase(size_t row) {
-    std::visit([row](auto& a) { a.erase(a.begin() + row); }, *this);
+    noo::visit([row](auto& a) { a.erase(a.begin() + row); }, *this);
 }
 
 void TableColumn::clear() {
-    std::visit([](auto& a) { a.clear(); }, *this);
+    noo::visit([](auto& a) { a.clear(); }, *this);
 }
 
 // =============

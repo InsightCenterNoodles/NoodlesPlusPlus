@@ -2,6 +2,7 @@
 
 #include "bufferlist.h"
 #include "materiallist.h"
+#include "noo_common.h"
 #include "noodlesserver.h"
 #include "src/common/serialize.h"
 #include "src/generated/interface_tools.h"
@@ -34,8 +35,7 @@ void MeshT::write_new_to(SMsgWriter& w) {
 
         auto ind   = geom_patch.indicies.emplace();
         ind.view   = patch.indicies.view->id();
-        ind.format = QString::fromLocal8Bit(
-            magic_enum::enum_name(patch.indicies.format));
+        ind.format = to_qstring(magic_enum::enum_name(patch.indicies.format));
         ind.stride = patch.indicies.stride;
         ind.offset = patch.indicies.offset;
 
@@ -45,14 +45,14 @@ void MeshT::write_new_to(SMsgWriter& w) {
 
             new_attrib.view = attrib.view->id();
             new_attrib.semantic =
-                QString::fromLocal8Bit(magic_enum::enum_name(attrib.semantic));
+                to_qstring(magic_enum::enum_name(attrib.semantic));
 
             if (attrib.channel) new_attrib.channel = attrib.channel;
             if (attrib.offset) new_attrib.offset = attrib.offset;
             if (attrib.stride) new_attrib.stride = attrib.stride;
 
             new_attrib.format =
-                QString::fromLocal8Bit(magic_enum::enum_name(attrib.format));
+                to_qstring(magic_enum::enum_name(attrib.format));
 
             if (attrib.maximum_value.size()) {
                 new_attrib.maximum_value = attrib.maximum_value;

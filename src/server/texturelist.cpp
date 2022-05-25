@@ -76,14 +76,12 @@ SamplerT::SamplerT(IDType id, SamplerList* host, SamplerData const& d)
 void SamplerT::write_new_to(SMsgWriter& w) {
 
     messages::MsgSamplerCreate m {
-        .id   = id(),
-        .name = opt_string(m_data.name),
-        .mag_filter =
-            QString::fromUtf8(magic_enum::enum_name(m_data.mag_filter)),
-        .min_filter =
-            QString::fromUtf8(magic_enum::enum_name(m_data.min_filter)),
-        .wrap_s = QString::fromUtf8(magic_enum::enum_name(m_data.wrap_s)),
-        .wrap_t = QString::fromUtf8(magic_enum::enum_name(m_data.wrap_t)),
+        .id         = id(),
+        .name       = opt_string(m_data.name),
+        .mag_filter = to_qstring(magic_enum::enum_name(m_data.mag_filter)),
+        .min_filter = to_qstring(magic_enum::enum_name(m_data.min_filter)),
+        .wrap_s     = to_qstring(magic_enum::enum_name(m_data.wrap_s)),
+        .wrap_t     = to_qstring(magic_enum::enum_name(m_data.wrap_t)),
     };
 
     w.add(m);

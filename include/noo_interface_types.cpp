@@ -3,6 +3,7 @@
 #include "noo_common.h"
 
 #include <QDebug>
+#include <QtGlobal>
 
 #include <string>
 
@@ -20,7 +21,7 @@ QCborValue to_cbor(std::span<double> sp) {
 QCborValue to_cbor(std::span<int64_t> sp) {
     QCborArray arr;
     for (auto d : sp) {
-        arr << d;
+        arr << (qint64)d;
     }
     return arr;
 }

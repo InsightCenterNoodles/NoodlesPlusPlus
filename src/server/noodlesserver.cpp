@@ -438,7 +438,7 @@ public:
     void handle(messages::ClientMessage const& message) {
         try {
 
-            std::visit([this](auto const& m) { this->handle(m); }, message);
+            noo::visit([this](auto const& m) { this->handle(m); }, message);
 
         } catch (std::exception const& e) {
             qCritical() << "Internal exception while handling client message!"

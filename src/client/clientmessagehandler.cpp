@@ -241,9 +241,13 @@ static void process(noo::messages::MsgGeometryCreate const& value,
                     MessageState&                           ms) {
     auto id = value.id;
 
-    MeshInit md(value, ms.state);
+    // this is what we like to call, a 'bad idea', but for consistencies sake
+    auto p = std::make_unique<MeshInit>(value, ms.state);
 
-    ms.state.mesh_list().handle_new(id, std::move(md));
+    ms.state.mesh_list().handle_new(id, *p);
+
+    // the delegate will now own P as part of the qt object tree
+    (void)p.release();
 }
 static void process(noo::messages::MsgGeometryDelete const& value,
                     MessageState&                           ms) {

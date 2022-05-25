@@ -102,6 +102,14 @@ inline bool from_cbor(QCborValue v, QString& s) {
     return true;
 }
 
+inline bool from_cbor(QCborValue v, QStringList& s) {
+    auto arr = v.toArray();
+    for (auto a : arr) {
+        s << a.toString();
+    }
+    return true;
+}
+
 inline bool from_cbor(QCborValue v, glm::vec3& s) {
     auto arr = v.toArray();
     s.x      = arr[0].toDouble(0);

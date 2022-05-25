@@ -4,9 +4,12 @@
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
+#include <cstdint>
 #include <qimage.h>
 #include <qline.h>
 #include <qnetworkaccessmanager.h>
+#include <qobject.h>
+#include <qobjectdefs.h>
 #include <qsslerror.h>
 #include <span>
 
@@ -892,7 +895,9 @@ struct Attribute {
     Attribute(noo::messages::Attribute const&, InternalClientState&);
 };
 
-struct Index {
+class Index : public QObject {
+    Q_OBJECT
+public:
     QPointer<BufferViewDelegate> view;
 
     uint64_t offset = 0;
@@ -901,12 +906,22 @@ struct Index {
 
     Index() = default;
     Index(noo::messages::Index const&, InternalClientState&);
+
+    bool is_ready();
+
+signals:
+    void ready();
 };
 
-struct MeshPatch {
+class MeshPatch : public QObject {
+    Q_OBJECT
+
+    uint64_t m_unready_buffers = 0;
+
+public:
     QVector<Attribute> attributes;
 
-    std::optional<Index> indicies;
+    QPointer<Index> indicies;
 
     PrimitiveType type;
 
@@ -914,11 +929,19 @@ struct MeshPatch {
 
     MeshPatch() = default;
     MeshPatch(noo::messages::GeometryPatch const&, InternalClientState&);
+
+private slots:
+    void on_buffer_ready();
+
+signals:
+    void ready();
 };
 
-struct MeshInit {
-    QString            name;
-    QVector<MeshPatch> patches;
+struct MeshInit : public QObject {
+    Q_OBJECT
+public:
+    QString                      name;
+    QVector<QPointer<MeshPatch>> patches;
 
     MeshInit(noo::messages::MsgGeometryCreate const&, InternalClientState&);
 };
@@ -926,7 +949,9 @@ struct MeshInit {
 class MeshDelegate : public QObject {
     Q_OBJECT
     noo::GeometryID m_id;
-    MeshInit        m_init;
+    MeshInit const* m_init;
+
+    uint64_t m_patch_unready = 0;
 
 public:
     MeshDelegate(noo::GeometryID, MeshInit const&);
@@ -938,7 +963,10 @@ public:
 
     noo::GeometryID id() const;
 
-    virtual void prepare_delete();
+    bool is_ready();
+
+signals:
+    void ready();
 };
 
 // =============================================================================
@@ -1044,7 +1072,7 @@ public:
 
     virtual void on_update(EntityUpdateData const&);
 
-    virtual void prepare_delete();
+    virtual void on_complete();
 
     AttachedMethodList const& attached_methods() const;
     AttachedSignalList const& attached_signals() const;
@@ -1098,8 +1126,6 @@ public:
     void update(TableUpdate const&);
 
     virtual void on_update(TableUpdate const&);
-
-    virtual void prepare_delete();
 
     AttachedMethodList const& attached_methods() const;
     AttachedSignalList const& attached_signals() const;
@@ -1191,8 +1217,6 @@ public:
     void update(PlotUpdate const&);
 
     virtual void on_update(PlotUpdate const&);
-
-    virtual void prepare_delete();
 
     AttachedMethodList const& attached_methods() const;
     AttachedSignalList const& attached_signals() const;

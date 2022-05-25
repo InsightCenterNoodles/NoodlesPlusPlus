@@ -94,12 +94,14 @@ BufferViewT::BufferViewT(IDType                id,
     : ComponentMixin(id, host), m_data(d) { }
 
 void BufferViewT::write_new_to(SMsgWriter& w) {
+    auto tname = magic_enum::enum_name(m_data.type);
+
     messages::MsgBufferViewCreate create {
         .id            = id(),
         .source_buffer = m_data.source_buffer->id(),
-        .type   = QString::fromLocal8Bit(magic_enum::enum_name(m_data.type)),
-        .offset = m_data.offset,
-        .length = m_data.length,
+        .type          = QString::fromUtf8(tname.data(), tname.size()),
+        .offset        = m_data.offset,
+        .length        = m_data.length,
     };
 
     w.add(create);
