@@ -148,6 +148,11 @@ bool from_cbor(QCborValue v, QVector<T>& out) {
     return true;
 }
 
+inline bool from_cbor(QCborValue v, QVector<int64_t>& out) {
+    out = coerce_to_int_list(v);
+    return true;
+}
+
 template <class T>
 bool from_cbor(QCborValue v, std::vector<T>& out) {
     out.clear();

@@ -1114,6 +1114,14 @@ class TableDelegate : public QObject {
     std::vector<QMetaObject::Connection> m_spec_signals;
 
 public:
+    struct ColumnInfo {
+        QString name;
+        QString type;
+
+        ColumnInfo() = default;
+        ColumnInfo(QCborMap);
+    };
+
     TableDelegate(noo::TableID, TableInit const&);
     virtual ~TableDelegate();
 
@@ -1131,26 +1139,27 @@ public:
     AttachedSignalList const& attached_signals() const;
 
 public slots:
-    virtual void on_table_initialize(QCborArray const& names,
-                                     QCborValue        keys,
-                                     QCborArray const& data_cols,
-                                     QCborArray const& selections);
+    virtual void on_table_initialize(QVector<ColumnInfo> const& names,
+                                     QVector<int64_t>           keys,
+                                     QVector<QCborArray> const& data_cols,
+                                     QVector<noo::Selection>    selections);
 
     virtual void on_table_reset();
-    virtual void on_table_updated(QCborValue keys, QCborValue columns);
-    virtual void on_table_rows_removed(QCborValue keys);
+    virtual void on_table_updated(QVector<int64_t> keys,
+                                  QCborArray       array_of_columns);
+    virtual void on_table_rows_removed(QVector<int64_t> keys);
     virtual void on_table_selection_updated(QString, noo::Selection const&);
 
 public:
     PendingMethodReply* subscribe() const;
-    PendingMethodReply* request_row_insert(QCborArray&& row) const;
-    PendingMethodReply* request_rows_insert(QCborArray&& columns) const;
+    PendingMethodReply* request_row_insert(QCborArray row) const;
+    PendingMethodReply* request_rows_insert(QCborArray array_of_columns) const;
 
-    PendingMethodReply* request_row_update(int64_t key, QCborArray&& row) const;
-    PendingMethodReply* request_rows_update(std::vector<int64_t>&& keys,
-                                            QCborArray&& columns) const;
+    PendingMethodReply* request_row_update(int64_t key, QCborArray row) const;
+    PendingMethodReply* request_rows_update(QVector<int64_t> keys,
+                                            QCborArray array_of_columns) const;
 
-    PendingMethodReply* request_deletion(std::span<int64_t> keys) const;
+    PendingMethodReply* request_deletion(QVector<int64_t> keys) const;
 
     PendingMethodReply* request_clear() const;
     PendingMethodReply* request_selection_update(QString, noo::Selection) const;

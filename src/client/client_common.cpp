@@ -6,20 +6,19 @@ namespace nooc {
 
 void SubscribeInitReply::interpret() {
 
-    auto arg_map = m_var.toMap();
+    noo::CborDecoder decoder(m_var.toMap());
 
-    if (arg_map.size() < 4) {
-        qDebug() << "Malformed subscribe reply";
-        emit recv_fail("Bad subscription reply!");
-        return;
-    }
+    QVector<TableDelegate::ColumnInfo> names;
+    QVector<int64_t>                   keys;
+    QVector<QCborArray>                data_columns;
+    QVector<noo::Selection>            selections;
 
-    auto names = arg_map[QStringLiteral("columns")].toArray();
-    auto keys  = arg_map[QStringLiteral("keys")];
-    auto cols  = arg_map[QStringLiteral("data")].toArray();
-    auto sels  = arg_map[QStringLiteral("selections")].toArray();
+    decoder(QStringLiteral("columns"), names);
+    decoder(QStringLiteral("keys"), keys);
+    decoder(QStringLiteral("data"), data_columns);
+    decoder.conditional(QStringLiteral("selections"), selections);
 
-    emit recv(names, keys, cols, sels);
+    emit recv(names, keys, data_columns, selections);
 }
 
 } // namespace nooc

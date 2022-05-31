@@ -935,6 +935,13 @@ TableUpdate::TableUpdate(noo::messages::MsgTableUpdate const& m,
     convert(m.signals_list, signals_list, state);
 }
 
+TableDelegate::ColumnInfo::ColumnInfo(QCborMap map) {
+    noo::CborDecoder decoder(map);
+
+    decoder("name", name);
+    decoder("type", type);
+}
+
 TableDelegate::TableDelegate(noo::TableID i, TableInit const& data)
     : m_id(i),
       m_init(data),
@@ -999,14 +1006,14 @@ noo::TableID TableDelegate::id() const {
     return m_id;
 }
 
-void TableDelegate::on_table_initialize(QCborArray const&,
-                                        QCborValue,
-                                        QCborArray const&,
-                                        QCborArray const&) { }
+void TableDelegate::on_table_initialize(QVector<ColumnInfo> const&,
+                                        QVector<int64_t>,
+                                        QVector<QCborArray> const&,
+                                        QVector<noo::Selection>) { }
 
 void TableDelegate::on_table_reset() { }
-void TableDelegate::on_table_updated(QCborValue, QCborValue) { }
-void TableDelegate::on_table_rows_removed(QCborValue) { }
+void TableDelegate::on_table_updated(QVector<int64_t>, QCborArray) { }
+void TableDelegate::on_table_rows_removed(QVector<int64_t>) { }
 void TableDelegate::on_table_selection_updated(QString, noo::Selection const&) {
 }
 
@@ -1025,18 +1032,18 @@ PendingMethodReply* TableDelegate::subscribe() const {
 }
 
 
-PendingMethodReply* TableDelegate::request_row_insert(QCborArray&& row) const {
+PendingMethodReply* TableDelegate::request_row_insert(QCborArray row) const {
     QCborArray new_list;
 
     for (int i = 0; i < row.size(); i++) {
         new_list << QCborArray({ row[i] });
     }
 
-    return request_rows_insert(std::move(new_list));
+    return request_rows_insert(new_list);
 }
 
 PendingMethodReply*
-TableDelegate::request_rows_insert(QCborArray&& columns) const {
+TableDelegate::request_rows_insert(QCborArray columns) const {
     auto* p = attached_methods().new_call_by_name("tbl_insert");
 
     p->call_direct(columns);
@@ -1044,8 +1051,8 @@ TableDelegate::request_rows_insert(QCborArray&& columns) const {
     return p;
 }
 
-PendingMethodReply* TableDelegate::request_row_update(int64_t      key,
-                                                      QCborArray&& row) const {
+PendingMethodReply* TableDelegate::request_row_update(int64_t    key,
+                                                      QCborArray row) const {
     QCborArray new_list;
 
     for (int i = 0; i < row.size(); i++) {
@@ -1056,8 +1063,8 @@ PendingMethodReply* TableDelegate::request_row_update(int64_t      key,
 }
 
 PendingMethodReply*
-TableDelegate::request_rows_update(std::vector<int64_t>&& keys,
-                                   QCborArray&&           columns) const {
+TableDelegate::request_rows_update(QVector<int64_t> keys,
+                                   QCborArray       columns) const {
     auto* p = attached_methods().new_call_by_name("tbl_update");
 
     p->call(keys, columns);
@@ -1066,7 +1073,7 @@ TableDelegate::request_rows_update(std::vector<int64_t>&& keys,
 }
 
 PendingMethodReply*
-TableDelegate::request_deletion(std::span<int64_t> keys) const {
+TableDelegate::request_deletion(QVector<int64_t> keys) const {
     auto* p = attached_methods().new_call_by_name("tbl_remove");
 
     p->call(keys);
@@ -1106,7 +1113,7 @@ void TableDelegate::interp_table_update(QCborArray const& ref) {
     auto keylist = ref[0];
     auto cols    = ref[1];
 
-    this->on_table_updated(keylist, cols);
+    this->on_table_updated(noo::coerce_to_int_list(keylist), cols.toArray());
 }
 
 void TableDelegate::interp_table_remove(QCborArray const& ref) {
@@ -1115,7 +1122,7 @@ void TableDelegate::interp_table_remove(QCborArray const& ref) {
         return;
     }
 
-    this->on_table_rows_removed(ref[0]);
+    this->on_table_rows_removed(noo::coerce_to_int_list(ref[0]));
 }
 
 void TableDelegate::interp_table_sel_update(QCborArray const& ref) {
@@ -1254,7 +1261,11 @@ void EntityDelegate::update(EntityUpdateData const& data) {
 
     this->on_update(data);
 }
-void                      EntityDelegate::on_update(EntityUpdateData const&) { }
+
+void EntityDelegate::on_update(EntityUpdateData const&) { }
+void EntityDelegate::on_complete() { }
+
+
 AttachedMethodList const& EntityDelegate::attached_methods() const {
     return m_attached_methods;
 }
