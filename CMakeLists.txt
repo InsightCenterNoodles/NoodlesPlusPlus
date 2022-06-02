@@ -47,11 +47,6 @@ CPMAddPackage(
     GIT_TAG v0.8.0
 )
 
-find_package(Qt6 COMPONENTS Gui Widgets Core Websockets)
-
-if (NOT Qt6_FOUND)
-    find_package(Qt5 COMPONENTS Gui Widgets Core WebSockets)
-endif()
 
 # Options ======================================================================
 
@@ -82,7 +77,17 @@ target_link_libraries(noodles PRIVATE magic_enum)
 if (NOT NOO_LOCAL_GLM)
     target_link_libraries(noodles PRIVATE glm)
 ENDIF()
-target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
+
+
+find_package(Qt6 COMPONENTS Gui Widgets Core Websockets)
+
+if (NOT Qt6_FOUND)
+    find_package(Qt5 COMPONENTS Gui Widgets Core WebSockets)
+    # universal targets were not added till 5.15
+    target_link_libraries(noodles PUBLIC Qt5::Core Qt5::WebSockets Qt5::Gui)
+else()
+    target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
+endif()
 
 add_subdirectory(src)
 
