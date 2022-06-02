@@ -31,7 +31,7 @@ CPMAddPackage(
 
 CPMAddPackage("gh:TheLartians/PackageProject.cmake@1.6.0")
 
-CPMAddPackage(
+CPMFindPackage(
     NAME glm
     URL  https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.7z
     VERSION 0.9.9.8
