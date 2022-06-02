@@ -5,6 +5,7 @@
 #include "noo_interface_types.h"
 
 #include <cstdint>
+#include <memory>
 #include <qimage.h>
 #include <qline.h>
 #include <qnetworkaccessmanager.h>
