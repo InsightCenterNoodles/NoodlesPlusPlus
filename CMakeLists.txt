@@ -31,11 +31,15 @@ CPMAddPackage(
 
 CPMAddPackage("gh:TheLartians/PackageProject.cmake@1.6.0")
 
-CPMFindPackage(
-    NAME glm
-    URL  https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.7z
-    VERSION 0.9.9.8
-)
+option(NOO_LOCAL_GLM "Use a local version of GLM instead of using CPM" OFF)
+
+if (NOT NOO_LOCAL_GLM)
+    CPMAddPackage(
+        NAME glm
+        URL  https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.7z
+        VERSION 0.9.9.8
+    )
+endif()
 
 CPMAddPackage(
     NAME magic_enum
