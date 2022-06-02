@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QSet>
 
+#include <memory>
 #include <unordered_set>
 
 class QWebSocketServer;
