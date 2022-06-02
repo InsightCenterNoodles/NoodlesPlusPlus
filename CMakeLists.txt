@@ -78,7 +78,10 @@ target_include_directories(noodles PUBLIC
 )
 
 # Because packagers like having fun
-target_link_libraries(noodles PRIVATE glm magic_enum)
+target_link_libraries(noodles PRIVATE magic_enum)
+if (NOT NOO_LOCAL_GLM)
+    target_link_libraries(noodles PRIVATE glm)
+ENDIF()
 target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
 
 add_subdirectory(src)
