@@ -61,13 +61,7 @@ static void process(noo::messages::MsgMethodCreate const& value,
 
     MethodInit md(value, ms.state);
 
-    MethodDelegate* delegate =
-        ms.state.method_list().handle_new(id, std::move(md));
-
-    QObject::connect(delegate,
-                     &MethodDelegate::invoke,
-                     &ms.state,
-                     &InternalClientState::on_method_ask_invoke);
+    ms.state.method_list().handle_new(id, std::move(md), ms.state);
 }
 static void process(noo::messages::MsgMethodDelete const& value,
                     MessageState&                         ms) {
@@ -120,9 +114,7 @@ static void process(noo::messages::MsgBufferCreate const& value,
 
     BufferInit init(value, ms.state);
 
-    auto* d = ms.state.buffer_list().handle_new(id, std::move(init));
-
-    d->start_download(ms.state.network_manager());
+    ms.state.buffer_list().handle_new(id, std::move(init), ms.state);
 }
 static void process(noo::messages::MsgBufferDelete const& value,
                     MessageState&                         ms) {
@@ -190,7 +182,7 @@ static void process(noo::messages::MsgImageCreate const& value,
 
     ImageInit init(value, ms.state);
 
-    ms.state.image_list().handle_new(id, std::move(init));
+    ms.state.image_list().handle_new(id, std::move(init), ms.state);
 }
 static void process(noo::messages::MsgImageDelete const& value,
                     MessageState&                        ms) {

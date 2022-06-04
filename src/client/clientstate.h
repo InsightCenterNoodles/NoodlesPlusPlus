@@ -24,14 +24,16 @@ public:
     ComponentList(Maker const& m) : m_maker(m) { }
     ~ComponentList() { qDebug() << Q_FUNC_INFO << typeid(Delegate).name(); }
 
-    Delegate* handle_new(IDType at, NewData const& nd) {
+    template <class... PostArgs>
+    void handle_new(IDType at, NewData const& nd, PostArgs&&... args) {
         qDebug() << "Handle new" << at.to_qstring();
-        if (!at.valid()) return nullptr;
+        if (!at.valid()) return;
 
         if (at.id_slot == m_list.size()) {
             // optimize to emplace_back
             auto& p = m_list.emplace_back(m_maker(at, std::move(nd)));
-            return p.get();
+            p->post_create(std::forward<PostArgs>(args)...);
+            return;
         }
 
         if (at.id_slot > m_list.size()) {
@@ -45,19 +47,19 @@ public:
         if (slot) {
             qDebug()
                 << "Server attempted to create an entity that already exists!";
-            return nullptr;
+            return;
         }
 
         slot = m_maker(at, std::move(nd));
 
-        return slot.get();
+        slot->post_create(std::forward<PostArgs>(args)...);
     }
     template <class UpdateData>
     bool handle_update(IDType at, UpdateData const& ud) {
-        if constexpr (Delegate::CAN_UPDATE) {
-            qWarning() << "Server attempted to update non-updatable object!";
-            return false;
-        }
+        //        if constexpr (Delegate::CAN_UPDATE) {
+        //            qWarning() << "Server attempted to update non-updatable
+        //            object!"; return false;
+        //        }
 
         if (!at.valid()) return false;
         if (at.id_slot >= m_list.size()) return false;
@@ -78,6 +80,7 @@ public:
 
         slot->update(ud);
         emit slot->updated();
+        return true;
     }
     bool handle_delete(IDType at) {
         if (!at.valid()) {

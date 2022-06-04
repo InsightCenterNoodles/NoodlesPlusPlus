@@ -388,8 +388,6 @@ public:
     AttachedSignal* find_by_delegate(SignalDelegate*) const;
 };
 
-#define NOODLES_CAN_UPDATE(B) static constexpr bool CAN_UPDATE = B;
-
 /// Represents an argument name/documentation pair for a method/signal.
 struct ArgDoc {
     QString name;
@@ -423,12 +421,13 @@ public:
     MethodDelegate(noo::MethodID, MethodInit const&);
     virtual ~MethodDelegate();
 
-    auto const& info() const { return m_data; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create(InternalClientState&);
 
     noo::MethodID id() const;
-    QString       name() const;
+    QString       name() const { return m_data.method_name; }
+    auto const&   info() const { return m_data; }
+
+    virtual void on_complete();
 
 signals:
     // private
@@ -461,12 +460,13 @@ public:
     SignalDelegate(noo::SignalID, SignalInit const&);
     virtual ~SignalDelegate();
 
-    auto const& info() const { return m_data; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create() { on_complete(); }
 
     noo::SignalID id() const;
-    QString       name() const;
+    QString       name() const { return m_data.name; }
+    auto const&   info() const { return m_data; }
+
+    virtual void on_complete();
 
 signals:
     /// Issued when this signal has been recv'ed.
@@ -500,25 +500,25 @@ public:
     BufferDelegate(noo::BufferID, BufferInit const&);
     virtual ~BufferDelegate();
 
-    auto const& info() const { return m_data; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create(InternalClientState&);
 
     noo::BufferID id() const;
+    QString       name() const { return m_data.name; }
+    auto const&   info() const { return m_data; }
 
-    bool is_data_ready() const { return m_buffer_bytes.size(); }
-
+    bool       is_data_ready() const { return m_buffer_bytes.size(); }
     QByteArray data() const { return m_buffer_bytes; }
 
-    void start_download(QNetworkAccessManager*);
+    virtual void on_complete();
+
 
 private slots:
-    void ready_read();
-    void on_error();
-    void on_ssl_error(QList<QSslError> const&);
+    void ready_read(QByteArray);
+    void on_error(QString);
 
 signals:
     void data_ready(QByteArray);
+    void data_progress(qint64 received, qint64 total);
 };
 
 // =============================================================================
@@ -553,20 +553,20 @@ public:
     BufferViewDelegate(noo::BufferViewID, BufferViewInit const&);
     virtual ~BufferViewDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create();
 
     noo::BufferViewID id() const;
+    QString           name() const { return m_init.name; }
+    auto const&       info() const { return m_init; }
 
-    bool is_data_ready() const { return m_init.source_buffer->is_data_ready(); }
+    bool            is_data_ready() const;
+    BufferDelegate* source_buffer() const;
+    QByteArray      get_sub_range() const;
 
-    BufferDelegate* source_buffer() const { return m_init.source_buffer; }
+    virtual void on_complete();
 
-    QByteArray get_sub_range() const {
-        return m_init.source_buffer->data().mid(m_init.offset, m_init.length);
-    }
-
+private slots:
+    void ready_read(QByteArray);
 signals:
     void data_ready(QByteArray);
 };
@@ -593,25 +593,25 @@ public:
     ImageDelegate(noo::ImageID, ImageInit const&);
     virtual ~ImageDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create(InternalClientState&);
 
     noo::ImageID id() const;
+    QString      name() const { return m_init.name; }
+    auto const&  info() const { return m_init; }
 
     bool is_data_ready() const { return !m_image.isNull(); }
 
-    void start_download(QNetworkAccessManager*);
+    QImage const& image() const { return m_image; }
+
+    virtual void on_complete();
 
 private slots:
-    void ready_read();
-    void on_error();
-    void on_ssl_error(QList<QSslError> const&);
-
-    void on_buffer_ready();
+    void ready_read(QByteArray);
+    void on_error(QString);
 
 signals:
     void data_ready(QImage);
+    void data_progress(qint64 received, qint64 total);
 };
 
 // =============================================================================
@@ -654,11 +654,13 @@ public:
     SamplerDelegate(noo::SamplerID, SamplerInit const&);
     virtual ~SamplerDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create() { on_complete(); }
 
     noo::SamplerID id() const;
+    QString        name() const { return m_init.name; }
+    auto const&    info() const { return m_init; }
+
+    virtual void on_complete();
 };
 
 // =============================================================================
@@ -684,13 +686,18 @@ public:
     TextureDelegate(noo::TextureID, TextureInit const&);
     virtual ~TextureDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create();
 
     noo::TextureID id() const;
+    QString        name() const { return m_init.name; }
+    auto const&    info() const { return m_init; }
 
     bool is_data_ready() const { return !m_init.image->is_data_ready(); }
+
+    virtual void on_complete();
+
+private slots:
+    void ready_read(QImage);
 
 signals:
     void data_ready(QImage);
@@ -752,16 +759,17 @@ public:
     MaterialDelegate(noo::MaterialID, MaterialInit const&);
     virtual ~MaterialDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(true)
+    void post_create();
 
     noo::MaterialID id() const;
+    QString         name() const { return m_init.name; }
+    auto const&     info() const { return m_init; }
 
     bool is_data_ready() const { return !m_unready_textures; }
 
     void         update(MaterialUpdate const&);
     virtual void on_update(MaterialUpdate const&);
+    virtual void on_complete();
 
 private slots:
     void texture_ready(QImage);
@@ -828,14 +836,15 @@ public:
     LightDelegate(noo::LightID, LightInit const&);
     virtual ~LightDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(true)
+    void post_create() { on_complete(); }
 
     noo::LightID id() const;
+    QString      name() const { return m_init.name; }
+    auto const&  info() const { return m_init; }
 
     void         update(LightUpdate const&);
     virtual void on_update(LightUpdate const&);
+    virtual void on_complete();
 
 signals:
     void updated();
@@ -931,6 +940,8 @@ public:
     MeshPatch() = default;
     MeshPatch(noo::messages::GeometryPatch const&, InternalClientState&);
 
+    bool is_ready() const { return !m_unready_buffers; }
+
 private slots:
     void on_buffer_ready();
 
@@ -958,13 +969,18 @@ public:
     MeshDelegate(noo::GeometryID, MeshInit const&);
     virtual ~MeshDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(false)
+    void post_create();
 
     noo::GeometryID id() const;
+    QString         name() const { return m_init->name; }
+    auto const&     info() const { return m_init; }
 
-    bool is_ready();
+    bool is_complete() { return !m_patch_unready; }
+
+    virtual void on_complete();
+
+private slots:
+    void on_patch_ready();
 
 signals:
     void ready();
@@ -1063,11 +1079,11 @@ public:
     EntityDelegate(noo::EntityID, EntityInit const&);
     virtual ~EntityDelegate();
 
-    auto const& info() const { return m_data; }
-
-    NOODLES_CAN_UPDATE(true)
+    void post_create();
 
     noo::EntityID id() const;
+    QString       name() const { return m_data.name; }
+    auto const&   info() const { return m_data; }
 
     void update(EntityUpdateData const&);
 
@@ -1126,15 +1142,17 @@ public:
     TableDelegate(noo::TableID, TableInit const&);
     virtual ~TableDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(true)
+    void post_create();
 
     noo::TableID id() const;
+    QString      name() const { return m_init.name; }
+    auto const&  info() const { return m_init; }
+
 
     void update(TableUpdate const&);
 
     virtual void on_update(TableUpdate const&);
+    virtual void on_complete();
 
     AttachedMethodList const& attached_methods() const;
     AttachedSignalList const& attached_signals() const;
@@ -1218,15 +1236,16 @@ public:
     PlotDelegate(noo::PlotID, PlotInit const&);
     virtual ~PlotDelegate();
 
-    auto const& info() const { return m_init; }
-
-    NOODLES_CAN_UPDATE(true)
+    void post_create();
 
     noo::PlotID id() const;
+    QString     name() const { return m_init.name; }
+    auto const& info() const { return m_init; }
 
     void update(PlotUpdate const&);
 
     virtual void on_update(PlotUpdate const&);
+    virtual void on_complete();
 
     AttachedMethodList const& attached_methods() const;
     AttachedSignalList const& attached_signals() const;

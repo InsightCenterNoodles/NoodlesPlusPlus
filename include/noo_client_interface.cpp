@@ -390,12 +390,21 @@ MethodInit::MethodInit(noo::messages::MsgMethodCreate const& m,
 MethodDelegate::MethodDelegate(noo::MethodID i, MethodInit const& d)
     : m_id(i), m_data(d) { }
 MethodDelegate::~MethodDelegate() = default;
+
+void MethodDelegate::post_create(InternalClientState& state) {
+    QObject::connect(this,
+                     &MethodDelegate::invoke,
+                     &state,
+                     &InternalClientState::on_method_ask_invoke);
+
+    on_complete();
+}
+
 noo::MethodID MethodDelegate::id() const {
     return m_id;
 }
-QString MethodDelegate::name() const {
-    return m_data.method_name;
-}
+
+void MethodDelegate::on_complete() { }
 
 // =============================================================================
 
@@ -412,9 +421,8 @@ SignalDelegate::~SignalDelegate() = default;
 noo::SignalID SignalDelegate::id() const {
     return m_id;
 }
-QString SignalDelegate::name() const {
-    return m_data.name;
-}
+
+void SignalDelegate::on_complete() { }
 
 // =============================================================================
 
@@ -437,41 +445,30 @@ noo::BufferID BufferDelegate::id() const {
     return m_id;
 }
 
-void BufferDelegate::start_download(QNetworkAccessManager* nm) {
-    if (is_data_ready()) return;
+void BufferDelegate::on_complete() { }
 
-    QNetworkRequest request;
-    request.setUrl(m_data.url);
-
-    auto* reply = nm->get(request);
-
-    connect(reply, &QNetworkReply::finished, this, &BufferDelegate::ready_read);
-    connect(
-        reply, &QNetworkReply::errorOccurred, this, &BufferDelegate::on_error);
-    connect(
-        reply, &QNetworkReply::sslErrors, this, &BufferDelegate::on_ssl_error);
-}
-
-void BufferDelegate::ready_read() {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    m_buffer_bytes       = reply->readAll();
-    reply->deleteLater();
-
-    if (is_data_ready()) emit data_ready(m_buffer_bytes);
-}
-void BufferDelegate::on_error() {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    qWarning() << "Download failed:" << reply->errorString();
-    reply->deleteLater();
-}
-void BufferDelegate::on_ssl_error(QList<QSslError> const& errs) {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    qWarning() << "Download failed:";
-
-    for (auto err : errs) {
-        qWarning() << err.errorString();
+void BufferDelegate::post_create(InternalClientState& state) {
+    if (is_data_ready()) {
+        emit data_progress(m_buffer_bytes.size(), m_buffer_bytes.size());
+        emit data_ready(m_buffer_bytes);
+        on_complete();
+        return;
     }
-    reply->deleteLater();
+
+    auto* p = new URLFetch(state.network_manager(), m_data.url);
+
+    connect(p, &URLFetch::completed, this, &BufferDelegate::ready_read);
+    connect(p, &URLFetch::error, this, &BufferDelegate::on_error);
+    connect(p, &URLFetch::progress, this, &BufferDelegate::data_progress);
+}
+
+void BufferDelegate::ready_read(QByteArray data) {
+    m_buffer_bytes = data;
+    emit data_ready(m_buffer_bytes);
+    on_complete();
+}
+void BufferDelegate::on_error(QString s) {
+    qWarning() << "Download failed:" << s;
 }
 
 // =============================================================================
@@ -497,11 +494,35 @@ BufferViewDelegate::BufferViewDelegate(noo::BufferViewID     i,
     connect(m_init.source_buffer,
             &BufferDelegate::data_ready,
             this,
-            &BufferViewDelegate::data_ready);
+            &BufferViewDelegate::ready_read);
 }
 BufferViewDelegate::~BufferViewDelegate() = default;
+
+void BufferViewDelegate::post_create() {
+    if (is_data_ready()) on_complete();
+}
+
 noo::BufferViewID BufferViewDelegate::id() const {
     return m_id;
+}
+
+bool BufferViewDelegate::is_data_ready() const {
+    return m_init.source_buffer->is_data_ready();
+}
+
+BufferDelegate* BufferViewDelegate::source_buffer() const {
+    return m_init.source_buffer;
+}
+
+QByteArray BufferViewDelegate::get_sub_range() const {
+    return m_init.source_buffer->data().mid(m_init.offset, m_init.length);
+}
+
+void BufferViewDelegate::on_complete() { }
+
+void BufferViewDelegate::ready_read(QByteArray) {
+    emit data_ready(get_sub_range());
+    on_complete();
 }
 
 // =============================================================================
@@ -520,15 +541,9 @@ ImageInit::ImageInit(noo::messages::MsgImageCreate const& m,
 }
 
 ImageDelegate::ImageDelegate(noo::ImageID i, ImageInit const& data)
-    : m_id(i), m_init(data) {
-    if (m_init.local_image) {
-        connect(m_init.local_image,
-                &BufferViewDelegate::data_ready,
-                this,
-                &ImageDelegate::on_buffer_ready);
-    }
-}
+    : m_id(i), m_init(data) { }
 ImageDelegate::~ImageDelegate() = default;
+
 noo::ImageID ImageDelegate::id() const {
     return m_id;
 }
@@ -537,44 +552,40 @@ static QImage convert_image(QByteArray array) {
     return QImage::fromData(array);
 }
 
-void ImageDelegate::start_download(QNetworkAccessManager* nm) {
+void ImageDelegate::post_create(InternalClientState& state) {
+    if (m_init.local_image) {
+
+        connect(m_init.local_image,
+                &BufferViewDelegate::data_ready,
+                this,
+                &ImageDelegate::ready_read);
+
+        if (m_init.local_image->is_data_ready()) {
+            ready_read(m_init.local_image->get_sub_range());
+        }
+
+        return;
+    }
+
     if (!m_init.remote_image.isValid()) return;
 
-    QNetworkRequest request;
-    request.setUrl(m_init.remote_image);
+    auto* p = new URLFetch(state.network_manager(), m_init.remote_image);
 
-    auto* reply = nm->get(request);
-
-    connect(reply, &QNetworkReply::finished, this, &ImageDelegate::ready_read);
-    connect(
-        reply, &QNetworkReply::errorOccurred, this, &ImageDelegate::on_error);
-    connect(
-        reply, &QNetworkReply::sslErrors, this, &ImageDelegate::on_ssl_error);
+    connect(p, &URLFetch::completed, this, &ImageDelegate::ready_read);
+    connect(p, &URLFetch::error, this, &ImageDelegate::on_error);
+    connect(p, &URLFetch::progress, this, &ImageDelegate::data_progress);
 }
 
-void ImageDelegate::ready_read() {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    m_image              = convert_image(reply->readAll());
-    reply->deleteLater();
+void ImageDelegate::on_complete() { }
 
-    if (is_data_ready()) emit data_ready(m_image);
-}
-void ImageDelegate::on_error() {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    qWarning() << "Download failed:" << reply->errorString();
-    reply->deleteLater();
-}
-void ImageDelegate::on_ssl_error(QList<QSslError> const& errs) {
-    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    qWarning() << "Download failed:";
+void ImageDelegate::ready_read(QByteArray array) {
+    m_image = convert_image(array);
 
-    for (auto err : errs) {
-        qWarning() << err.errorString();
-    }
-    reply->deleteLater();
+    emit data_ready(m_image);
+    on_complete();
 }
-void ImageDelegate::on_buffer_ready() {
-    m_image = convert_image(m_init.local_image->get_sub_range());
+void ImageDelegate::on_error(QString error) {
+    qWarning() << "Download failed:" << error;
 }
 
 // =============================================================================
@@ -608,6 +619,8 @@ noo::SamplerID SamplerDelegate::id() const {
     return m_id;
 }
 
+void SamplerDelegate::on_complete() { }
+
 // =============================================================================
 
 TextureInit::TextureInit(noo::messages::MsgTextureCreate const& m,
@@ -618,17 +631,33 @@ TextureInit::TextureInit(noo::messages::MsgTextureCreate const& m,
 }
 
 TextureDelegate::TextureDelegate(noo::TextureID i, TextureInit const& data)
-    : m_id(i), m_init(data) {
+    : m_id(i), m_init(data) { }
+TextureDelegate::~TextureDelegate() = default;
+
+void TextureDelegate::post_create() {
     if (m_init.image) {
-        connect(m_init.image,
-                &ImageDelegate::data_ready,
-                this,
-                &TextureDelegate::data_ready);
+
+        if (m_init.image->is_data_ready()) {
+            ready_read(m_init.image->image());
+
+        } else {
+            connect(m_init.image,
+                    &ImageDelegate::data_ready,
+                    this,
+                    &TextureDelegate::data_ready);
+        }
     }
 }
-TextureDelegate::~TextureDelegate() = default;
+
 noo::TextureID TextureDelegate::id() const {
     return m_id;
+}
+
+void TextureDelegate::on_complete() { }
+
+void TextureDelegate::ready_read(QImage img) {
+    emit data_ready(img);
+    on_complete();
 }
 
 // =============================================================================
@@ -712,6 +741,14 @@ MaterialDelegate::MaterialDelegate(noo::MaterialID i, MaterialInit const& data)
     test_texture(m_init.emissive_texture);
 }
 MaterialDelegate::~MaterialDelegate() = default;
+
+void MaterialDelegate::post_create() {
+    if (m_unready_textures == 0) {
+        emit all_textures_ready();
+        on_complete();
+    }
+}
+
 noo::MaterialID MaterialDelegate::id() const {
     return m_id;
 }
@@ -720,11 +757,15 @@ void MaterialDelegate::update(MaterialUpdate const& d) {
     emit updated();
 }
 void MaterialDelegate::on_update(MaterialUpdate const&) { }
+void MaterialDelegate::on_complete() { }
 
 void MaterialDelegate::texture_ready(QImage) {
     Q_ASSERT(m_unready_textures > 0);
     m_unready_textures--;
-    if (!m_unready_textures) { emit all_textures_ready(); }
+    if (!m_unready_textures) {
+        emit all_textures_ready();
+        on_complete();
+    }
 }
 
 // =============================================================================
@@ -783,6 +824,8 @@ void LightDelegate::update(LightUpdate const& d) {
 }
 
 void LightDelegate::on_update(LightUpdate const&) { }
+
+void LightDelegate::on_complete() { }
 
 // =============================================================================
 
@@ -898,13 +941,38 @@ MeshInit::MeshInit(noo::messages::MsgGeometryCreate const& m,
 MeshDelegate::MeshDelegate(noo::GeometryID i, MeshInit const& data)
     : m_id(i),
       m_init(&data) // gross, but we are doing it this way for consistency
-{ }
+{
+    for (auto const& p : m_init->patches) {
+        if (!p->is_ready()) {
+            m_patch_unready++;
+            connect(p, &MeshPatch::ready, this, &MeshDelegate::on_patch_ready);
+        }
+    }
+}
 
 MeshDelegate::~MeshDelegate() = default;
+
+void MeshDelegate::post_create() {
+    if (is_complete()) {
+        emit ready();
+        on_complete();
+    }
+}
 
 noo::GeometryID MeshDelegate::id() const {
     return m_id;
 }
+
+void MeshDelegate::on_patch_ready() {
+    Q_ASSERT(m_patch_unready > 0);
+    m_patch_unready--;
+    if (m_patch_unready == 0) {
+        emit ready();
+        on_complete();
+    }
+}
+
+void MeshDelegate::on_complete() { }
 
 
 // =============================================================================
@@ -953,6 +1021,10 @@ TableDelegate::TableDelegate(noo::TableID i, TableInit const& data)
 }
 TableDelegate::~TableDelegate() = default;
 
+void TableDelegate::post_create() {
+    on_complete();
+}
+
 void TableDelegate::update(TableUpdate const& data) {
 
     if (data.methods_list) {
@@ -995,6 +1067,7 @@ void TableDelegate::update(TableUpdate const& data) {
 }
 
 void TableDelegate::on_update(TableUpdate const&) { }
+void TableDelegate::on_complete() { }
 
 AttachedMethodList const& TableDelegate::attached_methods() const {
     return m_attached_methods;
@@ -1240,6 +1313,11 @@ EntityDelegate::EntityDelegate(noo::EntityID i, EntityInit const& data)
     m_attached_signals = m_data.signals_list;
 }
 EntityDelegate::~EntityDelegate() = default;
+
+void EntityDelegate::post_create() {
+    on_complete();
+}
+
 void EntityDelegate::update(EntityUpdateData const& data) {
 
     if (data.parent) m_data.parent = *data.parent;
@@ -1319,6 +1397,11 @@ PlotDelegate::PlotDelegate(noo::PlotID i, PlotInit const& data)
     m_attached_signals = data.signals_list;
 }
 PlotDelegate::~PlotDelegate() = default;
+
+void PlotDelegate::post_create() {
+    on_complete();
+}
+
 void PlotDelegate::update(PlotUpdate const& data) {
     if (data.type) { m_type = *data.type; }
     if (data.table) { m_table = *data.table; }
@@ -1336,6 +1419,7 @@ void PlotDelegate::update(PlotUpdate const& data) {
     emit updated();
 }
 void                      PlotDelegate::on_update(PlotUpdate const&) { }
+void                      PlotDelegate::on_complete() { }
 AttachedMethodList const& PlotDelegate::attached_methods() const {
     return m_attached_methods;
 }
