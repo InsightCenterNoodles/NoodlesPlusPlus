@@ -204,6 +204,7 @@ struct Selection {
     using Pair = std::pair<int64_t, int64_t>;
     static_assert(sizeof(Pair) == 2 * sizeof(int64_t));
 
+    QString          name;
     QVector<int64_t> rows;
     QVector<Pair>    row_ranges;
 

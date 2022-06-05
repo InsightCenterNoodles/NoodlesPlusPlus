@@ -1167,7 +1167,7 @@ public slots:
     virtual void on_table_updated(QVector<int64_t> keys,
                                   QCborArray       array_of_columns);
     virtual void on_table_rows_removed(QVector<int64_t> keys);
-    virtual void on_table_selection_updated(QString, noo::Selection const&);
+    virtual void on_table_selection_updated(noo::Selection const&);
 
 public:
     PendingMethodReply* subscribe() const;
@@ -1181,13 +1181,13 @@ public:
     PendingMethodReply* request_deletion(QVector<int64_t> keys) const;
 
     PendingMethodReply* request_clear() const;
-    PendingMethodReply* request_selection_update(QString, noo::Selection) const;
+    PendingMethodReply* request_selection_update(noo::Selection) const;
 
 private slots:
     void interp_table_reset(QCborArray const&);
     void interp_table_update(QCborArray const&);
     void interp_table_remove(QCborArray const&);
-    void interp_table_sel_update(QCborArray const&);
+    void interp_table_sel_update(QCborValue const&);
 
 signals:
     void updated();

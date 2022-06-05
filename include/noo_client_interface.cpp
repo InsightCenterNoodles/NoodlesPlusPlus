@@ -1087,8 +1087,7 @@ void TableDelegate::on_table_initialize(QVector<ColumnInfo> const&,
 void TableDelegate::on_table_reset() { }
 void TableDelegate::on_table_updated(QVector<int64_t>, QCborArray) { }
 void TableDelegate::on_table_rows_removed(QVector<int64_t>) { }
-void TableDelegate::on_table_selection_updated(QString, noo::Selection const&) {
-}
+void TableDelegate::on_table_selection_updated(noo::Selection const&) { }
 
 PendingMethodReply* TableDelegate::subscribe() const {
     auto* p = attached_methods().new_call_by_name<SubscribeInitReply>(
@@ -1163,11 +1162,10 @@ PendingMethodReply* TableDelegate::request_clear() const {
 }
 
 PendingMethodReply*
-TableDelegate::request_selection_update(QString        name,
-                                        noo::Selection selection) const {
+TableDelegate::request_selection_update(noo::Selection selection) const {
     auto* p = attached_methods().new_call_by_name("tbl_update_selection");
 
-    p->call(name, selection.to_cbor());
+    p->call(selection.to_cbor());
 
     return p;
 }
@@ -1198,16 +1196,10 @@ void TableDelegate::interp_table_remove(QCborArray const& ref) {
     this->on_table_rows_removed(noo::coerce_to_int_list(ref[0]));
 }
 
-void TableDelegate::interp_table_sel_update(QCborArray const& ref) {
-    if (ref.size() < 2) {
-        qWarning() << Q_FUNC_INFO << "Malformed signal from server";
-        return;
-    }
+void TableDelegate::interp_table_sel_update(QCborValue const& ref) {
+    auto sel_ref = noo::Selection(ref.toMap());
 
-    auto str     = ref[0].toString();
-    auto sel_ref = noo::Selection(ref[1].toMap());
-
-    this->on_table_selection_updated(str, sel_ref);
+    this->on_table_selection_updated(sel_ref);
 }
 
 

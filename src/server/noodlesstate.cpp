@@ -200,11 +200,7 @@ static QCborValue table_subscribe(MethodContext const& context,
         QCborArray lv;
 
         for (auto iter = selections.begin(); iter != selections.end(); ++iter) {
-            QCborArray entry;
-            entry << iter.key();
-            entry << to_cbor(iter.value());
-
-            lv.push_back(std::move(entry));
+            lv << to_cbor(iter.value());
         }
 
         return_obj[QStringLiteral("selections")] = std::move(lv);
@@ -272,7 +268,6 @@ static QCborValue table_data_clear(MethodContext const& context) {
 }
 
 static QCborValue table_update_selection(MethodContext const& context,
-                                         QString              selection_id,
                                          Selection            selection_ref) {
     // qDebug() << Q_FUNC_INFO;
 
@@ -280,7 +275,7 @@ static QCborValue table_update_selection(MethodContext const& context,
 
     auto* src = tbl->get_source();
 
-    bool ok = src->ask_update_selection(selection_id, selection_ref);
+    bool ok = src->ask_update_selection(selection_ref);
 
     if (!ok) {
         throw MethodException(ErrorCodes::TABLE_REJECT_SELECTION_UPDATE,

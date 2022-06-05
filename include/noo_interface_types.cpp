@@ -77,10 +77,12 @@ QVector<int64_t> coerce_to_int_list(QCborValue v) {
 
 // =============================================================================
 
+static auto const sel_name_str  = QStringLiteral("name");
 static auto const row_str       = QStringLiteral("rows");
 static auto const row_range_str = QStringLiteral("row_ranges");
 
 Selection::Selection(QCborMap v) {
+    name = v[sel_name_str].toString();
 
     rows = noo::coerce_to_int_list(v[row_str]);
 
@@ -101,6 +103,7 @@ QCborValue Selection::to_cbor() const {
 
     std::span<int64_t> ls((int64_t*)row_ranges.data(), row_ranges.size() * 2);
 
+    map[sel_name_str]  = name;
     map[row_str]       = noo::to_cbor(rows);
     map[row_range_str] = noo::to_cbor(ls);
 

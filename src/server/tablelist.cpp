@@ -104,14 +104,12 @@ static void send_table_signal(TableT& n, BuiltinSignals bs, Args&&... args) {
 }
 
 
-void TableT::on_table_selection_updated(QString name, Selection const& ref) {
+void TableT::on_table_selection_updated(Selection const& ref) {
     //    qDebug() << "Table emit" << Q_FUNC_INFO
     //             << QString::fromStdString(ref.to_any().dump_string());
 
-    send_table_signal(*this,
-                      BuiltinSignals::TABLE_SIG_SELECTION_CHANGED,
-                      name,
-                      ref.to_cbor());
+    send_table_signal(
+        *this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, ref.to_cbor());
 }
 
 void TableT::on_table_row_deleted(TableQueryPtr q) {

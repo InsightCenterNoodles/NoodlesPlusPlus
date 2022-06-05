@@ -1094,8 +1094,8 @@ bool TableSource::handle_reset() {
     return true;
 }
 
-bool TableSource::handle_set_selection(QString s, Selection const& ref) {
-    m_selections[s] = ref;
+bool TableSource::handle_set_selection(Selection const& ref) {
+    m_selections[ref.name] = ref;
 
     return true;
 }
@@ -1151,10 +1151,10 @@ bool TableSource::ask_clear() {
     return b;
 }
 
-bool TableSource::ask_update_selection(QString k, Selection const& s) {
-    auto b = handle_set_selection(k, s);
+bool TableSource::ask_update_selection(Selection const& s) {
+    auto b = handle_set_selection(s);
 
-    if (b) emit table_selection_updated(k, s);
+    if (b) emit table_selection_updated(s);
 
     return b;
 }

@@ -43,7 +43,7 @@ signals:
 
 private slots:
     void on_table_reset();
-    void on_table_selection_updated(QString, Selection const&);
+    void on_table_selection_updated(Selection const&);
     void on_table_row_updated(TableQueryPtr);
     void on_table_row_deleted(TableQueryPtr);
 };

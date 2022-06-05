@@ -701,7 +701,7 @@ protected:
                                         QCborArray const& cols);
     virtual TableQueryPtr handle_deletion(QCborValue const& keys);
     virtual bool          handle_reset();
-    virtual bool          handle_set_selection(QString, Selection const&);
+    virtual bool          handle_set_selection(Selection const&);
 
 public:
     TableSource(QObject* p) : QObject(p) { }
@@ -721,11 +721,11 @@ public:
                     QCborArray const&); // list of lists
     bool ask_delete(QCborValue const& keys);
     bool ask_clear();
-    bool ask_update_selection(QString, Selection const&);
+    bool ask_update_selection(Selection const&);
 
 signals:
     void table_reset();
-    void table_selection_updated(QString, Selection const&);
+    void table_selection_updated(Selection const&);
     void table_row_updated(TableQueryPtr);
     void table_row_deleted(TableQueryPtr);
 };
