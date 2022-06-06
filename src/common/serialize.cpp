@@ -432,6 +432,13 @@ struct DCBArchive {
         }
         ok = ok and deserialize(map[s], v);
     }
+
+    template <class T>
+    void operator()(QString s, std::optional<T>& v) {
+        if (!map.contains(s)) { return; }
+        auto& nt = v.emplace();
+        ok       = ok and deserialize(map[s], nt);
+    }
 };
 
 template <class T>
@@ -968,7 +975,11 @@ QVector<ServerMessage> deserialize_server(QByteArray bytes) {
 
         bool ok = deserialize_server_message(id, content, message);
 
-        if (!ok) continue;
+        if (!ok) {
+            qWarning() << "Unable to parse a message from the server:"
+                       << content.toDiagnosticNotation();
+            continue;
+        }
 
         ret.push_back(message);
     }
@@ -1034,7 +1045,11 @@ QVector<ClientMessage> deserialize_client(QByteArray bytes) {
 
         bool ok = deserialize_client_message(id, content, message);
 
-        if (!ok) continue;
+        if (!ok) {
+            qWarning() << "Unable to parse a message from the client:"
+                       << content.toDiagnosticNotation();
+            continue;
+        }
 
         ret.push_back(std::move(message));
     }
