@@ -287,7 +287,8 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
     qDebug() << "Creating buffer directory";
     QByteArray whole_array;
 
-    { // estimate size
+    {
+        // estimate size and reserve
         uint64_t sum = 0;
 
         for (auto const& v : sources) {

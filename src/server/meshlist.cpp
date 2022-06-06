@@ -62,7 +62,11 @@ void MeshT::write_new_to(SMsgWriter& w) {
             }
 
             new_attrib.normalized = attrib.normalized;
+
+            geom_patch.attributes << new_attrib;
         }
+
+        m.patches << geom_patch;
     }
 
     w.add(m);
