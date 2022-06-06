@@ -120,6 +120,8 @@ void update_common(ObjectT* obj, UP const& data, Message& m) {
                         new_inst.bb = t.instances->instance_bb.value();
                     }
                 }
+
+                m.render_rep = rep;
             });
     }
 
