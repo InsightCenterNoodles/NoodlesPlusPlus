@@ -33,11 +33,14 @@ void MeshT::write_new_to(SMsgWriter& w) {
 
         if (patch.material) geom_patch.material = patch.material->id();
 
-        auto ind   = geom_patch.indicies.emplace();
-        ind.view   = patch.indicies.view->id();
-        ind.format = to_qstring(magic_enum::enum_name(patch.indicies.format));
-        ind.stride = patch.indicies.stride;
-        ind.offset = patch.indicies.offset;
+        if (patch.indicies) {
+            auto const& src = *patch.indicies;
+            auto&       ind = geom_patch.indicies.emplace();
+            ind.view        = src.view->id();
+            ind.format      = to_qstring(magic_enum::enum_name(src.format));
+            ind.stride      = src.stride;
+            ind.offset      = src.offset;
+        }
 
         for (auto const& attrib : patch.attributes) {
 

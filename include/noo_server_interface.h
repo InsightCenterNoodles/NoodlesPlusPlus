@@ -543,7 +543,7 @@ struct Index {
 struct MeshPatch {
     std::vector<Attribute> attributes;
 
-    Index indicies;
+    std::optional<Index> indicies;
 
     PrimitiveType type;
 

@@ -386,17 +386,19 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
 
             patch.material = minfo.material;
 
-            patch.indicies.view   = view;
-            patch.indicies.stride = 0; // we pack our indicies
+            auto& new_index = patch.indicies.emplace();
+
+            new_index.view   = view;
+            new_index.stride = 0; // we pack our indicies
 
             if (minfo.lines) {
-                patch.indicies.offset = minfo.lines->start;
-                patch.indicies.format = Format::U16;
-                patch.type            = PrimitiveType::LINES;
+                new_index.offset = minfo.lines->start;
+                new_index.format = Format::U16;
+                patch.type       = PrimitiveType::LINES;
             } else {
-                patch.indicies.offset = minfo.triangles->start;
-                patch.indicies.format = Format::U16;
-                patch.type            = PrimitiveType::TRIANGLES;
+                new_index.offset = minfo.triangles->start;
+                new_index.format = Format::U16;
+                patch.type       = PrimitiveType::TRIANGLES;
             }
 
 
@@ -442,7 +444,7 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
 
             if (minfo.colors) {
                 add_comp(*minfo.colors,
-                         AttributeSemantic::TEXTURE,
+                         AttributeSemantic::COLOR,
                          Format::U8VEC4,
                          true);
             }
