@@ -178,6 +178,11 @@ struct CBArchive {
     void operator()(QString s, T& v) {
         map[s] = serialize(v);
     }
+
+    template <class T>
+    void operator()(QString s, std::optional<T>& v) {
+        if (v) map[s] = serialize(*v);
+    }
 };
 
 template <class T>
