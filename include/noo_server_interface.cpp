@@ -251,6 +251,8 @@ pack_mesh_source(MeshSource const& refs) {
         bytes += vertex_portion;
     }
 
+    qDebug() << "Packed vertex" << bytes.size();
+
     PMDRef index_ref;
     index_ref.start = bytes.size();
 
@@ -275,10 +277,16 @@ pack_mesh_source(MeshSource const& refs) {
         ret.triangles = index_ref;
     }
 
-    bytes.insert(index_copy_from.size(), (const char*)index_copy_from.data());
+    qDebug() << "Packed index" << index_copy_from.size();
+
+    bytes.insert(bytes.size(),
+                 (const char*)index_copy_from.data(),
+                 index_copy_from.size());
 
     ret.material = refs.material;
     ret.data     = bytes;
+
+    qDebug() << "Packed" << bytes.size();
 
     return ret;
 }
