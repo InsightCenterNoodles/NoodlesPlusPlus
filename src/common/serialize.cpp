@@ -2,8 +2,6 @@
 
 #include "src/common/variant_tools.h"
 
-#include "src/common/enum_tools.h"
-
 #include <QDebug>
 #include <QtGlobal>
 
@@ -12,6 +10,58 @@ namespace noo {
 namespace messages {
 
 #define NOONVP(NAME) a(#NAME, NAME)
+
+// =============================================================================
+
+template <class Key, class Value>
+class BidirectionalHash {
+    QHash<Key, Value> m_key_to_value;
+    QHash<Value, Key> m_value_to_key;
+
+public:
+    BidirectionalHash() = default;
+    BidirectionalHash(std::initializer_list<std::pair<Key, Value>> h)
+        : m_key_to_value(h) {
+        for (auto const& p : h) {
+            m_value_to_key[p.second] = p.first;
+        }
+    }
+
+    std::optional<Value> value(Key k) const {
+        auto iter = m_key_to_value.find(k);
+        if (iter == m_key_to_value.end()) return {};
+        return *iter;
+    }
+
+    Key value(Value k) const { return m_value_to_key.value(k); }
+};
+
+static const BidirectionalHash<QString, Format> format_name_hash = {
+    { "U8", Format::U8 },           { "U16", Format::U16 },
+    { "U32", Format::U32 },         { "U8VEC4", Format::U8VEC4 },
+    { "U16VEC2", Format::U16VEC2 }, { "VEC2", Format::VEC2 },
+    { "VEC3", Format::VEC3 },       { "VEC4", Format::VEC4 },
+    { "MAT3", Format::MAT3 },       { "MAT4", Format::MAT4 },
+};
+
+static const BidirectionalHash<QString, PrimitiveType> pt_name_hash = {
+    { "POINTS", PrimitiveType::POINTS },
+    { "LINES", PrimitiveType::LINES },
+    { "LINE_LOOP", PrimitiveType::LINE_LOOP },
+    { "LINE_STRIP", PrimitiveType::LINE_STRIP },
+    { "TRIANGLES", PrimitiveType::TRIANGLES },
+    { "TRIANGLE_STRIP", PrimitiveType::TRIANGLE_STRIP },
+    { "TRIANGLE_FAN", PrimitiveType::TRIANGLE_FAN },
+};
+
+static const BidirectionalHash<QString, AttributeSemantic>
+    semantic_name_hash = {
+        { "POSITION", AttributeSemantic::POSITION },
+        { "NORMAL", AttributeSemantic::NORMAL },
+        { "TANGENT", AttributeSemantic::TANGENT },
+        { "TEXTURE", AttributeSemantic::TEXTURE },
+        { "COLOR", AttributeSemantic::COLOR },
+    };
 
 // =============================================================================
 // Serialization
@@ -73,15 +123,15 @@ QCborValue serialize_f(InvokeID id) {
 }
 
 QCborValue serialize_f(Format& t) {
-    return enum_name(t);
+    return format_name_hash.value(t);
 }
 
 QCborValue serialize_f(PrimitiveType& t) {
-    return enum_name(t);
+    return pt_name_hash.value(t);
 }
 
 QCborValue serialize_f(AttributeSemantic& t) {
-    return enum_name(t);
+    return semantic_name_hash.value(t);
 }
 
 QCborValue serialize_f(QString& t) {
@@ -279,31 +329,25 @@ bool deserialize_f(QCborValue v, noo::InvokeID& id) {
     return true;
 };
 
-template <class Enum>
-bool deserialize_enum(QCborValue v, Enum& t) {
-    if (!v.isString()) return false;
-    auto string = v.toString().toUtf8();
-
-    auto opt = magic_enum::enum_cast<Enum>(
-        { string.data(), static_cast<size_t>(string.size()) });
-
-    if (!opt) return false;
-
+bool deserialize_f(QCborValue v, Format& t) {
+    auto opt = format_name_hash.value(v.toString());
+    if (!opt) { return false; }
     t = *opt;
-
     return true;
 }
 
-bool deserialize_f(QCborValue v, Format& t) {
-    return deserialize_enum(v, t);
-}
-
 bool deserialize_f(QCborValue v, PrimitiveType& t) {
-    return deserialize_enum(v, t);
+    auto opt = pt_name_hash.value(v.toString());
+    if (!opt) { return false; }
+    t = *opt;
+    return true;
 }
 
 bool deserialize_f(QCborValue v, AttributeSemantic& t) {
-    return deserialize_enum(v, t);
+    auto opt = semantic_name_hash.value(v.toString());
+    if (!opt) { return false; }
+    t = *opt;
+    return true;
 }
 
 bool deserialize_f(QCborValue v, QString& t) {
