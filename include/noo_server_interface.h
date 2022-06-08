@@ -535,6 +535,8 @@ struct Attribute {
 struct Index {
     BufferViewTPtr view;
 
+    uint64_t count = 0;
+
     uint64_t offset = 0;
     uint64_t stride = 0;
     Format   format;
@@ -542,6 +544,8 @@ struct Index {
 
 struct MeshPatch {
     std::vector<Attribute> attributes;
+
+    uint64_t vertex_count = 0;
 
     std::optional<Index> indicies;
 

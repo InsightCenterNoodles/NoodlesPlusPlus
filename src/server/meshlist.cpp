@@ -31,6 +31,8 @@ void MeshT::write_new_to(SMsgWriter& w) {
 
         messages::GeometryPatch geom_patch;
 
+        geom_patch.vertex_count = patch.vertex_count;
+
         if (patch.material) geom_patch.material = patch.material->id();
 
         if (patch.indicies) {
@@ -40,6 +42,7 @@ void MeshT::write_new_to(SMsgWriter& w) {
             ind.format      = to_qstring(magic_enum::enum_name(src.format));
             ind.stride      = src.stride;
             ind.offset      = src.offset;
+            ind.count       = src.count;
         }
 
         for (auto const& attrib : patch.attributes) {

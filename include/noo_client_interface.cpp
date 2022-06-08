@@ -864,6 +864,7 @@ Attribute::Attribute(noo::messages::Attribute const& m,
 
 Index::Index(noo::messages::Index const& m, InternalClientState& state) {
     convert(m.view, view, state);
+    count = m.count;
     if (m.offset) offset = *m.offset;
     if (m.stride) stride = m.stride.value();
 
@@ -894,6 +895,8 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
                     &MeshPatch::on_buffer_ready);
         }
     }
+
+    count = m.vertex_count;
 
     if (m.indicies) {
         indicies = new Index(m.indicies.value(), state);

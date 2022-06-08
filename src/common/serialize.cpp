@@ -784,6 +784,7 @@ void Attribute::serialize(Archive& a) {
 template <class Archive>
 void Index::serialize(Archive& a) {
     NOONVP(view);
+    NOONVP(count);
     NOONVP(offset);
     NOONVP(stride);
 
@@ -793,6 +794,7 @@ void Index::serialize(Archive& a) {
 template <class Archive>
 void GeometryPatch::serialize(Archive& a) {
     NOONVP(attributes);
+    NOONVP(vertex_count);
     NOONVP(indicies);
     NOONVP(type);
     NOONVP(material);

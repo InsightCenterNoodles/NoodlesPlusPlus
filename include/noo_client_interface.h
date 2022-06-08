@@ -910,6 +910,8 @@ class Index : public QObject {
 public:
     QPointer<BufferViewDelegate> view;
 
+    uint64_t count;
+
     uint64_t offset = 0;
     uint64_t stride = 0;
     Format   format;
@@ -930,6 +932,8 @@ class MeshPatch : public QObject {
 
 public:
     QVector<Attribute> attributes;
+
+    uint64_t count;
 
     QPointer<Index> indicies;
 

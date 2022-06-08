@@ -141,6 +141,9 @@ struct PackedMeshDataResult {
 
     BoundingBox bounding_box;
 
+    size_t vcount;
+    size_t icount;
+
 
     PMDRef                positions;
     std::optional<PMDRef> normals;
@@ -190,6 +193,8 @@ pack_mesh_source(MeshSource const& refs) {
     qDebug() << "Cell size" << cell_byte_size;
 
     auto const num_verts = refs.positions.size();
+
+    ret.vcount = num_verts;
 
     qDebug() << "Num verts" << num_verts;
 
@@ -267,6 +272,8 @@ pack_mesh_source(MeshSource const& refs) {
 
         ret.lines = index_ref;
 
+        ret.icount = refs.lines.size() * 2;
+
     } else if (!refs.triangles.empty()) {
         qDebug() << "Triangles" << refs.triangles.size();
         index_copy_from = std::as_bytes(refs.triangles);
@@ -275,6 +282,8 @@ pack_mesh_source(MeshSource const& refs) {
         index_ref.stride = sizeof(decltype(refs.triangles)::value_type);
 
         ret.triangles = index_ref;
+
+        ret.icount = refs.triangles.size() * 3;
     }
 
     qDebug() << "Packed index" << index_copy_from.size();
@@ -392,20 +401,21 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
 
             auto& patch = mdata.patches.emplace_back();
 
-            patch.material = minfo.material;
+            patch.material     = minfo.material;
+            patch.vertex_count = minfo.vcount;
 
             auto& new_index = patch.indicies.emplace();
 
             new_index.view   = view;
             new_index.stride = 0; // we pack our indicies
+            new_index.format = Format::U16;
+            new_index.count  = minfo.icount;
 
             if (minfo.lines) {
                 new_index.offset = minfo.lines->start;
-                new_index.format = Format::U16;
                 patch.type       = PrimitiveType::LINES;
             } else {
                 new_index.offset = minfo.triangles->start;
-                new_index.format = Format::U16;
                 patch.type       = PrimitiveType::TRIANGLES;
             }
 

@@ -529,6 +529,7 @@ struct Attribute {
 
 struct Index {
     BufferViewID            view;
+    uint64_t                count;
     std::optional<uint64_t> offset;
     std::optional<uint64_t> stride;
     QString                 format;
@@ -539,6 +540,7 @@ struct Index {
 
 struct GeometryPatch {
     QVector<Attribute>   attributes;
+    uint64_t             vertex_count;
     std::optional<Index> indicies;
     QString              type;
     MaterialID           material;
