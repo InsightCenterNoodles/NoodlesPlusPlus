@@ -1,6 +1,7 @@
 #ifndef CLIENT_INTERFACE_H
 #define CLIENT_INTERFACE_H
 
+#include "noo_common.h"
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
@@ -852,49 +853,14 @@ signals:
 
 // =============================================================================
 
-enum class Format : uint8_t {
-    U8,
-    U16,
-    U32,
-
-    U8VEC4,
-
-    U16VEC2,
-
-    VEC2,
-    VEC3,
-    VEC4,
-
-    MAT3,
-    MAT4,
-};
-
-enum class PrimitiveType : uint8_t {
-    POINTS,
-    LINES,
-    LINE_LOOP,
-    LINE_STRIP,
-    TRIANGLES,
-    TRIANGLE_STRIP,
-    TRIANGLE_FAN // Not recommended, some hardware support is lacking
-};
-
-enum class AttributeSemantic : uint8_t {
-    POSITION, // for the moment, must be a vec3.
-    NORMAL,   // for the moment, must be a vec3.
-    TANGENT,  // for the moment, must be a vec3.
-    TEXTURE,  // for the moment, is either a vec2, or normalized u16vec2
-    COLOR,    // normalized u8vec4, or vec4
-};
-
 struct Attribute {
     QPointer<BufferViewDelegate> view;
-    AttributeSemantic            semantic;
+    noo::AttributeSemantic       semantic;
     uint8_t                      channel = 0;
 
-    uint64_t offset = 0;
-    uint64_t stride = 0;
-    Format   format;
+    uint64_t    offset = 0;
+    uint64_t    stride = 0;
+    noo::Format format;
 
     QVector<float> minimum_value;
     QVector<float> maximum_value;
@@ -912,9 +878,9 @@ public:
 
     uint64_t count;
 
-    uint64_t offset = 0;
-    uint64_t stride = 0;
-    Format   format;
+    uint64_t    offset = 0;
+    uint64_t    stride = 0;
+    noo::Format format;
 
     Index() = default;
     Index(noo::messages::Index const&, InternalClientState&);
@@ -937,7 +903,7 @@ public:
 
     QPointer<Index> indicies;
 
-    PrimitiveType type;
+    noo::PrimitiveType type;
 
     QPointer<MaterialDelegate> material;
 

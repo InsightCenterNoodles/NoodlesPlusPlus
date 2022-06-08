@@ -39,7 +39,7 @@ void MeshT::write_new_to(SMsgWriter& w) {
             auto const& src = *patch.indicies;
             auto&       ind = geom_patch.indicies.emplace();
             ind.view        = src.view->id();
-            ind.format      = to_qstring(magic_enum::enum_name(src.format));
+            ind.format      = src.format;
             ind.stride      = src.stride;
             ind.offset      = src.offset;
             ind.count       = src.count;
@@ -49,16 +49,14 @@ void MeshT::write_new_to(SMsgWriter& w) {
 
             messages::Attribute new_attrib;
 
-            new_attrib.view = attrib.view->id();
-            new_attrib.semantic =
-                to_qstring(magic_enum::enum_name(attrib.semantic));
+            new_attrib.view     = attrib.view->id();
+            new_attrib.semantic = attrib.semantic;
 
             if (attrib.channel) new_attrib.channel = attrib.channel;
             if (attrib.offset) new_attrib.offset = attrib.offset;
             if (attrib.stride) new_attrib.stride = attrib.stride;
 
-            new_attrib.format =
-                to_qstring(magic_enum::enum_name(attrib.format));
+            new_attrib.format = attrib.format;
 
             if (attrib.maximum_value.size()) {
                 new_attrib.maximum_value = attrib.maximum_value;

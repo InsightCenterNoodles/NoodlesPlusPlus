@@ -490,33 +490,16 @@ struct MsgLightDelete {
 
 // Geometry Messages ===========================================================
 
-/*
-PrimativeType = "POINTS"/
-                "LINES"/
-                "LINE_LOOP"/
-                "LINE_STRIP"/
-                "TRIANGLES"/
-                "TRIANGLE_STRIP"/
-                "TRIANGLE_FAN"
-                ; Tri fan not recommended, some hardware support is lacking
-*/
-
-// AttributeSemantic =
-//     "POSITION" / ; for the moment, must be a vec3.
-//     "NORMAL" /   ; for the moment, must be a vec3.
-//     "TANGENT" /  ; for the moment, must be a vec3.
-//     "TEXTURE" /  ; for the moment, is either a vec2, or normalized u16vec2
-//     "COLOR"      ; normalized u8vec4, or vec4
 
 struct Attribute {
-    BufferViewID view;
-    QString      semantic;
+    BufferViewID      view;
+    AttributeSemantic semantic;
 
     std::optional<uint64_t> channel;
     std::optional<uint64_t> offset;
     std::optional<uint64_t> stride;
 
-    QString format;
+    Format format;
 
     std::optional<QVector<float>> minimum_value;
     std::optional<QVector<float>> maximum_value;
@@ -532,7 +515,7 @@ struct Index {
     uint64_t                count;
     std::optional<uint64_t> offset;
     std::optional<uint64_t> stride;
-    QString                 format;
+    Format                  format;
 
     template <class Archive>
     void serialize(Archive& a);
@@ -542,7 +525,7 @@ struct GeometryPatch {
     QVector<Attribute>   attributes;
     uint64_t             vertex_count;
     std::optional<Index> indicies;
-    QString              type;
+    PrimitiveType        type;
     MaterialID           material;
 
     template <class Archive>

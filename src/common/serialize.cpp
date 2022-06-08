@@ -2,6 +2,8 @@
 
 #include "src/common/variant_tools.h"
 
+#include "src/common/enum_tools.h"
+
 #include <QDebug>
 #include <QtGlobal>
 
@@ -68,6 +70,18 @@ QCborValue serialize_f(InvokeID id) {
 
 
     return m;
+}
+
+QCborValue serialize_f(Format& t) {
+    return enum_name(t);
+}
+
+QCborValue serialize_f(PrimitiveType& t) {
+    return enum_name(t);
+}
+
+QCborValue serialize_f(AttributeSemantic& t) {
+    return enum_name(t);
 }
 
 QCborValue serialize_f(QString& t) {
@@ -264,6 +278,33 @@ bool deserialize_f(QCborValue v, noo::InvokeID& id) {
 
     return true;
 };
+
+template <class Enum>
+bool deserialize_enum(QCborValue v, Enum& t) {
+    if (!v.isString()) return false;
+    auto string = v.toString().toUtf8();
+
+    auto opt = magic_enum::enum_cast<Enum>(
+        { string.data(), static_cast<size_t>(string.size()) });
+
+    if (!opt) return false;
+
+    t = *opt;
+
+    return true;
+}
+
+bool deserialize_f(QCborValue v, Format& t) {
+    return deserialize_enum(v, t);
+}
+
+bool deserialize_f(QCborValue v, PrimitiveType& t) {
+    return deserialize_enum(v, t);
+}
+
+bool deserialize_f(QCborValue v, AttributeSemantic& t) {
+    return deserialize_enum(v, t);
+}
 
 bool deserialize_f(QCborValue v, QString& t) {
     if (!v.isString()) return false;

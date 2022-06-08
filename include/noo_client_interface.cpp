@@ -829,32 +829,16 @@ void LightDelegate::on_complete() { }
 
 // =============================================================================
 
-static QHash<QString, Format> fmt_hash = {
-    { "U8", Format::U8 },           { "U16", Format::U16 },
-    { "U32", Format::U32 },         { "U8VEC4", Format::U8VEC4 },
-    { "U16VEC2", Format::U16VEC2 }, { "VEC2", Format::VEC2 },
-    { "VEC3", Format::VEC3 },       { "VEC4", Format::VEC4 },
-    { "MAT3", Format::MAT3 },       { "MAT4", Format::MAT4 },
-};
-
 Attribute::Attribute(noo::messages::Attribute const& m,
                      InternalClientState&            state) {
     convert(m.view, view, state);
 
-    static QHash<QString, AttributeSemantic> attrib_hash = {
-        { "POSITION", AttributeSemantic::POSITION },
-        { "NORMAL", AttributeSemantic::NORMAL },
-        { "TANGENT", AttributeSemantic::TANGENT },
-        { "TEXTURE", AttributeSemantic::TEXTURE },
-        { "COLOR", AttributeSemantic::COLOR },
-    };
-
-    semantic = attrib_hash.value(m.semantic);
+    semantic = m.semantic;
 
     if (m.channel) channel = *m.channel;
     if (m.offset) offset = *m.offset;
     if (m.stride) stride = *m.stride;
-    format = fmt_hash.value(m.format);
+    format = m.format;
 
     if (m.maximum_value) maximum_value = *m.maximum_value;
     if (m.minimum_value) minimum_value = *m.minimum_value;
@@ -868,7 +852,7 @@ Index::Index(noo::messages::Index const& m, InternalClientState& state) {
     if (m.offset) offset = *m.offset;
     if (m.stride) stride = m.stride.value();
 
-    format = fmt_hash.value(m.format);
+    format = m.format;
 
     if (view) {
         connect(view, &BufferViewDelegate::data_ready, this, &Index::ready);
@@ -909,17 +893,7 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
                 &MeshPatch::on_buffer_ready);
     }
 
-    static QHash<QString, PrimitiveType> prim_hash = {
-        { "POINTS", PrimitiveType::POINTS },
-        { "LINES", PrimitiveType::LINES },
-        { "LINE_LOOP", PrimitiveType::LINE_LOOP },
-        { "LINE_STRIP", PrimitiveType::LINE_STRIP },
-        { "TRIANGLES", PrimitiveType::TRIANGLES },
-        { "TRIANGLE_STRIP", PrimitiveType::TRIANGLE_STRIP },
-        { "TRIANGLE_FAN", PrimitiveType::TRIANGLE_FAN },
-    };
-
-    type = prim_hash.value(m.type);
+    type = m.type;
 
     convert(m.material, material, state);
 }

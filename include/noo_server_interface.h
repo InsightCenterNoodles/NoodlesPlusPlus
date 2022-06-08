@@ -482,40 +482,6 @@ void update_light(LightTPtr const&, LightUpdateData const&);
 
 // Mesh ========================================================================
 
-enum class Format : uint8_t {
-    U8,
-    U16,
-    U32,
-
-    U8VEC4,
-
-    U16VEC2,
-
-    VEC2,
-    VEC3,
-    VEC4,
-
-    MAT3,
-    MAT4,
-};
-
-enum class PrimitiveType : uint8_t {
-    POINTS,
-    LINES,
-    LINE_LOOP,
-    LINE_STRIP,
-    TRIANGLES,
-    TRIANGLE_STRIP,
-    TRIANGLE_FAN // Not recommended, some hardware support is lacking
-};
-
-enum class AttributeSemantic : uint8_t {
-    POSITION, // for the moment, must be a vec3.
-    NORMAL,   // for the moment, must be a vec3.
-    TANGENT,  // for the moment, must be a vec3.
-    TEXTURE,  // for the moment, is either a vec2, or normalized u16vec2
-    COLOR,    // normalized u8vec4, or vec4
-};
 
 struct Attribute {
     BufferViewTPtr    view;
