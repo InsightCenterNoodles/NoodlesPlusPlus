@@ -32,6 +32,7 @@ void MeshT::write_new_to(SMsgWriter& w) {
         messages::GeometryPatch geom_patch;
 
         geom_patch.vertex_count = patch.vertex_count;
+        geom_patch.type         = patch.type;
 
         if (patch.material) geom_patch.material = patch.material->id();
 
