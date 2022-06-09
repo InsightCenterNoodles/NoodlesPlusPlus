@@ -1106,7 +1106,7 @@ public:
         QString type;
 
         ColumnInfo() = default;
-        ColumnInfo(QCborMap);
+        ColumnInfo(QCborValue);
     };
 
     TableDelegate(noo::TableID, TableInit const&);

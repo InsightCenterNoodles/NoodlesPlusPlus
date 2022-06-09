@@ -63,8 +63,8 @@ QVector<int64_t> coerce_to_int_list(QCborValue);
 
 template <class T>
 bool from_cbor(QCborValue v, T& t) {
-    if constexpr (std::is_constructible_v<T, QCborMap>) {
-        t = T(v.toMap());
+    if constexpr (std::is_constructible_v<T, QCborValue>) {
+        t = T(v);
         return true;
     } else {
         static_assert(always_false<T>);
@@ -209,7 +209,7 @@ struct Selection {
     QVector<Pair>    row_ranges;
 
     Selection() = default;
-    Selection(QCborMap);
+    Selection(QCborValue);
 
     QCborValue to_cbor() const;
 };

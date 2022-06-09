@@ -980,8 +980,8 @@ TableUpdate::TableUpdate(noo::messages::MsgTableUpdate const& m,
     convert(m.signals_list, signals_list, state);
 }
 
-TableDelegate::ColumnInfo::ColumnInfo(QCborMap map) {
-    noo::CborDecoder decoder(map);
+TableDelegate::ColumnInfo::ColumnInfo(QCborValue value) {
+    noo::CborDecoder decoder(value.toMap());
 
     decoder("name", name);
     decoder("type", type);

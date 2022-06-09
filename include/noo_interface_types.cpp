@@ -81,8 +81,9 @@ static auto const sel_name_str  = QStringLiteral("name");
 static auto const row_str       = QStringLiteral("rows");
 static auto const row_range_str = QStringLiteral("row_ranges");
 
-Selection::Selection(QCborMap v) {
-    name = v[sel_name_str].toString();
+Selection::Selection(QCborValue map) {
+    auto v = map.toMap();
+    name   = v[sel_name_str].toString();
 
     rows = noo::coerce_to_int_list(v[row_str]);
 
