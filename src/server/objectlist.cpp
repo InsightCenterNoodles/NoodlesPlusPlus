@@ -111,7 +111,7 @@ void update_common(ObjectT* obj, UP const& data, Message& m) {
                 rep.mesh = t.mesh->id();
 
                 if (t.instances) {
-                    auto new_inst = rep.instances.emplace();
+                    auto& new_inst = rep.instances.emplace();
 
                     new_inst.view   = t.instances->view->id();
                     new_inst.stride = t.instances->stride;
