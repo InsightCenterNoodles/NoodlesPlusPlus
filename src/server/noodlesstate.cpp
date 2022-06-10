@@ -153,10 +153,32 @@ static QCborValue table_subscribe(MethodContext const& context,
 
     QCborMap return_obj;
 
-    return_obj[QStringLiteral("columns")] =
-        QCborArray::fromStringList(source.get_headers());
-
     auto q = source.get_all_data();
+
+    {
+        QCborArray column_info;
+
+        auto all_names = source.get_headers();
+
+        // "TEXT" / "REAL" / "INTEGER"
+
+        for (size_t ci = 0; ci < q->num_cols; ci++) {
+
+            QCborMap map;
+            map[QStringLiteral("name")] = all_names[ci];
+
+            if (q->is_column_string(ci)) {
+                map[QStringLiteral("type")] = "TEXT";
+            } else {
+                map[QStringLiteral("type")] = "REAL";
+            }
+
+            column_info << map;
+        }
+
+        return_obj[QStringLiteral("columns")] = column_info;
+    }
+
 
     {
         std::vector<int64_t> keys(q->num_rows);
@@ -169,7 +191,7 @@ static QCborValue table_subscribe(MethodContext const& context,
     {
         QCborArray lv; //(q->num_cols);
 
-        for (int ci = 0; ci < lv.size(); ci++) {
+        for (size_t ci = 0; ci < q->num_cols; ci++) {
             if (q->is_column_string(ci)) {
                 QCborArray data;
                 //(q->num_rows);
