@@ -1000,23 +1000,27 @@ TableDelegate::~TableDelegate() = default;
 
 void TableDelegate::post_create() {
     on_complete();
+
+    update_from(m_init.methods_list, m_init.signals_list);
 }
 
-void TableDelegate::update(TableUpdate const& data) {
+void TableDelegate::update_from(
+    std::optional<QVector<MethodDelegate*>> methods_list,
+    std::optional<QVector<SignalDelegate*>> signals_list) {
 
-    if (data.methods_list) {
-        m_init.methods_list = *data.methods_list;
-        m_attached_methods  = *data.methods_list;
+    if (methods_list) {
+        m_init.methods_list = *methods_list;
+        m_attached_methods  = *methods_list;
     }
 
-    if (data.signals_list) {
-        m_init.signals_list = *data.signals_list;
+    if (signals_list) {
+        m_init.signals_list = *signals_list;
 
         for (auto c : m_spec_signals) {
             disconnect(c);
         }
 
-        m_attached_signals = *data.signals_list;
+        m_attached_signals = *signals_list;
 
         // find specific signals
 
@@ -1038,6 +1042,10 @@ void TableDelegate::update(TableUpdate const& data) {
         find_sig(noo::names::sig_tbl_selection_updated,
                  &TableDelegate::interp_table_sel_update);
     }
+}
+
+void TableDelegate::update(TableUpdate const& data) {
+    update_from(data.methods_list, data.signals_list);
 
     this->on_update(data);
     emit updated();

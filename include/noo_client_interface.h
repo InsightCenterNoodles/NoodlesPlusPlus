@@ -1100,6 +1100,9 @@ class TableDelegate : public QObject {
 
     std::vector<QMetaObject::Connection> m_spec_signals;
 
+    void update_from(std::optional<QVector<MethodDelegate*>> methods_list,
+                     std::optional<QVector<SignalDelegate*>> signals_list);
+
 public:
     struct ColumnInfo {
         QString name;
