@@ -1160,7 +1160,7 @@ private slots:
     void interp_table_reset(QCborArray const&);
     void interp_table_update(QCborArray const&);
     void interp_table_remove(QCborArray const&);
-    void interp_table_sel_update(QCborValue const&);
+    void interp_table_sel_update(QCborArray const&);
 
 signals:
     void updated();

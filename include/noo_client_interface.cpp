@@ -1181,8 +1181,8 @@ void TableDelegate::interp_table_remove(QCborArray const& ref) {
     this->on_table_rows_removed(noo::coerce_to_int_list(ref[0]));
 }
 
-void TableDelegate::interp_table_sel_update(QCborValue const& ref) {
-    auto sel_ref = noo::Selection(ref.toMap());
+void TableDelegate::interp_table_sel_update(QCborArray const& ref) {
+    auto sel_ref = noo::Selection(ref.at(0).toMap());
 
     this->on_table_selection_updated(sel_ref);
 }
