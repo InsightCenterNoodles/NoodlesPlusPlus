@@ -894,7 +894,8 @@ signals:
 class MeshPatch : public QObject {
     Q_OBJECT
 
-    uint64_t m_unready_buffers = 0;
+    uint64_t m_unready_buffers   = 0;
+    bool     m_is_material_ready = false;
 
 public:
     QVector<Attribute> attributes;
@@ -910,13 +911,16 @@ public:
     MeshPatch() = default;
     MeshPatch(noo::messages::GeometryPatch const&, InternalClientState&);
 
-    bool is_ready() const { return !m_unready_buffers; }
+    bool is_ready() const { return !m_unready_buffers and m_is_material_ready; }
 
 private slots:
     void on_buffer_ready();
+    void on_material_ready();
+    void invalidate_material();
 
 signals:
     void ready();
+    void invalidated();
 };
 
 struct MeshInit : public QObject {
@@ -951,6 +955,7 @@ public:
 
 private slots:
     void on_patch_ready();
+    void on_patch_invalidated();
 
 signals:
     void ready();

@@ -896,12 +896,35 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
     type = m.type;
 
     convert(m.material, material, state);
+
+    if (material) {
+        m_is_material_ready = material->is_data_ready();
+        connect(material,
+                &MaterialDelegate::all_textures_ready,
+                this,
+                &MeshPatch::on_material_ready);
+
+        connect(material,
+                &MaterialDelegate::updated,
+                this,
+                &MeshPatch::invalidate_material);
+    }
 }
 
 void MeshPatch::on_buffer_ready() {
     Q_ASSERT(m_unready_buffers);
     m_unready_buffers--;
-    if (!m_unready_buffers) { emit ready(); }
+    if (is_ready()) { emit ready(); }
+}
+
+void MeshPatch::on_material_ready() {
+    m_is_material_ready = true;
+    if (is_ready()) { emit ready(); }
+}
+
+void MeshPatch::invalidate_material() {
+    emit invalidated();
+    m_is_material_ready = material->is_data_ready();
 }
 
 MeshInit::MeshInit(noo::messages::MsgGeometryCreate const& m,
@@ -920,10 +943,13 @@ MeshDelegate::MeshDelegate(noo::GeometryID i, MeshInit const& data)
       m_init(&data) // gross, but we are doing it this way for consistency
 {
     for (auto const& p : m_init->patches) {
-        if (!p->is_ready()) {
-            m_patch_unready++;
-            connect(p, &MeshPatch::ready, this, &MeshDelegate::on_patch_ready);
-        }
+        if (!p->is_ready()) { m_patch_unready++; }
+
+        connect(p, &MeshPatch::ready, this, &MeshDelegate::on_patch_ready);
+        connect(p,
+                &MeshPatch::invalidated,
+                this,
+                &MeshDelegate::on_patch_invalidated);
     }
 }
 
@@ -947,6 +973,10 @@ void MeshDelegate::on_patch_ready() {
         emit ready();
         on_complete();
     }
+}
+
+void MeshDelegate::on_patch_invalidated() {
+    m_patch_unready++;
 }
 
 void MeshDelegate::on_complete() { }
