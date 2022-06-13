@@ -16,14 +16,14 @@ namespace messages {
 template <class Key, class Value>
 class BidirectionalHash {
     QHash<Key, Value> m_key_to_value;
-    QHash<Value, Key> m_value_to_key;
+    QHash<int, Key>   m_value_to_key;
 
 public:
     BidirectionalHash() = default;
     BidirectionalHash(std::initializer_list<std::pair<Key, Value>> h)
         : m_key_to_value(h) {
         for (auto const& p : h) {
-            m_value_to_key[p.second] = p.first;
+            m_value_to_key[(int)p.second] = p.first;
         }
     }
 
@@ -33,7 +33,7 @@ public:
         return *iter;
     }
 
-    Key value(Value k) const { return m_value_to_key.value(k); }
+    Key value(Value k) const { return m_value_to_key.value((int)k); }
 };
 
 static const BidirectionalHash<QString, Format> format_name_hash = {
