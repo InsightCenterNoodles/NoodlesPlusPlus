@@ -48,9 +48,9 @@ NOO_STRING(mthd, probe_at);
 
 NOO_STRING(mthd, signal_attention);
 
-NOO_STRING(mthd, noo_client_view);
+NOO_STRING(mthd, client_view);
 
-NOO_STRING(tag, noo_user_hidden);
+NOO_STRING(tag, user_hidden);
 
 
 NOO_STRING(hint, any);
@@ -75,6 +75,7 @@ NOO_STRING(hint, bufferid);
 NOO_STRING(hint, plotid);
 
 #undef NOO_STRING
+#undef NOO_SEP
 } // namespace names
 
 
