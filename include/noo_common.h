@@ -13,65 +13,66 @@ namespace noo {
 
 namespace names {
 
-#define NOO_STRING(t, d) inline QString t##d = QStringLiteral(#d);
+#define NOO_SEP "noo::"
+#define NOO_STRING(t, d) inline QString t##_##d = QStringLiteral(NOO_SEP #d);
 
-NOO_STRING(mthd_, tbl_subscribe);
-NOO_STRING(mthd_, tbl_insert);
-NOO_STRING(mthd_, tbl_update);
-NOO_STRING(mthd_, tbl_remove);
-NOO_STRING(mthd_, tbl_clear);
-NOO_STRING(mthd_, tbl_update_selection);
+NOO_STRING(mthd, tbl_subscribe);
+NOO_STRING(mthd, tbl_insert);
+NOO_STRING(mthd, tbl_update);
+NOO_STRING(mthd, tbl_remove);
+NOO_STRING(mthd, tbl_clear);
+NOO_STRING(mthd, tbl_update_selection);
 
-NOO_STRING(sig_, tbl_reset);
-NOO_STRING(sig_, tbl_updated);
-NOO_STRING(sig_, tbl_rows_removed);
-NOO_STRING(sig_, tbl_selection_updated);
+NOO_STRING(sig, tbl_reset);
+NOO_STRING(sig, tbl_updated);
+NOO_STRING(sig, tbl_rows_removed);
+NOO_STRING(sig, tbl_selection_updated);
 
-NOO_STRING(mthd_, activate);
-NOO_STRING(mthd_, get_activation_choices);
+NOO_STRING(mthd, activate);
+NOO_STRING(mthd, get_activation_choices);
 
-NOO_STRING(mthd_, get_option_choices);
-NOO_STRING(mthd_, get_current_option);
-NOO_STRING(mthd_, set_current_option);
+NOO_STRING(mthd, get_option_choices);
+NOO_STRING(mthd, get_current_option);
+NOO_STRING(mthd, set_current_option);
 
-NOO_STRING(mthd_, set_position);
-NOO_STRING(mthd_, set_rotation);
-NOO_STRING(mthd_, set_scale);
+NOO_STRING(mthd, set_position);
+NOO_STRING(mthd, set_rotation);
+NOO_STRING(mthd, set_scale);
 
-NOO_STRING(mthd_, select_region);
-NOO_STRING(mthd_, select_sphere);
-NOO_STRING(mthd_, select_half_plane);
-NOO_STRING(mthd_, select_hull);
+NOO_STRING(mthd, select_region);
+NOO_STRING(mthd, select_sphere);
+NOO_STRING(mthd, select_half_plane);
+NOO_STRING(mthd, select_hull);
 
-NOO_STRING(mthd_, probe_at);
+NOO_STRING(mthd, probe_at);
 
-NOO_STRING(mthd_, signal_attention);
+NOO_STRING(mthd, signal_attention);
 
-NOO_STRING(mthd_, noo_client_view);
+NOO_STRING(mthd, noo_client_view);
 
-NOO_STRING(tag_, noo_user_hidden);
+NOO_STRING(tag, noo_user_hidden);
 
 
-NOO_STRING(hint_, any);
-NOO_STRING(hint_, text);
-NOO_STRING(hint_, integer);
-NOO_STRING(hint_, integerlist);
-NOO_STRING(hint_, real);
-NOO_STRING(hint_, reallist);
-NOO_STRING(hint_, data);
-NOO_STRING(hint_, list);
-NOO_STRING(hint_, map);
-NOO_STRING(hint_, anyid);
-NOO_STRING(hint_, objectid);
-NOO_STRING(hint_, tableid);
-NOO_STRING(hint_, signalid);
-NOO_STRING(hint_, methodid);
-NOO_STRING(hint_, materialid);
-NOO_STRING(hint_, geometryid);
-NOO_STRING(hint_, lightid);
-NOO_STRING(hint_, textureid);
-NOO_STRING(hint_, bufferid);
-NOO_STRING(hint_, plotid);
+NOO_STRING(hint, any);
+NOO_STRING(hint, text);
+NOO_STRING(hint, integer);
+NOO_STRING(hint, integerlist);
+NOO_STRING(hint, real);
+NOO_STRING(hint, reallist);
+NOO_STRING(hint, data);
+NOO_STRING(hint, list);
+NOO_STRING(hint, map);
+NOO_STRING(hint, anyid);
+NOO_STRING(hint, objectid);
+NOO_STRING(hint, tableid);
+NOO_STRING(hint, signalid);
+NOO_STRING(hint, methodid);
+NOO_STRING(hint, materialid);
+NOO_STRING(hint, geometryid);
+NOO_STRING(hint, lightid);
+NOO_STRING(hint, textureid);
+NOO_STRING(hint, bufferid);
+NOO_STRING(hint, plotid);
 
 #undef NOO_STRING
 } // namespace names

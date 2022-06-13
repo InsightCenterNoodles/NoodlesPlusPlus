@@ -1076,7 +1076,7 @@ void TableDelegate::on_table_selection_updated(noo::Selection const&) { }
 
 PendingMethodReply* TableDelegate::subscribe() const {
     auto* p = attached_methods().new_call_by_name<SubscribeInitReply>(
-        "tbl_subscribe");
+        noo::names::mthd_tbl_subscribe);
 
     connect(p,
             &SubscribeInitReply::recv,
@@ -1101,7 +1101,7 @@ PendingMethodReply* TableDelegate::request_row_insert(QCborArray row) const {
 
 PendingMethodReply*
 TableDelegate::request_rows_insert(QCborArray columns) const {
-    auto* p = attached_methods().new_call_by_name("tbl_insert");
+    auto* p = attached_methods().new_call_by_name(noo::names::mthd_tbl_insert);
 
     p->call_direct(columns);
 
@@ -1122,7 +1122,7 @@ PendingMethodReply* TableDelegate::request_row_update(int64_t    key,
 PendingMethodReply*
 TableDelegate::request_rows_update(QVector<int64_t> keys,
                                    QCborArray       columns) const {
-    auto* p = attached_methods().new_call_by_name("tbl_update");
+    auto* p = attached_methods().new_call_by_name(noo::names::mthd_tbl_update);
 
     p->call(keys, columns);
 
@@ -1131,7 +1131,7 @@ TableDelegate::request_rows_update(QVector<int64_t> keys,
 
 PendingMethodReply*
 TableDelegate::request_deletion(QVector<int64_t> keys) const {
-    auto* p = attached_methods().new_call_by_name("tbl_remove");
+    auto* p = attached_methods().new_call_by_name(noo::names::mthd_tbl_remove);
 
     p->call(keys);
 
@@ -1139,7 +1139,7 @@ TableDelegate::request_deletion(QVector<int64_t> keys) const {
 }
 
 PendingMethodReply* TableDelegate::request_clear() const {
-    auto* p = attached_methods().new_call_by_name("tbl_clear");
+    auto* p = attached_methods().new_call_by_name(noo::names::mthd_tbl_clear);
 
     p->call();
 
@@ -1148,7 +1148,8 @@ PendingMethodReply* TableDelegate::request_clear() const {
 
 PendingMethodReply*
 TableDelegate::request_selection_update(noo::Selection selection) const {
-    auto* p = attached_methods().new_call_by_name("tbl_update_selection");
+    auto* p = attached_methods().new_call_by_name(
+        noo::names::mthd_tbl_update_selection);
 
     p->call(selection.to_cbor());
 
