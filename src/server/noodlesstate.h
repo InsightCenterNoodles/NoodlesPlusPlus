@@ -31,9 +31,10 @@ enum class BuiltinMethods {
     OBJ_ACTIVATE,
     OBJ_GET_ACTIVATE_CHOICES,
 
-    OBJ_GET_OPTS,
-    OBJ_GET_CURR_OPT,
-    OBJ_SET_CURR_OPT,
+    OBJ_GET_KEYS,
+    OBJ_VAR_OPTS,
+    OBJ_GET_VAR,
+    OBJ_SET_VAR,
 
     OBJ_SET_POS,
     OBJ_SET_ROT,

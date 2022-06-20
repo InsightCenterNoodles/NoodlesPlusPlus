@@ -1217,13 +1217,18 @@ QStringList EntityCallbacks::get_activation_choices() {
     return {};
 }
 
-QStringList EntityCallbacks::get_option_choices() {
+QStringList EntityCallbacks::get_var_keys() {
     return {};
 }
-std::string EntityCallbacks::get_current_option() {
+QCborArray EntityCallbacks::get_var_options(QString /*key*/) {
     return {};
 }
-void EntityCallbacks::set_current_option(QString) { }
+QCborValue EntityCallbacks::get_var_value(QString /*key*/) {
+    return {};
+}
+bool EntityCallbacks::set_var_value(QString /*value*/, QString /*key*/) {
+    return false;
+}
 
 void EntityCallbacks::set_position(glm::vec3) { }
 void EntityCallbacks::set_rotation(glm::quat) { }

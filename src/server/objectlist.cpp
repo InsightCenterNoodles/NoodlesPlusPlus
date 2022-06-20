@@ -36,9 +36,10 @@ ObjectT::ObjectT(IDType id, ObjectList* host, ObjectData const& d)
         }
 
         if (enabled.options) {
-            add_bt(BuiltinMethods::OBJ_GET_OPTS);
-            add_bt(BuiltinMethods::OBJ_GET_CURR_OPT);
-            add_bt(BuiltinMethods::OBJ_SET_CURR_OPT);
+            add_bt(BuiltinMethods::OBJ_GET_KEYS);
+            add_bt(BuiltinMethods::OBJ_VAR_OPTS);
+            add_bt(BuiltinMethods::OBJ_GET_VAR);
+            add_bt(BuiltinMethods::OBJ_SET_VAR);
         }
 
         if (enabled.transform_position) { add_bt(BuiltinMethods::OBJ_SET_POS); }

@@ -31,9 +31,10 @@ NOO_STRING(sig, tbl_selection_updated);
 NOO_STRING(mthd, activate);
 NOO_STRING(mthd, get_activation_choices);
 
-NOO_STRING(mthd, get_option_choices);
-NOO_STRING(mthd, get_current_option);
-NOO_STRING(mthd, set_current_option);
+NOO_STRING(mthd, get_var_keys);
+NOO_STRING(mthd, get_var_options);
+NOO_STRING(mthd, get_var_value);
+NOO_STRING(mthd, set_var_value);
 
 NOO_STRING(mthd, set_position);
 NOO_STRING(mthd, set_rotation);

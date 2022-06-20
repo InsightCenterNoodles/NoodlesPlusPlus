@@ -233,12 +233,30 @@ void PendingMethodReply::complete(QCborValue       v,
 
 namespace replies {
 
+void GetBoolReply::interpret() {
+    if (m_var.isBool()) {
+        emit recv(m_var.toBool());
+    } else {
+        auto s = m_var.toDiagnosticNotation();
+        emit recv_fail("Wrong result type expected (bool), got:" + s);
+    }
+}
+
 void GetIntegerReply::interpret() {
     if (m_var.isInteger()) {
         emit recv(m_var.toInteger());
     } else {
         auto s = m_var.toDiagnosticNotation();
-        emit recv_fail("Wrong result type expected" + s);
+        emit recv_fail("Wrong result type expected (integer), got:" + s);
+    }
+}
+
+void ArrayReply::interpret() {
+    if (m_var.isArray()) {
+        emit recv(m_var.toArray());
+    } else {
+        auto s = m_var.toDiagnosticNotation();
+        emit recv_fail("Wrong result type expected (array), got:" + s);
     }
 }
 
@@ -1360,6 +1378,65 @@ AttachedSignalList const& EntityDelegate::attached_signals() const {
 }
 noo::EntityID EntityDelegate::id() const {
     return m_id;
+}
+
+void EntityDelegate::activate_str(QString value) {
+    auto* ptr = m_attached_methods.new_call_by_name(noo::names::mthd_activate);
+    ptr->call(value);
+}
+
+void EntityDelegate::activate_int(int slot) {
+    auto* ptr = m_attached_methods.new_call_by_name(noo::names::mthd_activate);
+    ptr->call(slot);
+}
+
+replies::GetStringListReply* EntityDelegate::get_activate_choices() {
+    auto* ptr =
+        m_attached_methods.new_call_by_name<replies::GetStringListReply>(
+            noo::names::mthd_get_activation_choices);
+
+    ptr->call();
+    return ptr;
+}
+
+
+replies::GetStringListReply* EntityDelegate::get_var_keys() {
+    return m_attached_methods.new_call_by_name<replies::GetStringListReply>(
+        noo::names::mthd_get_var_keys);
+}
+replies::ArrayReply* EntityDelegate::get_var_options(QString key) {
+    auto* ptr = m_attached_methods.new_call_by_name<replies::ArrayReply>(
+        noo::names::mthd_get_var_options);
+    ptr->call(key);
+    return ptr;
+}
+PendingMethodReply* EntityDelegate::get_var(QString key) {
+    auto* ptr =
+        m_attached_methods.new_call_by_name(noo::names::mthd_get_var_value);
+    ptr->call(key);
+    return ptr;
+}
+replies::GetBoolReply* EntityDelegate::set_var(QString value, QString key) {
+    auto* ptr = m_attached_methods.new_call_by_name<replies::GetBoolReply>(
+        noo::names::mthd_set_var_value);
+    ptr->call(value, key);
+    return ptr;
+}
+
+
+void EntityDelegate::set_position(glm::vec3 v) {
+    auto* ptr =
+        m_attached_methods.new_call_by_name(noo::names::mthd_set_position);
+    ptr->call(v);
+}
+void EntityDelegate::set_rotation(glm::quat q) {
+    auto* ptr =
+        m_attached_methods.new_call_by_name(noo::names::mthd_set_rotation);
+    ptr->call(q);
+}
+void EntityDelegate::set_scale(glm::vec3 s) {
+    auto* ptr = m_attached_methods.new_call_by_name(noo::names::mthd_set_scale);
+    ptr->call(s);
 }
 
 // =============================================================================

@@ -191,6 +191,18 @@ signals:
 ///
 namespace replies {
 
+class GetBoolReply : public PendingMethodReply {
+    Q_OBJECT
+
+public:
+    using PendingMethodReply::PendingMethodReply;
+
+    void interpret() override;
+
+signals:
+    void recv(bool);
+};
+
 class GetIntegerReply : public PendingMethodReply {
     Q_OBJECT
 
@@ -201,6 +213,18 @@ public:
 
 signals:
     void recv(int64_t);
+};
+
+class ArrayReply : public PendingMethodReply {
+    Q_OBJECT
+
+public:
+    using PendingMethodReply::PendingMethodReply;
+
+    void interpret() override;
+
+signals:
+    void recv(QCborArray);
 };
 
 class GetStringReply : public PendingMethodReply {
@@ -1071,6 +1095,22 @@ public:
 
 signals:
     void updated();
+
+public slots:
+    void                         activate_str(QString);
+    void                         activate_int(int slot = 0);
+    replies::GetStringListReply* get_activate_choices();
+
+
+    replies::GetStringListReply* get_var_keys();
+    replies::ArrayReply*         get_var_options(QString key = QString());
+    PendingMethodReply*          get_var(QString key = QString());
+    replies::GetBoolReply* set_var(QString value, QString key = QString());
+
+
+    void set_position(glm::vec3);
+    void set_rotation(glm::quat);
+    void set_scale(glm::vec3);
 };
 
 // =============================================================================

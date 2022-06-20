@@ -749,9 +749,11 @@ public:
     virtual void        on_activate_int(int);
     virtual QStringList get_activation_choices();
 
-    virtual QStringList get_option_choices();
-    virtual std::string get_current_option();
-    virtual void        set_current_option(QString);
+
+    virtual QStringList get_var_keys();
+    virtual QCborArray  get_var_options(QString key = QString());
+    virtual QCborValue  get_var_value(QString key = QString());
+    virtual bool        set_var_value(QString value, QString key = QString());
 
     virtual void set_position(glm::vec3);
     virtual void set_rotation(glm::quat);

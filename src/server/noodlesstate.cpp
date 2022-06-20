@@ -364,7 +364,6 @@ static QCborValue object_activate(MethodContext const& context,
 }
 
 static QCborValue object_get_activate_choices(MethodContext const& context) {
-
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
@@ -372,34 +371,42 @@ static QCborValue object_get_activate_choices(MethodContext const& context) {
     return QCborArray::fromStringList(cb->get_activation_choices());
 }
 
-static QCborValue object_get_option_choices(MethodContext const& context) {
-
+static QCborValue object_get_var_keys(MethodContext const& context) {
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    return QCborArray::fromStringList(cb->get_activation_choices());
+    return QCborArray::fromStringList(cb->get_var_keys());
 }
 
-static QCborValue object_get_current_option(MethodContext const& context) {
+static QCborValue object_get_var_options(MethodContext const& context,
+                                         QString              key) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    return QCborArray::fromStringList(cb->get_activation_choices());
+    return cb->get_var_options(key);
 }
 
-static QCborValue object_set_current_option(MethodContext const& context,
-                                            QString              arg) {
+static QCborValue object_get_var_value(MethodContext const& context,
+                                       QString              key) {
 
     auto obj = get_object(context);
 
     auto* cb = get_callbacks(obj);
 
-    cb->set_current_option(arg);
+    return cb->get_var_value(key);
+}
 
-    return {};
+static QCborValue
+object_set_var_value(MethodContext const& context, QString value, QString key) {
+
+    auto obj = get_object(context);
+
+    auto* cb = get_callbacks(obj);
+
+    return cb->set_var_value(value, key);
 }
 
 static QCborValue object_set_position(MethodContext const& context,
@@ -674,41 +681,57 @@ void DocumentT::build_table_methods() {
 
     {
         MethodData d;
-        d.method_name          = noo::names::mthd_get_option_choices;
-        d.documentation        = "Get the names of options on the object";
+        d.method_name          = noo::names::mthd_get_var_keys;
+        d.documentation        = "Get the keys of any options on the object";
         d.return_documentation = "[string]";
 
-        d.set_code(object_get_option_choices);
+        d.set_code(object_get_var_keys);
 
-        m_builtin_methods[BuiltinMethods::OBJ_GET_OPTS] =
+        m_builtin_methods[BuiltinMethods::OBJ_GET_KEYS] =
             create_method(this, d);
     }
 
     {
         MethodData d;
-        d.method_name          = noo::names::mthd_get_current_option;
-        d.documentation        = "Get the current option name";
-        d.return_documentation = "string";
-
-        d.set_code(object_get_current_option);
-
-        m_builtin_methods[BuiltinMethods::OBJ_GET_CURR_OPT] =
-            create_method(this, d);
-    }
-
-    {
-        MethodData d;
-        d.method_name            = noo::names::mthd_set_current_option;
-        d.documentation          = "Set the current option on an object";
+        d.method_name   = noo::names::mthd_get_var_options;
+        d.documentation = "Get the list of valid options for this variable";
         d.argument_documentation = {
-            { "string", "The option name to set.", QString() }
+            { "key", "The optional variable key", QString() }
         };
-        d.return_documentation = "None";
+        d.return_documentation = "[any]";
 
-        d.set_code(object_set_current_option);
+        d.set_code(object_get_var_options);
 
-        m_builtin_methods[BuiltinMethods::OBJ_SET_CURR_OPT] =
+        m_builtin_methods[BuiltinMethods::OBJ_VAR_OPTS] =
             create_method(this, d);
+    }
+
+    {
+        MethodData d;
+        d.method_name            = noo::names::mthd_get_var_value;
+        d.documentation          = "Get the given variable content";
+        d.argument_documentation = {
+            { "key", "The optional variable key", QString() }
+        };
+        d.return_documentation = "any";
+
+        d.set_code(object_get_var_value);
+
+        m_builtin_methods[BuiltinMethods::OBJ_GET_VAR] = create_method(this, d);
+    }
+
+    {
+        MethodData d;
+        d.method_name            = noo::names::mthd_set_var_value;
+        d.documentation          = "Set a given variable's value";
+        d.argument_documentation = {
+            { "value", "The new variable value content", QString() }
+        };
+        d.return_documentation = "success ";
+
+        d.set_code(object_set_var_value);
+
+        m_builtin_methods[BuiltinMethods::OBJ_SET_VAR] = create_method(this, d);
     }
 
     {

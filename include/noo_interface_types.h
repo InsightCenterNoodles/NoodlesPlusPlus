@@ -37,6 +37,7 @@ QCborValue to_cbor(QVector<int64_t>);
 
 QCborValue to_cbor(glm::vec3);
 QCborValue to_cbor(glm::vec4);
+QCborValue to_cbor(glm::quat);
 
 inline QCborValue to_cbor(QCborValue v) {
     return v;

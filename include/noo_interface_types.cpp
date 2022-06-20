@@ -39,6 +39,11 @@ QCborValue to_cbor(glm::vec4 v) {
     arr << v.x << v.y << v.z << v.w;
     return arr;
 }
+QCborValue to_cbor(glm::quat q) {
+    QCborArray arr;
+    arr << q.x << q.y << q.z << q.w;
+    return arr;
+}
 
 QCborValue to_cbor(Selection const& t) {
     return t.to_cbor();
