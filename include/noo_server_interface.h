@@ -753,7 +753,7 @@ public:
     virtual QStringList get_var_keys();
     virtual QCborArray  get_var_options(QString key = QString());
     virtual QCborValue  get_var_value(QString key = QString());
-    virtual bool        set_var_value(QString value, QString key = QString());
+    virtual bool set_var_value(QCborValue value, QString key = QString());
 
     virtual void set_position(glm::vec3);
     virtual void set_rotation(glm::quat);

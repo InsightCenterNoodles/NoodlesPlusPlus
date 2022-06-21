@@ -1105,7 +1105,7 @@ public slots:
     replies::GetStringListReply* get_var_keys();
     replies::ArrayReply*         get_var_options(QString key = QString());
     PendingMethodReply*          get_var(QString key = QString());
-    replies::GetBoolReply* set_var(QString value, QString key = QString());
+    replies::GetBoolReply* set_var(QCborValue value, QString key = QString());
 
 
     void set_position(glm::vec3);

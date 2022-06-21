@@ -1226,7 +1226,7 @@ QCborArray EntityCallbacks::get_var_options(QString /*key*/) {
 QCborValue EntityCallbacks::get_var_value(QString /*key*/) {
     return {};
 }
-bool EntityCallbacks::set_var_value(QString /*value*/, QString /*key*/) {
+bool EntityCallbacks::set_var_value(QCborValue /*value*/, QString /*key*/) {
     return false;
 }
 

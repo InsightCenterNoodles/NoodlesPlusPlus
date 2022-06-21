@@ -1416,7 +1416,7 @@ PendingMethodReply* EntityDelegate::get_var(QString key) {
     ptr->call(key);
     return ptr;
 }
-replies::GetBoolReply* EntityDelegate::set_var(QString value, QString key) {
+replies::GetBoolReply* EntityDelegate::set_var(QCborValue value, QString key) {
     auto* ptr = m_attached_methods.new_call_by_name<replies::GetBoolReply>(
         noo::names::mthd_set_var_value);
     ptr->call(value, key);
