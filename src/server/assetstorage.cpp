@@ -141,7 +141,9 @@ void AssetRequest::on_data() {
 
     // we are handing out urls that give the asset at the root
 
-    path = path.mid(path.lastIndexOf("/"));
+    int last_slash = path.lastIndexOf("/");
+
+    if (last_slash > 0) { path = path.mid(last_slash + 1); }
 
     auto asset_id = QUuid(path);
 
