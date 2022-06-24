@@ -1300,6 +1300,8 @@ EntityInit::EntityInit(noo::messages::MsgEntityCreate const& m,
     convert(m.methods_list, methods_list, state);
     convert(m.signals_list, signals_list, state);
     if (m.influence) influence = m.influence.value();
+
+    visible = m.visible;
 }
 
 
@@ -1328,6 +1330,8 @@ EntityUpdateData::EntityUpdateData(noo::messages::MsgEntityUpdate const& m,
     convert(m.methods_list, methods_list, state);
     convert(m.signals_list, signals_list, state);
     if (m.influence) influence = m.influence.value();
+
+    if (m.visible) visible = *m.visible;
 }
 
 EntityDelegate::EntityDelegate(noo::EntityID i, EntityInit const& data)
@@ -1362,6 +1366,7 @@ void EntityDelegate::update(EntityUpdateData const& data) {
         m_attached_signals  = *data.signals_list;
     }
     if (data.influence) m_data.influence = *data.influence;
+    if (data.visible) m_data.visible = *data.visible;
 
     this->on_update(data);
 }

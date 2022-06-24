@@ -625,6 +625,7 @@ void MsgEntityCreate::serialize(Archive& a) {
     NOONVP(methods_list);
     NOONVP(signals_list);
     NOONVP(influence);
+    NOONVP(visible);
 }
 
 template <class Archive>
@@ -646,6 +647,7 @@ void MsgEntityUpdate::serialize(Archive& a) {
     NOONVP(methods_list);
     NOONVP(signals_list);
     NOONVP(influence);
+    NOONVP(visible);
 }
 
 template <class Archive>

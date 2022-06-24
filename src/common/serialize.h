@@ -155,6 +155,7 @@ struct MsgEntityCreate {
     std::optional<QVector<SignalID>> signals_list;
 
     std::optional<BoundingBox> influence;
+    bool                       visible = true;
 
     template <class Archive>
     void serialize(Archive& a);
@@ -182,6 +183,7 @@ struct MsgEntityUpdate {
     std::optional<QVector<SignalID>> signals_list;
 
     std::optional<BoundingBox> influence;
+    std::optional<bool>        visible;
 
     template <class Archive>
     void serialize(Archive& a);

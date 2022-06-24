@@ -824,6 +824,7 @@ struct ObjectData {
     std::optional<QVector<MethodTPtr>>        method_list;
     std::optional<QVector<SignalTPtr>>        signal_list;
     std::optional<std::optional<BoundingBox>> influence;
+    std::optional<bool>                       visible;
 
     std::function<std::unique_ptr<EntityCallbacks>(ObjectT*)> create_callbacks;
 };
@@ -839,6 +840,7 @@ struct ObjectUpdateData {
     std::optional<QVector<MethodTPtr>>        method_list;
     std::optional<QVector<SignalTPtr>>        signal_list;
     std::optional<std::optional<BoundingBox>> influence;
+    std::optional<bool>                       visible;
 };
 
 ObjectTPtr create_object(DocumentTPtrRef, ObjectData const&);

@@ -143,6 +143,8 @@ void update_common(ObjectT* obj, UP const& data, Message& m) {
     }
 
     if (data.influence) { m.influence = data.influence.value(); }
+
+    if (data.visible) { m.visible = data.visible.value(); }
 }
 
 void ObjectT::write_new_to(SMsgWriter& w) {
@@ -177,6 +179,7 @@ void ObjectT::update(ObjectUpdateData& data, SMsgWriter& w) {
     CHECK_UPDATE(method_list)
     CHECK_UPDATE(signal_list)
     CHECK_UPDATE(influence)
+    CHECK_UPDATE(visible)
 
     if (data.method_list) { m_method_search = *m_data.method_list; }
     if (data.signal_list) { m_signal_search = *m_data.signal_list; }

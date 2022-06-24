@@ -1042,6 +1042,7 @@ struct EntityInit {
     QVector<MethodDelegate*> methods_list;
     QVector<SignalDelegate*> signals_list;
     noo::BoundingBox         influence;
+    bool                     visible;
 
     EntityInit(noo::messages::MsgEntityCreate const&, InternalClientState&);
 };
@@ -1057,6 +1058,7 @@ struct EntityUpdateData {
     std::optional<QVector<MethodDelegate*>> methods_list;
     std::optional<QVector<SignalDelegate*>> signals_list;
     std::optional<noo::BoundingBox>         influence;
+    std::optional<bool>                     visible;
 
     EntityUpdateData(noo::messages::MsgEntityUpdate const&,
                      InternalClientState&);
