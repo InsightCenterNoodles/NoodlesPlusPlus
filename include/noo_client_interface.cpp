@@ -384,9 +384,7 @@ AttachedSignalList::find_by_delegate(SignalDelegate* ptr) const {
 #define BASIC_DELEGATE_IMPL(C, ID, DATA)                                       \
     C::C(noo::ID i, DATA const&) : m_id(i) { }                                 \
     C::~C() = default;                                                         \
-    noo::ID C::id() const {                                                    \
-        return m_id;                                                           \
-    }
+    noo::ID C::id() const { return m_id; }
 
 // =============================================================================
 
@@ -1301,7 +1299,7 @@ EntityInit::EntityInit(noo::messages::MsgEntityCreate const& m,
     convert(m.signals_list, signals_list, state);
     if (m.influence) influence = m.influence.value();
 
-    visible = m.visible;
+    visible = m.visible.value_or(true);
 }
 
 
