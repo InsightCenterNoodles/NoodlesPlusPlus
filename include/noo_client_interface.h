@@ -540,6 +540,7 @@ public:
 private slots:
     void ready_read(QByteArray);
     void on_error(QString);
+    void on_data_progress(qint64 received, qint64 total);
 
 signals:
     void data_ready(QByteArray);
@@ -1329,9 +1330,9 @@ struct ClientDelegates {
     DispatchFn<TextureDelegate, noo::TextureID, TextureInit> tex_maker;
     DispatchFn<BufferDelegate, noo::BufferID, BufferInit>    buffer_maker;
     DispatchFn<BufferViewDelegate, noo::BufferViewID, BufferViewInit>
-                                                                buffer_view_maker;
-    DispatchFn<TableDelegate, noo::TableID, TableInit>          table_maker;
-    DispatchFn<LightDelegate, noo::LightID, LightInit>          light_maker;
+                                                       buffer_view_maker;
+    DispatchFn<TableDelegate, noo::TableID, TableInit> table_maker;
+    DispatchFn<LightDelegate, noo::LightID, LightInit> light_maker;
     DispatchFn<MaterialDelegate, noo::MaterialID, MaterialInit> mat_maker;
     DispatchFn<MeshDelegate, noo::GeometryID, MeshInit>         mesh_maker;
     DispatchFn<EntityDelegate, noo::EntityID, EntityInit>       object_maker;

@@ -384,7 +384,9 @@ AttachedSignalList::find_by_delegate(SignalDelegate* ptr) const {
 #define BASIC_DELEGATE_IMPL(C, ID, DATA)                                       \
     C::C(noo::ID i, DATA const&) : m_id(i) { }                                 \
     C::~C() = default;                                                         \
-    noo::ID C::id() const { return m_id; }
+    noo::ID C::id() const {                                                    \
+        return m_id;                                                           \
+    }
 
 // =============================================================================
 
@@ -465,11 +467,14 @@ void BufferDelegate::on_complete() { }
 
 void BufferDelegate::post_create(InternalClientState& state) {
     if (is_data_ready()) {
+        qDebug() << id() << "ready";
         emit data_progress(m_buffer_bytes.size(), m_buffer_bytes.size());
         emit data_ready(m_buffer_bytes);
         on_complete();
         return;
     }
+
+    qDebug() << id() << "unready, starting download";
 
     auto* p = new URLFetch(state.network_manager(), m_data.url);
 
@@ -479,12 +484,16 @@ void BufferDelegate::post_create(InternalClientState& state) {
 }
 
 void BufferDelegate::ready_read(QByteArray data) {
+    qDebug() << id() << "download complete";
     m_buffer_bytes = data;
     emit data_ready(m_buffer_bytes);
     on_complete();
 }
 void BufferDelegate::on_error(QString s) {
     qWarning() << "Download failed:" << s;
+}
+void BufferDelegate::on_data_progress(qint64 received, qint64 total) {
+    qDebug() << id() << "download progress" << received << "of" << total;
 }
 
 // =============================================================================
@@ -537,6 +546,7 @@ QByteArray BufferViewDelegate::get_sub_range() const {
 void BufferViewDelegate::on_complete() { }
 
 void BufferViewDelegate::ready_read(QByteArray) {
+    qDebug() << this->id() << "source buffer ready";
     emit data_ready(get_sub_range());
     on_complete();
 }
@@ -925,11 +935,14 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
                 this,
                 &MeshPatch::invalidate_material);
     }
+
+    qDebug() << "MeshPatch has" << m_unready_buffers << "unready buffers";
 }
 
 void MeshPatch::on_buffer_ready() {
     Q_ASSERT(m_unready_buffers);
     m_unready_buffers--;
+    qDebug() << "Patch has" << m_unready_buffers;
     if (is_ready()) { emit ready(); }
 }
 
@@ -967,6 +980,8 @@ MeshDelegate::MeshDelegate(noo::GeometryID i, MeshInit const& data)
                 this,
                 &MeshDelegate::on_patch_invalidated);
     }
+
+    qDebug() << this->id() << "has" << m_patch_unready << "unready patches";
 }
 
 MeshDelegate::~MeshDelegate() = default;
@@ -985,6 +1000,9 @@ noo::GeometryID MeshDelegate::id() const {
 void MeshDelegate::on_patch_ready() {
     Q_ASSERT(m_patch_unready > 0);
     m_patch_unready--;
+
+    qDebug() << this->id() << "patch ready, " << m_patch_unready << "left";
+
     if (m_patch_unready == 0) {
         emit ready();
         on_complete();

@@ -167,6 +167,15 @@ struct TagToString<PlotIDTag> {
     static constexpr const char* str = "Plot";
 };
 
+
+template <class Tag>
+QDebug operator<<(QDebug debug, ID<Tag> id) {
+    QDebugStateSaver saver(debug);
+    debug.nospace() << id.to_qstring();
+
+    return debug;
+}
+
 ///
 /// \brief The AnyID struct models the NOODLES Any type
 ///
