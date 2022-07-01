@@ -988,8 +988,8 @@ MeshDelegate::~MeshDelegate() = default;
 
 void MeshDelegate::post_create() {
     if (is_complete()) {
-        emit ready();
         on_complete();
+        emit ready();
     }
 }
 
@@ -1004,8 +1004,8 @@ void MeshDelegate::on_patch_ready() {
     qDebug() << this->id() << "patch ready, " << m_patch_unready << "left";
 
     if (m_patch_unready == 0) {
-        emit ready();
         on_complete();
+        emit ready();
     }
 }
 
