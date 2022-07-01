@@ -558,8 +558,12 @@ struct MeshSource {
     std::span<glm::u8vec4 const>  colors;
 
     // Index data
-    std::span<glm::u16vec2 const> lines;
-    std::span<glm::u16vec3 const> triangles;
+    std::span<uint32_t> indicies;
+
+    enum Type {
+        LINE,
+        TRIANGLE,
+    } type = Type::TRIANGLE;
 };
 
 struct BuilderBytes {

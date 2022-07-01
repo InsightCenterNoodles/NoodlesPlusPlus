@@ -151,6 +151,8 @@ struct PackedMeshDataResult {
     std::optional<PMDRef> colors;
     std::optional<PMDRef> lines;
     std::optional<PMDRef> triangles;
+
+    Format format;
 };
 
 static std::optional<PackedMeshDataResult>
@@ -158,8 +160,7 @@ pack_mesh_source(MeshSource const& refs) {
 
     qDebug() << Q_FUNC_INFO;
 
-    if (refs.triangles.empty() and refs.lines.empty()) return std::nullopt;
-    if (!refs.triangles.empty() and !refs.lines.empty()) return std::nullopt;
+    if (refs.indicies.empty()) return std::nullopt;
     if (refs.positions.empty()) return std::nullopt;
 
     PackedMeshDataResult ret;
@@ -263,27 +264,33 @@ pack_mesh_source(MeshSource const& refs) {
 
     std::span<std::byte const> index_copy_from;
 
-    if (!refs.lines.empty()) {
-        qDebug() << "Line segs" << refs.lines.size();
-        index_copy_from = std::as_bytes(refs.lines);
+    {
+        index_copy_from = std::as_bytes(refs.indicies);
+        index_ref.size  = index_copy_from.size();
 
-        index_ref.size   = index_copy_from.size();
-        index_ref.stride = sizeof(decltype(refs.lines)::value_type);
+        auto base_size = 1;
 
-        ret.lines = index_ref;
+        if (num_verts < (1 << 16)) {
+            base_size  = sizeof(uint16_t);
+            ret.format = Format::U16;
+        } else {
+            base_size  = sizeof(uint32_t);
+            ret.format = Format::U32;
+        }
 
-        ret.icount = refs.lines.size() * 2;
 
-    } else if (!refs.triangles.empty()) {
-        qDebug() << "Triangles" << refs.triangles.size();
-        index_copy_from = std::as_bytes(refs.triangles);
+        switch (refs.type) {
+        case MeshSource::LINE:
+            ret.lines        = index_ref;
+            index_ref.stride = base_size * 2;
+            break;
+        case MeshSource::TRIANGLE:
+            ret.triangles    = index_ref;
+            index_ref.stride = base_size * 3;
+            break;
+        }
 
-        index_ref.size   = index_copy_from.size();
-        index_ref.stride = sizeof(decltype(refs.triangles)::value_type);
-
-        ret.triangles = index_ref;
-
-        ret.icount = refs.triangles.size() * 3;
+        ret.icount = refs.indicies.size();
     }
 
     qDebug() << "Packed index" << index_copy_from.size();
@@ -319,7 +326,7 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
                 VCASE(MeshSource const& b)->uint64_t {
                     return b.positions.size_bytes() + b.normals.size_bytes() +
                            b.textures.size_bytes() + b.colors.size_bytes() +
-                           b.lines.size_bytes() + b.triangles.size_bytes();
+                           b.indicies.size_bytes();
                 });
         }
 
@@ -406,9 +413,11 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
 
             auto& new_index = patch.indicies.emplace();
 
+            // what format to use?
+
             new_index.view   = view;
             new_index.stride = 0; // we pack our indicies
-            new_index.format = Format::U16;
+            new_index.format = minfo.format;
             new_index.count  = minfo.icount;
 
             if (minfo.lines) {
