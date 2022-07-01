@@ -558,7 +558,9 @@ struct MeshSource {
     std::span<glm::u8vec4 const>  colors;
 
     // Index data
-    std::span<uint32_t> indicies;
+    std::span<std::byte> indicies;
+
+    Format index_format = Format::U16;
 
     enum Type {
         LINE,

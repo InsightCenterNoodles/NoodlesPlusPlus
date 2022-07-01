@@ -268,14 +268,15 @@ pack_mesh_source(MeshSource const& refs) {
         index_copy_from = std::as_bytes(refs.indicies);
         index_ref.size  = index_copy_from.size();
 
+        ret.format = refs.index_format;
+
         auto base_size = 1;
 
-        if (num_verts < (1 << 16)) {
-            base_size  = sizeof(uint16_t);
-            ret.format = Format::U16;
-        } else {
-            base_size  = sizeof(uint32_t);
-            ret.format = Format::U32;
+        switch (refs.index_format) {
+        case Format::U8: break;
+        case Format::U16: base_size = sizeof(uint16_t); break;
+        case Format::U32: base_size = sizeof(uint32_t); break;
+        default: break;
         }
 
 
