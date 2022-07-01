@@ -291,7 +291,7 @@ pack_mesh_source(MeshSource const& refs) {
             break;
         }
 
-        ret.icount = refs.indicies.size();
+        ret.icount = refs.indicies.size() / base_size;
     }
 
     qDebug() << "Packed index" << index_copy_from.size();
