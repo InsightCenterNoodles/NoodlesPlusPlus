@@ -1202,6 +1202,9 @@ std::shared_ptr<ObjectT> create_object(DocumentTPtrRef   doc,
     return doc->obj_list().provision_next(data);
 }
 
+void update_object(ObjectT* item, ObjectUpdateData& data) {
+    item->update(data);
+}
 void update_object(ObjectTPtr item, ObjectUpdateData& data) {
     item->update(data);
 }
