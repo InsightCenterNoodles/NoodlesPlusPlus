@@ -80,6 +80,9 @@ void execute_reply(HTTPResponse response, QTcpSocket* socket) {
         header += QByteArrayLiteral("Content-Length: ") +
                   QByteArray::number(response.asset.size()) + line_ending;
 
+        header +=
+            QByteArrayLiteral("Access-Control-Allow-Origin: *") + line_ending;
+
         header += mime_type;
     }
 
