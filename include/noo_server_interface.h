@@ -558,7 +558,7 @@ struct MeshSource {
     std::span<glm::u8vec4 const>  colors;
 
     // Index data
-    std::span<std::byte> indicies;
+    std::span<std::byte const> indicies;
 
     Format index_format = Format::U16;
 
