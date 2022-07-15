@@ -1172,6 +1172,7 @@ SMsgWriter::~SMsgWriter() noexcept {
 }
 
 void SMsgWriter::flush() {
+    if (m_messages.empty()) return;
     QByteArray bytes = messages::serialize_server(m_messages);
 
     m_messages.clear();

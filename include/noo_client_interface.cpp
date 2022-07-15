@@ -1044,7 +1044,16 @@ TableUpdate::TableUpdate(noo::messages::MsgTableUpdate const& m,
     convert(m.signals_list, signals_list, state);
 }
 
-TableDelegate::ColumnInfo::ColumnInfo(QCborValue value) {
+TableDataInit::TableDataInit(QCborValue value) {
+    noo::CborDecoder decoder(value.toMap());
+
+    decoder(QStringLiteral("columns"), names);
+    decoder(QStringLiteral("keys"), keys);
+    decoder(QStringLiteral("data"), rows);
+    decoder.conditional(QStringLiteral("selections"), selections);
+}
+
+TableDataInit::ColumnInfo::ColumnInfo(QCborValue value) {
     noo::CborDecoder decoder(value.toMap());
 
     decoder("name", name);
@@ -1080,7 +1089,7 @@ void TableDelegate::update_from(
     if (signals_list) {
         m_init.signals_list = *signals_list;
 
-        for (auto c : m_spec_signals) {
+        for (auto const& c : m_spec_signals) {
             disconnect(c);
         }
 
@@ -1128,13 +1137,9 @@ noo::TableID TableDelegate::id() const {
     return m_id;
 }
 
-void TableDelegate::on_table_initialize(QVector<ColumnInfo> const&,
-                                        QVector<int64_t>,
-                                        QVector<QCborArray> const&,
-                                        QVector<noo::Selection>) { }
-
-void TableDelegate::on_table_reset() { }
-void TableDelegate::on_table_updated(QVector<int64_t>, QCborArray) { }
+void TableDelegate::on_table_subscribed(TableDataInit const&) { }
+void TableDelegate::on_table_reset(TableDataInit const&) { }
+void TableDelegate::on_table_rows_updated(QVector<int64_t>, QCborArray) { }
 void TableDelegate::on_table_rows_removed(QVector<int64_t>) { }
 void TableDelegate::on_table_selection_updated(noo::Selection const&) { }
 
@@ -1145,7 +1150,7 @@ PendingMethodReply* TableDelegate::subscribe() const {
     connect(p,
             &SubscribeInitReply::recv,
             this,
-            &TableDelegate::on_table_initialize);
+            &TableDelegate::on_table_subscribed);
 
     p->call();
 
@@ -1154,41 +1159,28 @@ PendingMethodReply* TableDelegate::subscribe() const {
 
 
 PendingMethodReply* TableDelegate::request_row_insert(QCborArray row) const {
-    QCborArray new_list;
-
-    for (int i = 0; i < row.size(); i++) {
-        new_list << QCborArray({ row[i] });
-    }
-
-    return request_rows_insert(new_list);
+    return request_rows_insert(QCborArray() << row);
 }
 
-PendingMethodReply*
-TableDelegate::request_rows_insert(QCborArray columns) const {
+PendingMethodReply* TableDelegate::request_rows_insert(QCborArray rows) const {
     auto* p = attached_methods().new_call_by_name(noo::names::mthd_tbl_insert);
 
-    p->call_direct(columns);
+    p->call_direct(rows);
 
     return p;
 }
 
 PendingMethodReply* TableDelegate::request_row_update(int64_t    key,
                                                       QCborArray row) const {
-    QCborArray new_list;
 
-    for (int i = 0; i < row.size(); i++) {
-        new_list << QCborArray({ row[i] });
-    }
-
-    return request_rows_update({ key }, std::move(new_list));
+    return request_rows_update({ key }, QCborArray() << row);
 }
 
-PendingMethodReply*
-TableDelegate::request_rows_update(QVector<int64_t> keys,
-                                   QCborArray       columns) const {
+PendingMethodReply* TableDelegate::request_rows_update(QVector<int64_t> keys,
+                                                       QCborArray rows) const {
     auto* p = attached_methods().new_call_by_name(noo::names::mthd_tbl_update);
 
-    p->call(keys, columns);
+    p->call(keys, rows);
 
     return p;
 }
@@ -1220,8 +1212,11 @@ TableDelegate::request_selection_update(noo::Selection selection) const {
     return p;
 }
 
-void TableDelegate::interp_table_reset(QCborArray const&) {
-    this->on_table_reset();
+void TableDelegate::interp_table_reset(QCborArray const& args) {
+
+    auto init = TableDataInit(args[0]);
+
+    this->on_table_reset(init);
 }
 
 void TableDelegate::interp_table_update(QCborArray const& ref) {
@@ -1232,9 +1227,10 @@ void TableDelegate::interp_table_update(QCborArray const& ref) {
     }
 
     auto keylist = ref[0];
-    auto cols    = ref[1];
+    auto rows    = ref[1];
 
-    this->on_table_updated(noo::coerce_to_int_list(keylist), cols.toArray());
+    this->on_table_rows_updated(noo::coerce_to_int_list(keylist),
+                                rows.toArray());
 }
 
 void TableDelegate::interp_table_remove(QCborArray const& ref) {

@@ -624,576 +624,424 @@ MeshTPtr create_mesh(DocumentTPtrRef doc, MeshData const& data) {
 
 // Table =======================================================================
 
-// TableQuery::~TableQuery() = default;
-
-// size_t TableQuery::next() const {
-//    return 0;
-//}
-
-// void TableQuery::write_next_to(std::span<double>) {
-//    // do nothing
-//}
-
-bool TableQuery::is_column_string(size_t) const {
-    return false;
-}
-
-bool TableQuery::get_reals_to(size_t, std::span<double>) const {
-    return false;
-}
-
-bool TableQuery::get_cell_to(size_t, size_t, QString&) const {
-    return false;
-}
-
-bool TableQuery::get_keys_to(std::span<int64_t>) const {
-    return false;
-}
-
-// =============
-
-size_t TableColumn::size() const {
-    return noo::visit([&](auto const& a) { return uint64_t(a.size()); }, *this);
-}
-
-bool TableColumn::is_string() const {
-    return std::holds_alternative<QStringList>(*this);
-}
-
-std::span<double const> TableColumn::as_doubles() const {
-    auto* p = std::get_if<QVector<double>>(this);
-
-    return p ? std::span<double const>(*p) : std::span<double const> {};
-}
-QStringList const& TableColumn::as_string() const {
-    auto* p = std::get_if<QStringList>(this);
-
-    if (p) return *p;
-
-    static const QStringList blank;
-
-    return blank;
-}
-
-void TableColumn::append(std::span<double const> d) {
-    VMATCH(
-        *this,
-        VCASE(QVector<double> & a) {
-            a << QVector<double>(d.begin(), d.end());
-        },
-        VCASE(QStringList & a) {
-            for (auto value : d) {
-                a.push_back(QString::number(value));
-            }
-        });
-}
-
-void TableColumn::append(QCborArray const& d) {
-    VMATCH(
-        *this,
-        VCASE(QVector<double> & a) {
-            for (auto const& s : d) {
-                a.push_back(s.toDouble());
-            }
-        },
-        VCASE(QStringList & a) {
-            for (auto const& s : d) {
-                a.push_back(s.toString());
-            }
-        });
-}
-
-void TableColumn::append(double d) {
-    VMATCH(
-        *this,
-        VCASE(QVector<double> & a) { a.push_back(d); },
-        VCASE(QStringList & a) { a.push_back(QString::number(d)); });
-}
-void TableColumn::append(QString d) {
-    VMATCH(
-        *this,
-        VCASE(QVector<double> & a) { a.push_back(d.toDouble()); },
-        VCASE(QStringList & a) { a.push_back(d); });
-}
-
-void TableColumn::set(size_t row, double d) {
-    VMATCH(
-        *this,
-        VCASE(QVector<double> & a) { a[row] = d; },
-        VCASE(QStringList & a) { a[row] = QString::number(d); });
-}
-void TableColumn::set(size_t row, QCborValue d) {
-    VMATCH(
-        *this,
-        VCASE(QVector<double> & a) { a[row] = d.toDouble(); },
-        VCASE(QStringList & a) { a[row] = d.toString(); });
-}
-void TableColumn::set(size_t row, QString d) {
-    VMATCH(
-        *this,
-        VCASE(QVector<double> & a) { a[row] = d.toDouble(); },
-        VCASE(QStringList & a) { a[row] = d; });
-}
-
-void TableColumn::erase(size_t row) {
-    noo::visit([row](auto& a) { a.erase(a.begin() + row); }, *this);
-}
-
-void TableColumn::clear() {
-    noo::visit([](auto& a) { a.clear(); }, *this);
-}
-
-// =============
-
-namespace {
-
-
-struct WholeTableQuery : TableQuery {
-    TableSource* source;
-
-    WholeTableQuery(TableSource* s) : source(s) {
-        num_cols = s->get_columns().size();
-        num_rows = num_cols ? s->get_columns().at(0).size() : 0;
-    }
-
-    bool is_column_string(size_t col) const override {
-        return source->get_columns().at(col).is_string();
-    }
-
-    bool get_reals_to(size_t col, std::span<double> dest) const override {
-        auto& column = source->get_columns().at(col);
-
-        if (column.is_string()) return false;
-
-        auto sp = column.as_doubles();
-
-        copy_range(sp, dest);
-
-        return true;
-    }
-
-    bool get_cell_to(size_t col, size_t row, QString& s) const override {
-        try {
-            auto& column = source->get_columns().at(col);
-
-            auto sp = column.as_string();
-
-            if (row >= sp.size()) return false;
-
-            s = sp[row];
-
-            return true;
-
-        } catch (...) { return false; }
-    }
-
-    bool get_keys_to(std::span<int64_t> dest) const override {
-        auto const& r = source->get_row_to_key_map();
-        copy_range(r, dest);
-        return true;
-    }
-};
-
-struct InsertQuery : TableQuery {
-    TableSource* source;
-
-    size_t start_at = 0;
-
-    InsertQuery(TableSource* s, size_t row_start, size_t count) : source(s) {
-        num_cols = s->get_columns().size();
-        num_rows = count;
-        start_at = row_start;
-    }
-
-    bool is_column_string(size_t col) const override {
-        return source->get_columns().at(col).is_string();
-    }
-
-    bool get_reals_to(size_t col, std::span<double> dest) const override {
-        auto& column = source->get_columns().at(col);
-
-        Q_ASSERT(!column.is_string()); // should already have been checked
-
-        auto sp = column.as_doubles();
-
-        qDebug() << Q_FUNC_INFO << col << dest.size() << start_at << num_rows
-                 << sp.size();
-
-        sp = noo::safe_subspan(sp, start_at, num_rows);
-
-        Q_ASSERT(sp.size() == num_rows);
-
-        copy_range(sp, dest);
-
-        return true;
-    }
-
-    bool get_cell_to(size_t col, size_t row, QString& s) const override {
-        try {
-            auto& column = source->get_columns().at(col);
-
-            auto sp = column.as_string();
-
-            if (row >= sp.size()) return false;
-
-            s = sp[row + start_at];
-
-            return true;
-
-        } catch (...) { return false; }
-    }
-
-    bool get_keys_to(std::span<int64_t> dest) const override {
-        auto const& r = source->get_row_to_key_map();
-
-        auto key_sp = noo::safe_subspan(std::span(r), start_at, num_rows);
-
-        Q_ASSERT(key_sp.size() == num_rows);
-
-        copy_range(key_sp, dest);
-        return true;
-    }
-};
-
-struct UpdateQuery : TableQuery {
-    TableSource*         source;
-    std::vector<int64_t> keys;
-
-
-    UpdateQuery(TableSource* s, std::vector<int64_t> _keys)
-        : source(s), keys(std::move(_keys)) {
-        num_cols = s->get_columns().size();
-        num_rows = keys.size();
-    }
-
-    bool is_column_string(size_t col) const override {
-        return source->get_columns().at(col).is_string();
-    }
-
-    bool get_reals_to(size_t col, std::span<double> dest) const override {
-        auto& column = source->get_columns().at(col);
-
-        if (column.is_string()) return false;
-
-        auto sp = column.as_doubles();
-
-        auto& map = source->get_key_to_row_map();
-
-        for (size_t i = 0; i < num_rows; i++) {
-            auto key = keys[i];
-            auto row = map.at(key);
-
-            dest[i] = sp[row];
-        }
-
-        return true;
-    }
-
-    bool get_cell_to(size_t col, size_t row, QString& s) const override {
-        try {
-            auto& column = source->get_columns().at(col);
-
-            auto sp = column.as_string();
-
-            if (row >= sp.size()) return false;
-
-            auto& map = source->get_key_to_row_map();
-
-            auto key        = keys[row];
-            auto source_row = map.at(key);
-
-            s = sp[source_row];
-
-            return true;
-
-        } catch (...) {
-            qCritical() << Q_FUNC_INFO << "Internal error!";
-            return false;
-        }
-    }
-
-    bool get_keys_to(std::span<int64_t> dest) const override {
-        copy(keys.begin(), keys.end(), dest.begin(), dest.end());
-        return true;
-    }
-};
-
-struct DeleteQuery : TableQuery {
-    TableSource*         source;
-    std::vector<int64_t> keys;
-
-
-    DeleteQuery(TableSource* s, std::vector<int64_t> _keys)
-        : source(s), keys(std::move(_keys)) {
-        num_cols = s->get_columns().size();
-        num_rows = keys.size();
-    }
-
-    bool is_column_string(size_t col) const override {
-        return source->get_columns().at(col).is_string();
-    }
-
-    bool get_reals_to(size_t /*col*/, std::span<double>) const override {
-        return false;
-    }
-
-    bool get_cell_to(size_t /*col*/, size_t /*row*/, QString&) const override {
-        return false;
-    }
-
-    bool get_keys_to(std::span<int64_t> dest) const override {
-        qDebug() << Q_FUNC_INFO << dest.size() << keys.size();
-        copy(keys.begin(), keys.end(), dest.begin(), dest.end());
-        return true;
-    }
-};
-
-} // namespace
-
-TableQueryPtr TableSource::handle_insert(QCborArray const& cols) {
-    // get dimensions of insert
-
-    size_t num_cols = cols.size();
-
-    if (num_cols == 0) return nullptr;
-    if (num_cols != m_columns.size()) return nullptr;
-
-    size_t num_rows = 0;
-    bool   ok       = true;
-
-    for (size_t ci = 0; ci < num_cols; ci++) {
-        auto r = cols[ci];
-        if (r.isArray()) {
-            auto la  = r.toArray();
-            num_rows = std::max(num_rows, static_cast<size_t>(la.size()));
-        } else {
-            ok = false;
-            break;
-        }
-    }
-
-    if (!ok or num_rows == 0) return nullptr;
-
-    qDebug() << Q_FUNC_INFO << "num rows" << num_rows;
-
-    // lets get some keys
-
-    std::vector<int64_t> new_row_keys;
-    new_row_keys.resize(num_rows);
-
-    auto const current_row_count = m_columns.at(0).size();
-
-    qDebug() << "current row count" << current_row_count;
-
-    for (size_t i = 0; i < num_rows; i++) {
-        new_row_keys[i]             = m_counter;
-        m_key_to_row_map[m_counter] = current_row_count + i;
-        m_counter++;
-    }
-
-    m_row_to_key_map.insert(
-        m_row_to_key_map.end(), new_row_keys.begin(), new_row_keys.end());
-
-    // qDebug() << "assigned keys"
-    //         << QVector<int64_t>::fromStdVector(new_row_keys);
-
-    // now lets insert
-
-    for (size_t ci = 0; ci < num_cols; ci++) {
-        auto  source_col = cols[ci];
-        auto& dest_col   = m_columns.at(ci);
-
-        if (source_col.isArray()) {
-            auto la = source_col.toArray();
-
-            dest_col.append(la);
-        }
-    }
-
-    // now return a query to the data
-
-    return std::make_shared<InsertQuery>(this, current_row_count, num_rows);
-}
-
-TableQueryPtr TableSource::handle_update(QCborValue const& keys,
-                                         QCborArray const& cols) {
-    // get dimensions of update
-
-    size_t const num_cols = cols.size();
-
-    if (num_cols == 0) return nullptr;
-    if (num_cols != m_columns.size()) return nullptr;
-
-    size_t num_rows = 0;
-    bool   ok       = true;
-
-    for (size_t ci = 0; ci < num_cols; ci++) {
-        auto r = cols[ci];
-
-        if (r.isArray()) {
-            num_rows = std::max<size_t>(num_rows, r.toArray().size());
-        } else {
-            ok = false;
-            break;
-        }
-    }
-
-    if (!ok or num_rows == 0) return nullptr;
-
-    qDebug() << Q_FUNC_INFO << num_rows;
-
-    // lets get some keys
-
-    auto key_list      = coerce_to_int_list(keys);
-    auto key_list_span = std::span(key_list);
-
-    // now lets update
-
-    for (size_t key_i = 0; key_i < key_list_span.size(); key_i++) {
-        auto key = key_list_span[key_i];
-
-        auto iter = m_key_to_row_map.find(key);
-
-        if (iter == m_key_to_row_map.end()) continue;
-
-        auto const update_at = iter->second;
-
-        for (size_t ci = 0; ci < num_cols; ci++) {
-            auto  source_col = cols[ci];
-            auto& dest_col   = m_columns.at(ci);
-
-            dest_col.set(update_at, source_col[key_i]);
-        }
-    }
-
-    // now return a query to the data
-
-    return std::make_shared<UpdateQuery>(this, span_to_vector(key_list_span));
-}
-
-TableQueryPtr TableSource::handle_deletion(QCborValue const& keys) {
-    qDebug() << Q_FUNC_INFO;
-    auto key_list = coerce_to_int_list(keys);
-
-    qDebug() << QVector<int64_t>(key_list.begin(), key_list.end());
-
-    // to delete we are finding the rows to remove, and then deleting the rows
-    // from highest to lowest. this means we dont break index validity
-
-    std::vector<size_t> rows_to_delete;
-
-    for (auto k : key_list) {
-        if (m_key_to_row_map.count(k) != 1) continue;
-
-        rows_to_delete.push_back(m_key_to_row_map.at(k));
-
-        m_key_to_row_map.erase(k);
-    }
-
-    qDebug() << "Rows to delete"
-             << QVector<size_t>(rows_to_delete.begin(), rows_to_delete.end());
-
-    std::sort(
-        rows_to_delete.begin(), rows_to_delete.end(), std::greater<size_t>());
-
-    qDebug() << "Rows to delete sorted"
-             << QVector<size_t>(rows_to_delete.begin(), rows_to_delete.end());
-
-    for (auto row : rows_to_delete) {
-        m_row_to_key_map.erase(m_row_to_key_map.begin() + row);
-        for (auto& c : m_columns) {
-            c.erase(row);
-        }
-    }
-
-    qDebug() << "Rebuilding maps";
-
-    for (size_t row = 0; row < m_row_to_key_map.size(); row++) {
-        auto k              = m_row_to_key_map[row];
-        m_key_to_row_map[k] = row;
-    }
-
-
-    return std::make_shared<DeleteQuery>(this,
-                                         span_to_vector(std::span(key_list)));
-}
-
-bool TableSource::handle_reset() {
-    for (auto& col : m_columns) {
-        col.clear();
-    }
-    return true;
-}
-
-bool TableSource::handle_set_selection(Selection const& ref) {
-    m_selections[ref.name] = ref;
-
-    return true;
+ServerTableDelegate::ServerTableDelegate(QObject* p) : QObject(p) { }
+ServerTableDelegate::~ServerTableDelegate() = default;
+
+QStringList ServerTableDelegate::get_headers() {
+    return QStringList();
 }
 
 
-TableSource::~TableSource() = default;
+std::pair<QCborArray, QCborArray> ServerTableDelegate::get_all_data() {
+    return {};
+}
 
-QStringList TableSource::get_headers() {
-    QStringList ret;
-    for (auto const& c : m_columns) {
-        ret << c.name;
-    }
-    return ret;
+QList<Selection> ServerTableDelegate::get_all_selections() {
+    return {};
 }
 
 
-TableQueryPtr TableSource::get_all_data() {
-    return std::make_shared<WholeTableQuery>(this);
+void ServerTableDelegate::handle_insert(QCborArray const& rows) {
+    //    QCborArray new_keys, fixed_rows;
+    //    auto       b = handle_insert(rows, new_keys, fixed_rows);
+
+    //    if (b) { emit table_row_updated(new_keys, fixed_rows); }
+
+    //    return b;
 }
 
 
-bool TableSource::ask_insert(QCborArray const& cols) {
-    auto b = handle_insert(cols);
+void ServerTableDelegate::handle_update(QCborArray const& keys,
+                                        QCborArray const& rows) {
+    //    QCborArray fixed_rows;
 
-    if (b) { emit table_row_updated(b); }
+    //    auto b = handle_update(keys.toArray(), rows, fixed_rows);
 
-    return !!b;
+    //    if (b) { emit table_row_updated(keys.toArray(), fixed_rows); }
+
+    //    return b;
 }
 
+void ServerTableDelegate::handle_deletion(QCborArray const& keys) {
+    //    auto b = handle_deletion(keys.toArray());
 
-bool TableSource::ask_update(QCborValue const& keys,
-                             QCborArray const& columns) {
-    auto b = handle_update(keys, columns);
+    //    if (b) { emit table_row_deleted(keys.toArray()); }
 
-    if (b) { emit table_row_updated(b); }
-
-    return !!b;
+    //    return !!b;
 }
 
-bool TableSource::ask_delete(QCborValue const& keys) {
-    auto b = handle_deletion(keys);
+void ServerTableDelegate::handle_reset() {
+    //    auto b = handle_reset();
 
-    if (b) { emit table_row_deleted(b); }
+    //    if (b) emit table_reset();
 
-    return !!b;
+    //    return b;
 }
 
-bool TableSource::ask_clear() {
-    auto b = handle_reset();
+void ServerTableDelegate::handle_set_selection(Selection const& s) {
+    //    auto b = handle_set_selection(s);
 
-    if (b) emit table_reset();
+    //    if (b) emit table_selection_updated(s);
 
-    return b;
-}
-
-bool TableSource::ask_update_selection(Selection const& s) {
-    auto b = handle_set_selection(s);
-
-    if (b) emit table_selection_updated(s);
-
-    return b;
+    //    return b;
 }
 
 
 TableTPtr create_table(DocumentTPtrRef doc, TableData const& data) {
     return doc->table_list().provision_next(data);
 }
+
+// Table Delegate ==============================================================
+
+uint64_t AbstractTableDelegate::next_counter() {
+    auto save = m_counter;
+    m_counter++;
+    return save;
+}
+
+void AbstractTableDelegate::reconnect_standard(QAbstractTableModel* m) {
+    m_connections << connect(m,
+                             &QAbstractTableModel::destroyed,
+                             this,
+                             &AbstractTableDelegate::act_model_destroy);
+
+    m_connections << connect(m,
+                             &QAbstractTableModel::modelReset,
+                             this,
+                             &AbstractTableDelegate::act_model_reset);
+
+    m_connections << connect(m,
+                             &QAbstractTableModel::rowsInserted,
+                             this,
+                             &AbstractTableDelegate::act_model_rows_inserted);
+
+    m_connections << connect(m,
+                             &QAbstractTableModel::rowsRemoved,
+                             this,
+                             &AbstractTableDelegate::act_model_rows_removed);
+
+    m_connections << connect(m,
+                             &QAbstractTableModel::columnsInserted,
+                             this,
+                             &AbstractTableDelegate::act_model_reset);
+
+    m_connections << connect(m,
+                             &QAbstractTableModel::columnsRemoved,
+                             this,
+                             &AbstractTableDelegate::act_model_reset);
+
+    m_connections << connect(m,
+                             &QAbstractTableModel::columnsMoved,
+                             this,
+                             &AbstractTableDelegate::act_model_reset);
+
+    m_connections << connect(m,
+                             &QAbstractTableModel::dataChanged,
+                             this,
+                             &AbstractTableDelegate::act_model_data_changed);
+}
+
+void AbstractTableDelegate::handle_insert(QCborArray const& new_rows) {
+    // we check both: the insertable class is not a child class of qobject, and
+    // we dont want to have to force that, as it could require virtual
+    // inheriting. so, we can just check the pointer that we do know has to be a
+    // qobject.
+    if (m_table_model and m_insertable) {
+        m_insertable->handle_insert(new_rows);
+    }
+}
+
+void AbstractTableDelegate::handle_update(QCborArray const& keys,
+                                          QCborArray const& rows) {
+    if (m_table_model and m_insertable) {
+        m_insertable->handle_update(keys, rows);
+    }
+}
+
+void AbstractTableDelegate::handle_deletion(QCborArray const& keys) {
+    if (m_table_model and m_insertable) { m_insertable->handle_deletion(keys); }
+}
+
+void AbstractTableDelegate::handle_reset() {
+    if (m_table_model and m_insertable) { m_insertable->handle_reset(); }
+}
+
+void AbstractTableDelegate::handle_set_selection(Selection const& s) {
+    m_selections[s.name] = s;
+    emit table_selection_updated(s);
+
+    if (s.row_ranges.empty() and s.rows.empty()) {
+        m_selections.remove(s.name);
+    }
+}
+
+AbstractTableDelegate::~AbstractTableDelegate() { }
+
+QStringList AbstractTableDelegate::get_headers() {
+
+    QStringList ret;
+
+    if (m_table_model) {
+        for (auto i = 0; i < m_table_model->columnCount(); i++) {
+            ret << m_table_model->headerData(i, Qt::Orientation::Horizontal)
+                       .toString();
+        }
+    }
+
+    return ret;
+}
+
+std::pair<QCborArray, QCborArray> AbstractTableDelegate::get_all_data() {
+
+    QCborArray rows;
+    QCborArray keys;
+
+    auto cc = m_table_model->columnCount();
+
+    for (auto iter = m_model_to_key_map.begin();
+         iter != m_model_to_key_map.end();
+         ++iter) {
+        auto key = iter.value();
+
+        keys << (qint64)key;
+
+        auto model_row = iter.key().row();
+
+        QCborArray row;
+
+        for (auto i = 0; i < cc; i++) {
+            row << QCborValue::fromVariant(
+                m_table_model->data(m_table_model->index(model_row, i)));
+        }
+
+        rows << row;
+    }
+
+    return { keys, rows };
+}
+
+QList<Selection> AbstractTableDelegate::get_all_selections() {
+    return m_selections.values();
+}
+
+void AbstractTableDelegate::act_model_destroy() {
+    set_model((QAbstractTableModel*)nullptr);
+}
+
+void AbstractTableDelegate::act_model_reset() {
+    emit table_reset();
+}
+
+void AbstractTableDelegate::act_model_rows_inserted(QModelIndex mi,
+                                                    int         first,
+                                                    int         last) {
+    Q_ASSERT(!mi.isValid());
+
+    QCborArray new_keys;
+
+    QCborArray rows;
+
+    for (int i = first; i <= last; i++) {
+        auto key = next_counter();
+        new_keys << (qint64)key;
+        auto pi = QPersistentModelIndex(m_table_model->index(i, 0));
+        m_key_to_model_map[key] = pi;
+        m_model_to_key_map[pi]  = key;
+
+        QCborArray row;
+
+        for (int j = 0; j < m_table_model->columnCount(); j++) {
+            row << QCborValue::fromVariant(
+                m_table_model->data(m_table_model->index(i, j)));
+        }
+
+        rows << row;
+    }
+
+    emit table_row_updated(new_keys, rows);
+}
+void AbstractTableDelegate::act_model_rows_removed(QModelIndex mi,
+                                                   int         first,
+                                                   int         last) {
+    Q_ASSERT(!mi.isValid());
+
+    QCborArray del_keys;
+
+    for (int i = first; i <= last; i++) {
+        auto index = m_table_model->index(i, 0);
+        auto key   = m_model_to_key_map[QPersistentModelIndex(index)];
+
+        del_keys << (qint64)key;
+    }
+
+    emit table_row_deleted(del_keys);
+}
+void AbstractTableDelegate::act_model_data_changed(QModelIndex top_left,
+                                                   QModelIndex bottom_right,
+                                                   QVector<int>) {
+    int first = std::min(top_left.row(), bottom_right.row());
+    int last  = std::max(top_left.row(), bottom_right.row());
+
+    QCborArray new_keys;
+
+    QCborArray rows;
+
+    for (int i = first; i <= last; i++) {
+        auto index = m_table_model->index(i, 0);
+        auto key   = m_model_to_key_map[QPersistentModelIndex(index)];
+
+        new_keys << (qint64)key;
+        m_key_to_model_map[key] = m_table_model->index(i, 0);
+
+        QCborArray row;
+
+        for (int j = 0; j < m_table_model->columnCount(); j++) {
+            row << QCborValue::fromVariant(
+                m_table_model->data(m_table_model->index(i, j)));
+        }
+
+        rows << row;
+    }
+
+    emit table_row_updated(new_keys, rows);
+}
+
+// Variant Delegate ============================================================
+
+uint64_t VariantTableDelegate::next_counter() {
+    auto save = m_counter;
+    m_counter++;
+    return save;
+}
+
+void VariantTableDelegate::normalize_row(QCborArray& row_arr) {
+    while (row_arr.size() < m_headers.size()) {
+        row_arr << QCborValue(0);
+    }
+
+    while (row_arr.size() > m_headers.size()) {
+        row_arr.pop_back();
+    }
+}
+
+std::pair<QCborArray, QCborArray>
+VariantTableDelegate::common_insert(QCborArray const& new_rows) {
+    QCborArray new_keys;
+    QCborArray final_rows;
+
+    for (auto row : qAsConst(new_rows)) {
+        auto new_key = next_counter();
+
+        new_keys << (qint64)new_key;
+
+        auto row_arr = row.toArray();
+
+        normalize_row(row_arr);
+
+        final_rows << row_arr;
+
+        m_rows[new_key] = row_arr;
+    }
+
+    return { new_keys, final_rows };
+}
+
+void VariantTableDelegate::handle_insert(QCborArray const& new_rows) {
+
+    auto [new_keys, final_rows] = common_insert(new_rows);
+
+    emit table_row_updated(new_keys, final_rows);
+}
+
+void VariantTableDelegate::handle_update(QCborArray const& keys,
+                                         QCborArray const& rows) {
+
+    QCborArray final_keys;
+    QCborArray final_rows;
+
+    int bounds = std::min(keys.size(), rows.size());
+
+    for (int i = 0; i < bounds; i++) {
+        auto key = keys[i].toInteger(-1);
+
+        auto iter = m_rows.find(key);
+
+        if (iter == m_rows.end()) { continue; }
+
+        auto row_arr = rows[i].toArray();
+
+        normalize_row(row_arr);
+
+        final_keys << key;
+        final_rows << row_arr;
+
+        iter.value() = row_arr;
+    }
+
+    emit table_row_updated(final_keys, final_rows);
+}
+void VariantTableDelegate::handle_deletion(QCborArray const& keys) {
+
+    QCborArray final_keys;
+
+    for (auto key_v : qAsConst(keys)) {
+        auto key = key_v.toInteger(-1);
+
+        auto iter = m_rows.find(key);
+
+        if (iter == m_rows.end()) { continue; }
+
+        m_rows.erase(iter);
+
+        final_keys << key;
+    }
+
+    emit table_row_deleted(final_keys);
+}
+
+void VariantTableDelegate::handle_reset() {
+    m_rows.clear();
+
+    emit table_reset();
+}
+void VariantTableDelegate::handle_set_selection(Selection const& s) {
+    m_selections[s.name] = s;
+    emit table_selection_updated(s);
+
+    if (s.row_ranges.empty() and s.rows.empty()) {
+        m_selections.remove(s.name);
+    }
+}
+
+VariantTableDelegate::VariantTableDelegate(QStringList column_names,
+                                           QCborArray  initial_rows,
+                                           QObject*    p)
+    : ServerTableDelegate(p), m_headers(column_names) {
+
+    common_insert(initial_rows);
+}
+VariantTableDelegate::~VariantTableDelegate() { }
+
+QStringList VariantTableDelegate::get_headers() {
+    return m_headers;
+}
+std::pair<QCborArray, QCborArray> VariantTableDelegate::get_all_data() {
+
+    QCborArray keys;
+    QCborArray rows;
+
+    for (auto iter = m_rows.begin(); iter != m_rows.end(); ++iter) {
+        keys << (qint64)iter.key();
+        rows << iter.value();
+    }
+
+    return { keys, rows };
+}
+
+QList<Selection> VariantTableDelegate::get_all_selections() {
+    return m_selections.values();
+}
+
 
 // Object ======================================================================
 

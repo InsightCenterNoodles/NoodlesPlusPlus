@@ -14,10 +14,7 @@ public:
     void interpret() override;
 
 signals:
-    void recv(QVector<TableDelegate::ColumnInfo> const&,
-              QVector<int64_t>,
-              QVector<QCborArray> const&,
-              QVector<noo::Selection> const&);
+    void recv(nooc::TableDataInit);
 };
 
 // =============================================================================

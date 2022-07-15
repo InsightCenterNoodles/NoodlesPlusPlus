@@ -173,7 +173,7 @@ public:
 
 public slots:
     /// Internal use. do not touch!
-    void complete(QCborValue, MethodException*);
+    void complete(QCborValue, nooc::MethodException*);
 
 signals:
     /// Issued when a non-error reply has been received
@@ -183,7 +183,7 @@ signals:
     void recv_fail(QString);
 
     /// Issued when the method raised an exception on the server side.
-    void recv_exception(MethodException);
+    void recv_exception(nooc::MethodException);
 };
 
 ///
@@ -457,9 +457,9 @@ public:
 signals:
     // private
     void invoke(noo::MethodID,
-                MethodContextPtr,
+                nooc::MethodContextPtr,
                 QCborArray const&,
-                PendingMethodReply*);
+                nooc::PendingMethodReply*);
 };
 
 // =============================================================================
@@ -495,7 +495,7 @@ public:
 
 signals:
     /// Issued when this signal has been recv'ed.
-    void fired(MethodContextPtr, QCborArray const&);
+    void fired(nooc::MethodContextPtr, QCborArray const&);
 };
 
 // =============================================================================
@@ -1107,7 +1107,7 @@ public slots:
 
     replies::GetStringListReply* get_var_keys();
     replies::ArrayReply*         get_var_options(QString key = QString());
-    PendingMethodReply*          get_var(QString key = QString());
+    nooc::PendingMethodReply*    get_var(QString key = QString());
     replies::GetBoolReply* set_var(QCborValue value, QString key = QString());
 
 
@@ -1134,6 +1134,24 @@ struct TableUpdate {
     TableUpdate(noo::messages::MsgTableUpdate const&, InternalClientState&);
 };
 
+struct TableDataInit {
+    struct ColumnInfo {
+        QString name;
+        QString type;
+
+        ColumnInfo() = default;
+        ColumnInfo(QCborValue);
+    };
+
+    TableDataInit() = default;
+    TableDataInit(QCborValue);
+
+    QVector<ColumnInfo>     names;
+    QVector<int64_t>        keys;
+    QVector<QCborArray>     rows;
+    QVector<noo::Selection> selections;
+};
+
 /// The base delegate class for tables. Users can inherit from this to add
 /// their own functionality. Delegates are instantiated on new tables from the
 /// server. Table delegates can also be updated.
@@ -1152,14 +1170,6 @@ class TableDelegate : public QObject {
                      std::optional<QVector<SignalDelegate*>> signals_list);
 
 public:
-    struct ColumnInfo {
-        QString name;
-        QString type;
-
-        ColumnInfo() = default;
-        ColumnInfo(QCborValue);
-    };
-
     TableDelegate(noo::TableID, TableInit const&);
     virtual ~TableDelegate();
 
@@ -1179,25 +1189,20 @@ public:
     AttachedSignalList const& attached_signals() const;
 
 public slots:
-    virtual void on_table_initialize(QVector<ColumnInfo> const& names,
-                                     QVector<int64_t>           keys,
-                                     QVector<QCborArray> const& data_cols,
-                                     QVector<noo::Selection>    selections);
-
-    virtual void on_table_reset();
-    virtual void on_table_updated(QVector<int64_t> keys,
-                                  QCborArray       array_of_columns);
+    virtual void on_table_subscribed(TableDataInit const&);
+    virtual void on_table_reset(TableDataInit const&);
+    virtual void on_table_rows_updated(QVector<int64_t> keys, QCborArray rows);
     virtual void on_table_rows_removed(QVector<int64_t> keys);
     virtual void on_table_selection_updated(noo::Selection const&);
 
 public:
     PendingMethodReply* subscribe() const;
     PendingMethodReply* request_row_insert(QCborArray row) const;
-    PendingMethodReply* request_rows_insert(QCborArray array_of_columns) const;
+    PendingMethodReply* request_rows_insert(QCborArray rows) const;
 
     PendingMethodReply* request_row_update(int64_t key, QCborArray row) const;
     PendingMethodReply* request_rows_update(QVector<int64_t> keys,
-                                            QCborArray array_of_columns) const;
+                                            QCborArray       rows) const;
 
     PendingMethodReply* request_deletion(QVector<int64_t> keys) const;
 

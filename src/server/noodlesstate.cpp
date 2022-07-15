@@ -134,7 +134,6 @@ static TableTPtr get_table(MethodContext const& context) {
     return ctlb;
 }
 
-
 static QCborValue table_subscribe(MethodContext const& context,
                                   QCborArray const& /*args*/) {
 
@@ -151,97 +150,14 @@ static QCborValue table_subscribe(MethodContext const& context,
     auto& source = *tbl->get_source();
 
 
-    QCborMap return_obj;
-
-    auto q = source.get_all_data();
-
-    {
-        QCborArray column_info;
-
-        auto all_names = source.get_headers();
-
-        // "TEXT" / "REAL" / "INTEGER"
-
-        for (size_t ci = 0; ci < q->num_cols; ci++) {
-
-            QCborMap map;
-            map[QStringLiteral("name")] = all_names[ci];
-
-            if (q->is_column_string(ci)) {
-                map[QStringLiteral("type")] = "TEXT";
-            } else {
-                map[QStringLiteral("type")] = "REAL";
-            }
-
-            column_info << map;
-        }
-
-        return_obj[QStringLiteral("columns")] = column_info;
-    }
-
-
-    {
-        std::vector<int64_t> keys(q->num_rows);
-
-        q->get_keys_to(keys);
-
-        return_obj[QStringLiteral("keys")] = to_cbor(keys);
-    }
-
-    {
-        QCborArray lv; //(q->num_cols);
-
-        for (size_t ci = 0; ci < q->num_cols; ci++) {
-            if (q->is_column_string(ci)) {
-                QCborArray data;
-                //(q->num_rows);
-
-                for (int ri = 0; ri < data.size(); ri++) {
-                    QString view;
-                    q->get_cell_to(ci, ri, view);
-                    data << QString(view);
-                }
-
-                lv << std::move(data);
-
-            } else {
-                std::vector<double> data(q->num_rows);
-
-                q->get_reals_to(ci, data);
-
-                lv << to_cbor(data);
-            }
-        }
-
-        return_obj[QStringLiteral("data")] = std::move(lv);
-    }
-
-    {
-        auto const& selections = source.get_all_selections();
-
-        QCborArray lv;
-
-        for (auto iter = selections.begin(); iter != selections.end(); ++iter) {
-            lv << to_cbor(iter.value());
-        }
-
-        return_obj[QStringLiteral("selections")] = std::move(lv);
-    }
-
-
-    return return_obj;
+    return make_table_init_data(source);
 }
 
 static QCborValue table_data_insert(MethodContext const& context,
                                     AnyListArg           ref) {
     auto tbl = get_table(context);
 
-    bool ok = tbl->get_source()->ask_insert(ref.list);
-
-    if (!ok) {
-        throw MethodException(ErrorCodes::TABLE_REJECT_INSERT,
-                              "Unable to insert data");
-    }
+    tbl->get_source()->handle_insert(ref.list);
 
     return {};
 }
@@ -249,15 +165,10 @@ static QCborValue table_data_insert(MethodContext const& context,
 
 static QCborValue table_data_update(MethodContext const& context,
                                     QCborValue           keys,
-                                    AnyListArg           cols) {
+                                    AnyListArg           rows) {
     auto tbl = get_table(context);
 
-    bool ok = tbl->get_source()->ask_update(keys, cols.list);
-
-    if (!ok) {
-        throw MethodException(ErrorCodes::TABLE_REJECT_UPDATE,
-                              "Unable to update data");
-    }
+    tbl->get_source()->handle_update(keys.toArray(), rows.list);
 
     return {};
 }
@@ -266,12 +177,7 @@ static QCborValue table_data_remove(MethodContext const& context,
                                     QCborValue           keys) {
     auto tbl = get_table(context);
 
-    bool ok = tbl->get_source()->ask_delete(keys);
-
-    if (!ok) {
-        throw MethodException(ErrorCodes::TABLE_REJECT_REMOVE,
-                              "Unable to remove data");
-    }
+    tbl->get_source()->handle_deletion(keys.toArray());
 
     return {};
 }
@@ -279,12 +185,7 @@ static QCborValue table_data_remove(MethodContext const& context,
 static QCborValue table_data_clear(MethodContext const& context) {
     auto tbl = get_table(context);
 
-    bool ok = tbl->get_source()->ask_clear();
-
-    if (!ok) {
-        throw MethodException(ErrorCodes::TABLE_REJECT_CLEAR,
-                              "Unable to clear table");
-    }
+    tbl->get_source()->handle_reset();
 
     return {};
 }
@@ -297,13 +198,7 @@ static QCborValue table_update_selection(MethodContext const& context,
 
     auto* src = tbl->get_source();
 
-    bool ok = src->ask_update_selection(selection_ref);
-
-    if (!ok) {
-        throw MethodException(ErrorCodes::TABLE_REJECT_SELECTION_UPDATE,
-                              "Unable to update selection");
-    }
-
+    src->handle_set_selection(selection_ref);
 
     return {};
 }

@@ -5,9 +5,11 @@
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
+#include <QAbstractTableModel>
 #include <QColor>
 #include <QImage>
 #include <QObject>
+#include <QPointer>
 #include <QUrl>
 
 #include <filesystem>
@@ -60,30 +62,6 @@ T _any_call_getter(QCborArray const& source, size_t& loc) {
     T ret;
     from_cbor(at_i, ret);
     return ret;
-
-    //    if constexpr (std::is_same_v<T, int64_t>) {
-    //        return at_i.to_int();
-    //    } else if constexpr (std::is_same_v<T, double>) {
-    //        return at_i.to_real();
-    //    } else if constexpr (std::is_same_v<T, std::string_view>) {
-    //        return at_i.to_string();
-    //    } else if constexpr (std::is_same_v<T, QCborArray>) {
-    //        return at_i.to_vector();
-    //    } else if constexpr (std::is_same_v<T, std::span<std::byte const>>) {
-    //        return at_i.to_data();
-    //    } else if constexpr (std::is_same_v<T, QCborValueMapRef>) {
-    //        return at_i.to_map();
-    //    } else if constexpr (std::is_same_v<T, std::span<double const>>) {
-    //        return at_i.to_real_list();
-    //    } else if constexpr (std::is_same_v<T, std::span<int64_t const>>) {
-    //        return at_i.to_int_list();
-    //    } else if constexpr (std::is_same_v<T, AnyID>) {
-    //        return at_i.to_id();
-    //    } else if constexpr (std::is_same_v<T, QCborValue>) {
-    //        return at_i;
-    //    } else {
-    //        return T(at_i);
-    //    }
 }
 
 
@@ -609,102 +587,219 @@ void update_plot(DocumentTPtrRef, PlotUpdateData const&);
 
 // Table =======================================================================
 
-// The table system here is just preliminary
-
-// sketch for better query...
-struct TableQuery {
-    size_t num_cols = 0;
-    size_t num_rows = 0;
-
-    virtual bool is_column_string(size_t col) const; // either real or string
-
-    virtual bool get_reals_to(size_t col, std::span<double>) const;
-    virtual bool get_cell_to(size_t col, size_t row, QString&) const;
-
-    virtual bool get_keys_to(std::span<int64_t>) const;
-};
-
-using TableQueryPtr = std::shared_ptr<TableQuery const>;
-
-
-class TableColumn : public std::variant<QVector<double>, QStringList> {
-public:
-    QString name;
-
-    using variant::variant;
-
-    size_t size() const;
-    bool   is_string() const;
-
-    std::span<double const> as_doubles() const;
-    QStringList const&      as_string() const;
-
-    void append(std::span<double const>);
-    void append(QStringList const&);
-    void append(QCborArray const&);
-    void append(double);
-    void append(QString);
-
-    void set(size_t row, double);
-    void set(size_t row, QCborValue);
-    void set(size_t row, QString);
-
-    void erase(size_t row);
-
-    void clear();
-};
-
 ///
-/// \brief The TableSource class is the base type for tables. Users should
-/// inherit from this and override the functionality they desire.
+/// \brief The ServerTableDelegate class is the base type for tables. Users
+/// should inherit from this and override the functionality they desire.
 ///
-class TableSource : public QObject {
+class ServerTableDelegate : public QObject {
     Q_OBJECT
 
-protected:
-    std::vector<TableColumn> m_columns;
-    uint64_t                 m_counter = 0;
-
-    std::unordered_map<int64_t, uint64_t> m_key_to_row_map;
-    std::vector<int64_t>                  m_row_to_key_map;
-
-    // how should selections handle key deletion?
-    QHash<QString, Selection> m_selections;
-
-protected:
-    virtual TableQueryPtr handle_insert(QCborArray const& cols);
-    virtual TableQueryPtr handle_update(QCborValue const& keys,
-                                        QCborArray const& cols);
-    virtual TableQueryPtr handle_deletion(QCborValue const& keys);
-    virtual bool          handle_reset();
-    virtual bool          handle_set_selection(Selection const&);
-
 public:
-    TableSource(QObject* p) : QObject(p) { }
-    virtual ~TableSource();
+    ServerTableDelegate(QObject* p);
+    virtual ~ServerTableDelegate();
 
-    QStringList   get_headers();
-    TableQueryPtr get_all_data();
+    virtual QStringList                       get_headers();
+    virtual std::pair<QCborArray, QCborArray> get_all_data(); // keys, rows
+    virtual QList<Selection>                  get_all_selections();
 
-    auto const& get_columns() const { return m_columns; }
-    auto const& get_all_selections() const { return m_selections; }
-    auto const& get_key_to_row_map() const { return m_key_to_row_map; }
-    auto const& get_row_to_key_map() const { return m_row_to_key_map; }
+    // list of rows, return new keys.
+    virtual void handle_insert(QCborArray const& new_rows);
 
+    // list of keys, list of columns
+    virtual void handle_update(QCborArray const& keys, QCborArray const& rows);
 
-    bool ask_insert(QCborArray const&); // list of lists
-    bool ask_update(QCborValue const& keys,
-                    QCborArray const&); // list of lists
-    bool ask_delete(QCborValue const& keys);
-    bool ask_clear();
-    bool ask_update_selection(Selection const&);
+    // list of keys
+    virtual void handle_deletion(QCborArray const& keys);
+
+    // ask to clear
+    virtual void handle_reset();
+    virtual void handle_set_selection(Selection const&);
 
 signals:
     void table_reset();
-    void table_selection_updated(Selection const&);
-    void table_row_updated(TableQueryPtr);
-    void table_row_deleted(TableQueryPtr);
+    void table_selection_updated(noo::Selection const&);
+    void table_row_updated(QCborArray keys, QCborArray rows);
+    void table_row_deleted(QCborArray keys);
 };
+
+// Useful Table Delegates ====
+
+// Abstract Table Delegate; this is an interface to an abstract table model,
+// with optional modification provided through another inherited class.
+// This can be used to interface with SQL tables, etc.
+
+struct AbstractTableInsertable {
+    virtual void handle_insert(QCborArray const& new_rows) = 0;
+    virtual void handle_update(QCborArray const& keys,
+                               QCborArray const& rows)     = 0;
+    virtual void handle_deletion(QCborArray const& keys)   = 0;
+    virtual void handle_reset()                            = 0;
+};
+
+class AbstractTableDelegate : public ServerTableDelegate {
+    Q_OBJECT
+
+    QVector<QMetaObject::Connection> m_connections;
+
+    QPointer<QAbstractTableModel> m_table_model;
+    AbstractTableInsertable*      m_insertable;
+
+    uint64_t m_counter = 0;
+
+    uint64_t next_counter();
+
+    QHash<uint64_t, QPersistentModelIndex> m_key_to_model_map;
+    QHash<QPersistentModelIndex, uint64_t> m_model_to_key_map;
+
+    QHash<QString, Selection> m_selections;
+
+    void reconnect_standard(QAbstractTableModel*);
+
+protected:
+    void handle_insert(QCborArray const& new_rows) override;
+    void handle_update(QCborArray const& keys, QCborArray const& rows) override;
+    void handle_deletion(QCborArray const& keys) override;
+    void handle_reset() override;
+    void handle_set_selection(Selection const&) override;
+
+public:
+    template <class Model>
+    AbstractTableDelegate(Model* model, QObject* parent)
+        : ServerTableDelegate(parent) {
+        set_model(model);
+    }
+    ~AbstractTableDelegate() override;
+
+    QStringList                       get_headers() override;
+    std::pair<QCborArray, QCborArray> get_all_data() override;
+    QList<Selection>                  get_all_selections() override;
+
+    template <class Model>
+    void set_model(Model* model = nullptr) {
+        static_assert(std::is_base_of<QAbstractTableModel, Model>::value);
+
+        if (m_table_model == model) return;
+
+        for (auto const& c : m_connections) {
+            disconnect(c);
+        }
+
+        m_key_to_model_map.clear();
+        m_model_to_key_map.clear();
+        m_selections.clear();
+
+        m_table_model = model;
+
+        if (!m_table_model) return;
+
+        reconnect_standard(model);
+
+        if constexpr (std::is_base_of<AbstractTableInsertable, Model>::value) {
+            m_insertable = model;
+        }
+
+        if (model->columnCount() != 0) {
+            for (auto i = 0; i < model->rowCount(); i++) {
+                auto key = next_counter();
+                auto mi  = QPersistentModelIndex(model->index(i, 0));
+                m_key_to_model_map[key] = mi;
+                m_model_to_key_map[mi]  = key;
+            }
+        }
+
+        emit table_reset();
+    }
+
+private slots:
+    void act_model_destroy();
+    void act_model_reset();
+    void act_model_rows_inserted(QModelIndex, int, int);
+    void act_model_rows_removed(QModelIndex, int, int);
+    void act_model_data_changed(QModelIndex, QModelIndex, QVector<int>);
+};
+
+// This class is a delegate around simple variants. It's not very efficient, but
+// does the job.
+class VariantTableDelegate : public ServerTableDelegate {
+    Q_OBJECT
+
+    QStringList                 m_headers;
+    QHash<uint64_t, QCborArray> m_rows;
+    uint64_t                    m_counter = 0;
+
+    uint64_t next_counter();
+
+    void normalize_row(QCborArray&);
+    // new keys, new rows
+    std::pair<QCborArray, QCborArray> common_insert(QCborArray const& new_rows);
+
+
+    QHash<QString, Selection> m_selections;
+
+public:
+    VariantTableDelegate(QStringList column_names,
+                         QCborArray  initial_rows,
+                         QObject*    p);
+    virtual ~VariantTableDelegate();
+
+    QStringList                       get_headers() override;
+    std::pair<QCborArray, QCborArray> get_all_data() override;
+    QList<Selection>                  get_all_selections() override;
+
+    void handle_insert(QCborArray const& new_rows) override;
+    void handle_update(QCborArray const& keys, QCborArray const& rows) override;
+    void handle_deletion(QCborArray const& keys) override;
+    void handle_reset() override;
+    void handle_set_selection(Selection const&) override;
+};
+
+// class AbstractTableDelegate : public ServerTableDelegate {
+//     Q_OBJECT
+
+// protected:
+//     std::vector<TableColumn> m_columns;
+//     uint64_t                 m_counter = 0;
+
+//    std::unordered_map<int64_t, uint64_t> m_key_to_row_map;
+//    std::vector<int64_t>                  m_row_to_key_map;
+
+//    // how should selections handle key deletion?
+//    QHash<QString, Selection> m_selections;
+
+// protected:
+//     virtual TableQueryPtr handle_insert(QCborArray const& cols);
+//     virtual TableQueryPtr handle_update(QCborValue const& keys,
+//                                         QCborArray const& cols);
+//     virtual TableQueryPtr handle_deletion(QCborValue const& keys);
+//     virtual bool          handle_reset();
+//     virtual bool          handle_set_selection(Selection const&);
+
+// public:
+//     TableSource(QObject* p) : QObject(p) { }
+//     virtual ~TableSource();
+
+//    QStringList   get_headers();
+//    TableQueryPtr get_all_data();
+
+//    auto const& get_columns() const { return m_columns; }
+//    auto const& get_all_selections() const { return m_selections; }
+//    auto const& get_key_to_row_map() const { return m_key_to_row_map; }
+//    auto const& get_row_to_key_map() const { return m_row_to_key_map; }
+
+
+//    bool ask_insert(QCborArray const&); // list of lists
+//    bool ask_update(QCborValue const& keys,
+//                    QCborArray const&); // list of lists
+//    bool ask_delete(QCborValue const& keys);
+//    bool ask_clear();
+//    bool ask_update_selection(Selection const&);
+
+// signals:
+//     void table_reset();
+//     void table_selection_updated(noo::Selection const&);
+//     void table_row_updated(noo::TableQueryPtr);
+//     void table_row_deleted(noo::TableQueryPtr);
+// };
 
 ///
 /// \brief The TableData struct helps define a new table
@@ -713,7 +808,7 @@ struct TableData {
     QString name;
     QString meta;
 
-    std::shared_ptr<TableSource> source;
+    std::shared_ptr<ServerTableDelegate> source;
 };
 
 /// Create a new table
