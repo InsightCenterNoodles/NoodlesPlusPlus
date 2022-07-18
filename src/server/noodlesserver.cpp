@@ -81,6 +81,8 @@ void ClientT::send(QByteArray data) {
 
     m_socket->sendBinaryMessage(data);
 
+    qDebug() << QCborValue::fromCbor(data).toDiagnosticNotation();
+
     //    if (m_use_binary) {
     //        m_socket->sendBinaryMessage(data);
     //    } else {
@@ -143,7 +145,7 @@ std::unique_ptr<SMsgWriter> ServerT::get_table_subscribers_writer(TableT& t) {
 }
 
 void ServerT::broadcast(QByteArray ptr) {
-    for (ClientT* c : m_connected_clients) {
+    for (ClientT* c : qAsConst(m_connected_clients)) {
         c->send(ptr);
     }
 }
