@@ -93,6 +93,11 @@ inline bool from_cbor(QCborValue v, int64_t& s) {
     return true;
 }
 
+inline bool from_cbor(QCborValue v, float& s) {
+    s = v.toDouble();
+    return true;
+}
+
 inline bool from_cbor(QCborValue v, double& s) {
     s = v.toDouble();
     return true;
