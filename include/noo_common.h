@@ -28,6 +28,8 @@ NOO_STRING(sig, tbl_updated);
 NOO_STRING(sig, tbl_rows_removed);
 NOO_STRING(sig, tbl_selection_updated);
 
+NOO_STRING(sig, signal_attention);
+
 NOO_STRING(mthd, activate);
 NOO_STRING(mthd, get_activation_choices);
 

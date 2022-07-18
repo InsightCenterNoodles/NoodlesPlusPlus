@@ -474,9 +474,7 @@ void DocumentT::build_table_methods() {
         d.method_name   = noo::names::mthd_tbl_insert;
         d.documentation = "Request that given data be inserted into the table.";
         d.argument_documentation = {
-            { "[ col ]",
-              "A list of columns to insert. Columns must be the same length.",
-              QString() },
+            { "[ rows ]", "A list of rows to insert", QString() },
         };
         d.return_documentation = "None";
         d.set_code(table_data_insert);
@@ -492,7 +490,7 @@ void DocumentT::build_table_methods() {
         d.documentation = "Request that rows be updated with given data.";
         d.argument_documentation = {
             { "[keys]", "Integer list of keys to update", QString() },
-            { "[cols]", "Data to use to update the table", QString() },
+            { "[rows]", "Rows to use to update the table", QString() },
         };
         d.return_documentation = "None";
         d.set_code(table_data_update);
@@ -767,7 +765,7 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name   = "tbl_reset";
+        d.signal_name   = noo::names::sig_tbl_reset;
         d.documentation = "The table has been reset, and cleared.";
 
         m_builtin_signals[BuiltinSignals::TABLE_SIG_RESET] =
@@ -776,11 +774,11 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name      = "tbl_updated";
+        d.signal_name      = noo::names::sig_tbl_updated;
         d.documentation    = "Rows have been inserted or updated in the table";
         std::string args[] = {
             "[key]",
-            "[col]",
+            "[rows]",
         };
 
         m_builtin_signals[BuiltinSignals::TABLE_SIG_DATA_UPDATED] =
@@ -789,7 +787,7 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name      = "tbl_rows_removed";
+        d.signal_name      = noo::names::sig_tbl_rows_removed;
         d.documentation    = "Rows have been deleted from the table";
         std::string args[] = { "[key]" };
 
@@ -799,7 +797,7 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name      = "tbl_selection_updated";
+        d.signal_name      = noo::names::sig_tbl_selection_updated;
         d.documentation    = "A selection of the table has changed";
         std::string args[] = {
             "Selection ID",
@@ -812,7 +810,7 @@ void DocumentT::build_table_signals() {
 
     {
         SignalData d;
-        d.signal_name   = "signal_attention";
+        d.signal_name   = noo::names::sig_signal_attention;
         d.documentation = "User attention is requested. The two arguments may "
                           "be omitted from the signal.";
         std::string args[] = {
