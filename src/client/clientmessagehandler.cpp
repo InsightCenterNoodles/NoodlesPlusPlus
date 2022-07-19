@@ -301,6 +301,11 @@ static void process(noo::messages::MsgDocumentUpdate const& value,
 
     ms.state.document().update(dd);
 }
+static void process(noo::messages::MsgDocumentInitialized const& value,
+                    MessageState&                                ms) {
+    emit ms.state.server_done_init();
+}
+
 static void process(noo::messages::MsgDocumentReset const& value,
                     MessageState&                          ms) {
     ms.state.clear();

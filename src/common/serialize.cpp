@@ -928,6 +928,9 @@ void MsgDocumentUpdate::serialize(Archive& a) {
 }
 
 template <class Archive>
+void MsgDocumentInitialized::serialize(Archive&) { }
+
+template <class Archive>
 void MsgDocumentReset::serialize(Archive&) { }
 
 template <class Archive>
@@ -1035,6 +1038,8 @@ deserialize_server_message(int id, QCborValue v, ServerMessage& ret) {
     case MsgDocumentReset::MID: return extract_smsg<MsgDocumentReset>(v, ret);
     case MsgSignalInvoke::MID: return extract_smsg<MsgSignalInvoke>(v, ret);
     case MsgMethodReply::MID: return extract_smsg<MsgMethodReply>(v, ret);
+    case MsgDocumentInitialized::MID:
+        return extract_smsg<MsgDocumentInitialized>(v, ret);
     default: return false;
     }
 }

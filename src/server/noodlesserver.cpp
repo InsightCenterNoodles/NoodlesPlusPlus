@@ -184,13 +184,8 @@ class MessageHandler {
     DocumentT&    get_document() { return *get_state().document(); }
 
     template <class List>
-    void dump_list(List& l) {
-        l.for_all([this](auto& item) {
-            auto w = m_server->get_single_client_writer(m_client);
-
-            item.write_new_to(*w);
-            // TODO: Pack into a single message!
-        });
+    void dump_list(List& l, SMsgWriter& w) {
+        l.for_all([this, &w](auto& item) { item.write_new_to(w); });
     }
 
     void handle(messages::MsgIntroduction const& m) {
@@ -205,21 +200,23 @@ class MessageHandler {
 
         auto& d = get_document();
 
-        dump_list(d.method_list());
-        dump_list(d.signal_list());
-        dump_list(d.light_list());
-        dump_list(d.buffer_list());
-        dump_list(d.buffer_view_list());
-        dump_list(d.sampler_list());
-        dump_list(d.image_list());
-        dump_list(d.tex_list());
-        dump_list(d.mat_list());
-        dump_list(d.mesh_list());
-        dump_list(d.table_list());
-        dump_list(d.obj_list());
-
         auto w = m_server->get_single_client_writer(m_client);
+
+        dump_list(d.method_list(), *w);
+        dump_list(d.signal_list(), *w);
+        dump_list(d.light_list(), *w);
+        dump_list(d.buffer_list(), *w);
+        dump_list(d.buffer_view_list(), *w);
+        dump_list(d.sampler_list(), *w);
+        dump_list(d.image_list(), *w);
+        dump_list(d.tex_list(), *w);
+        dump_list(d.mat_list(), *w);
+        dump_list(d.mesh_list(), *w);
+        dump_list(d.table_list(), *w);
+        dump_list(d.obj_list(), *w);
+
         get_document().write_refresh(*w);
+        w->add(messages::MsgDocumentInitialized {});
     }
 
 

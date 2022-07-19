@@ -123,6 +123,8 @@ public:
 
 
 class InternalClientState : public QObject {
+    Q_OBJECT
+
     QWebSocket& m_socket;
 
     std::shared_ptr<DocumentDelegate> m_document;
@@ -206,15 +208,18 @@ public:
 
     void clear();
 
+signals:
+    void server_done_init();
+
 public slots:
     void on_new_binary_message(QByteArray m);
     void on_new_text_message(QString t);
 
     // Takes ownership of the reply!
     void on_method_ask_invoke(noo::MethodID,
-                              MethodContextPtr,
+                              nooc::MethodContextPtr,
                               QCborArray const&,
-                              PendingMethodReply*);
+                              nooc::PendingMethodReply*);
 };
 
 } // namespace nooc

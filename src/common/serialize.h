@@ -607,6 +607,13 @@ struct MsgDocumentReset {
     void serialize(Archive&);
 };
 
+struct MsgDocumentInitialized {
+    MSGID(35);
+
+    template <class Archive>
+    void serialize(Archive&);
+};
+
 // Communication Messages ======================================================
 
 struct MsgSignalInvoke {
@@ -674,7 +681,8 @@ struct ServerMessage : std::variant<MsgMethodCreate,
                                     MsgDocumentUpdate,
                                     MsgDocumentReset,
                                     MsgSignalInvoke,
-                                    MsgMethodReply> {
+                                    MsgMethodReply,
+                                    MsgDocumentInitialized> {
     using variant::variant;
 };
 

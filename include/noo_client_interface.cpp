@@ -1573,6 +1573,7 @@ AttachedSignalList const& DocumentDelegate::attached_signals() const {
 // =============================================================================
 
 class ClientCore : public QObject {
+
     ClientConnection* m_owning_connection;
 
     ClientDelegates m_makers;
@@ -1661,11 +1662,18 @@ private slots:
         m_connecting = false;
         m_state.emplace(m_socket, m_makers);
         emit m_owning_connection->connected();
+
+        connect(&m_state.value(),
+                &InternalClientState::server_done_init,
+                this,
+                &ClientCore::on_server_done_init);
     }
     void socket_closed() {
         emit m_owning_connection->disconnected();
         m_state.reset();
     }
+
+    void on_server_done_init() { emit m_owning_connection->initialized(); }
 };
 
 

@@ -1388,6 +1388,9 @@ signals:
     /// Issued when the connection is open and ready.
     void connected();
 
+    /// Issued when the server has sent all the initial scene state
+    void initialized();
+
     /// Issued when we (or the server) close the connection.
     void disconnected();
 };
