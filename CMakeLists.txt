@@ -79,15 +79,13 @@ if (NOT NOO_LOCAL_GLM)
 ENDIF()
 
 
-find_package(Qt6 COMPONENTS Gui Widgets Core Websockets)
+find_package(Qt6 COMPONENTS Gui Widgets Core WebSockets)
 
 if (NOT Qt6_FOUND)
-    find_package(Qt5 5.15 COMPONENTS Gui Widgets Core WebSockets)
-    # universal targets were not added till 5.15
-    target_link_libraries(noodles PUBLIC Qt5::Core Qt5::WebSockets Qt5::Gui)
-else()
-    target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
+    find_package(Qt5 5.15 COMPONENTS Gui Widgets Core WebSockets REQUIRED)
 endif()
+
+target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
 
 add_subdirectory(src)
 
