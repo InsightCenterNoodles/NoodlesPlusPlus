@@ -5,6 +5,7 @@
 
 #include <deque>
 
+#include <QNetworkAccessManager>
 #include <QObject>
 #include <QPointer>
 #include <QWebSocket>

@@ -3,6 +3,8 @@
 
 #include "include/noo_client_interface.h"
 
+#include <QNetworkAccessManager>
+
 namespace nooc {
 
 class SubscribeInitReply : public PendingMethodReply {
@@ -29,7 +31,11 @@ public:
 
 private slots:
     void on_finished();
+
+#ifndef Q_NO_SSL
     void on_ssl_error(QList<QSslError> const&);
+#endif
+
 signals:
     void completed(QByteArray);
     void error(QString);

@@ -7,12 +7,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <qimage.h>
-#include <qline.h>
-#include <qnetworkaccessmanager.h>
-#include <qobject.h>
-#include <qobjectdefs.h>
-#include <qsslerror.h>
 #include <span>
 
 #include <QCborMap>
