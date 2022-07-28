@@ -9,6 +9,8 @@
 #include <qtcpsocket.h>
 #include <quuid.h>
 
+namespace noo {
+
 struct QTcpServer;
 
 // This whole class is going to be nuked when Qt gets a nice HTTP server.
@@ -47,7 +49,8 @@ class AssetStorage : public QObject {
     QHash<QUuid, QByteArray> m_assets;
 
 public:
-    explicit AssetStorage(quint16 port, QObject* parent = nullptr);
+    explicit AssetStorage(ServerOptions const& options,
+                          QObject*             parent = nullptr);
 
     bool is_ready() const;
 
@@ -58,3 +61,5 @@ public:
 private slots:
     void handle_new_connection();
 };
+
+} // namespace noo

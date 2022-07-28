@@ -9,6 +9,7 @@
 #include <glm/gtx/component_wise.hpp>
 
 #include <QBuffer>
+#include <QCommandLineParser>
 #include <QDebug>
 #include <QFile>
 
@@ -98,10 +99,69 @@ SignalTPtr create_signal(DocumentT* server, SignalData const& data) {
     return server->signal_list().provision_next(data);
 }
 
-// Server
+// Server ======================================================================
 std::shared_ptr<ServerT> create_server(ServerOptions const& options) {
     return std::make_shared<ServerT>(options.port);
 }
+
+std::shared_ptr<ServerT> create_server(QCommandLineParser& parser) {
+    QCommandLineOption debug_option(
+        "d", QCoreApplication::translate("main", "Enable debug output."));
+
+    QCommandLineOption port_option(
+        "p",
+        QCoreApplication::translate("main", "Port number to use."),
+        "port",
+        "50000");
+
+    QCommandLineOption asset_port_option(
+        "ap",
+        QCoreApplication::translate("main", "Asset server port number to use."),
+        "port",
+        "50001");
+
+    QCommandLineOption asset_host_option(
+        "ah",
+        QCoreApplication::translate(
+            "main", "Asset server host name to use (automatic by default)"),
+        "hostname",
+        "");
+
+    parser.addOption(debug_option);
+    parser.addOption(port_option);
+    parser.addOption(asset_port_option);
+    parser.addOption(asset_host_option);
+
+    parser.process(*QCoreApplication::instance());
+
+    {
+        bool use_debug = parser.isSet(debug_option);
+
+        if (!use_debug) { QLoggingCategory::setFilterRules("*.debug=false"); }
+    }
+
+    auto get_port_opt =
+        [](QCommandLineOption const& opt) -> std::optional<uint16_t> {
+        bool ok;
+        auto value = parser.value(port_option).toInt(&ok);
+        if (ok and value > 0 and value < std::numeric_limits<uint16_t>::max()) {
+            return new_port;
+        }
+        return {};
+    }
+
+    ServerOptions options;
+    options.port = get_port_opt(port_option).value_or(options.port);
+
+    if (auto ap = get_port_opt(asset_port_option); ap and *ap != options.port) {
+        options.asset_port = *ap;
+    }
+
+    options.asset_hostname = parser.value(asset_host_option);
+
+    return create_server(options);
+}
+
 
 // Document ====================================================================
 DocumentTPtr get_document(ServerT* server) {

@@ -10,6 +10,7 @@
 #include <qurl.h>
 #include <quuid.h>
 
+namespace noo {
 
 // Request handling ============================================================
 
@@ -175,7 +176,7 @@ void AssetRequest::on_data() {
     execute_reply(HTTPResponse { .code = ResponseCode::OK, .asset = asset }, p);
 }
 
-AssetStorage::AssetStorage(quint16 port, QObject* parent)
+AssetStorage::AssetStorage(ServerOptions const& options, QObject* parent)
     : QObject(parent), m_server(new QTcpServer(this)) {
 
     connect(m_server,
@@ -183,7 +184,7 @@ AssetStorage::AssetStorage(quint16 port, QObject* parent)
             this,
             &AssetStorage::handle_new_connection);
 
-    bool ok = m_server->listen(QHostAddress::Any, port);
+    bool ok = m_server->listen(QHostAddress::Any, options.asset_port);
 
     if (!ok) {
         qCritical() << "Unable to open the asset server on the requested port.";
@@ -251,3 +252,5 @@ void AssetStorage::handle_new_connection() {
 
     auto* handler = new AssetRequest(socket, this);
 }
+
+} // namespace noo

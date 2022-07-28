@@ -23,6 +23,8 @@
 #include <variant>
 #include <vector>
 
+class QCommandLineParser;
+
 namespace noo {
 
 ///
@@ -220,11 +222,19 @@ SignalTPtr create_signal(DocumentT*, SignalData const&);
 // Server ======================================================================
 
 struct ServerOptions {
-    uint16_t port = 50000;
+    uint16_t port       = 50000;
+    uint16_t asset_port = 50001;
+    QString  asset_hostname; //< If blank, automatic
 };
 
 /// Create a new server, which uses a WebSocket to listen on the given port.
 std::shared_ptr<ServerT> create_server(ServerOptions const&);
+
+/// Create a server from common command line options
+/// Set up the parser with application information first.
+/// This function will process arguments, and can then be checked afterwards for
+/// custom arguments.
+std::shared_ptr<ServerT> create_server(QCommandLineParser&);
 
 // Document ====================================================================
 

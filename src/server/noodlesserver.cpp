@@ -94,15 +94,17 @@ void ClientT::send(QByteArray data) {
 // =============================================================================
 
 
-ServerT::ServerT(quint16 port, QObject* parent) : QObject(parent) {
+ServerT::ServerT(ServerOptions const& options, QObject* parent)
+    : QObject(parent) {
 
-    m_state = new NoodlesState(this, port + 1);
+    m_state = new NoodlesState(this, options);
 
     m_socket_server = new QWebSocketServer(QStringLiteral("Noodles Server"),
                                            QWebSocketServer::NonSecureMode,
                                            this);
 
-    bool is_listening = m_socket_server->listen(QHostAddress::Any, port);
+    bool is_listening =
+        m_socket_server->listen(QHostAddress::Any, options.port);
 
     if (!is_listening) return;
 
