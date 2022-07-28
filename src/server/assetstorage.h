@@ -2,16 +2,15 @@
 
 #include <QHash>
 #include <QObject>
+#include <QPointer>
+#include <QTcpSocket>
 #include <QUuid>
-#include <qobject.h>
-#include <qobjectdefs.h>
-#include <qpointer.h>
-#include <qtcpsocket.h>
-#include <quuid.h>
+
+struct QTcpServer;
 
 namespace noo {
 
-struct QTcpServer;
+class ServerOptions;
 
 // This whole class is going to be nuked when Qt gets a nice HTTP server.
 // There is one in the works, but it seems to be somewhat unstable at this time.

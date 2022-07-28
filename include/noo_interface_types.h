@@ -1,5 +1,4 @@
-#ifndef INTERFACE_TYPES_H
-#define INTERFACE_TYPES_H
+#pragma once
 
 #include "noo_id.h"
 #include "noo_include_glm.h"
@@ -338,5 +337,3 @@ struct BoundingBox {
 
 
 } // namespace noo
-
-#endif // INTERFACE_TYPES_H

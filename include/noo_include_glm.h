@@ -1,10 +1,10 @@
-#ifndef INCLUDE_GLM_H
-#define INCLUDE_GLM_H
+#pragma once
 
 /// \file Normalize include of GLM with all desired options
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-volatile"
+#ifdef __clang__
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wdeprecated-volatile"
+#endif
 
 #define GLM_ENABLE_EXPERIMENTAL
 
@@ -14,6 +14,6 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#pragma GCC diagnostic pop
-
-#endif // INCLUDE_GLM_H
+#ifdef __clang__
+#    pragma GCC diagnostic pop
+#endif

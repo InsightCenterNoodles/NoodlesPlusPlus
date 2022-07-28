@@ -1,5 +1,4 @@
-#ifndef BUFFERLIST_H
-#define BUFFERLIST_H
+#pragma once
 
 #include "componentlistbase.h"
 #include "include/noo_id.h"
@@ -79,5 +78,3 @@ public:
 };
 
 } // namespace noo
-
-#endif // BUFFERLIST_H

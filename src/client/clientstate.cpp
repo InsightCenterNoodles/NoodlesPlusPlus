@@ -2,7 +2,6 @@
 
 #include "clientmessagehandler.h"
 #include "src/common/variant_tools.h"
-#include "src/generated/interface_tools.h"
 
 #include <QUuid>
 
@@ -36,6 +35,7 @@ InternalClientState::InternalClientState(QWebSocket& s, ClientDelegates& makers)
 
     connect(&m_socket,
             QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
+            this,
             [&](QAbstractSocket::SocketError) {
                 qCritical()
                     << "Error from websocket!" << m_socket.errorString();
@@ -85,7 +85,7 @@ void InternalClientState::on_new_binary_message(QByteArray m) {
     process_message(m_socket, *this, m);
 }
 void InternalClientState::on_new_text_message(QString t) {
-    // we cant handle text yet.
+    // Assuming it is JSON
     qWarning() << "Unexpected text from server" << t;
 }
 

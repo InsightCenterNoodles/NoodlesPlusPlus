@@ -158,7 +158,7 @@ void ServerT::on_new_connection() {
 
     ClientT* client = new ClientT(socket, this);
 
-    qInfo() << "New client: " << socket->origin();
+    qInfo() << "New client: " << socket->peerAddress();
 
     connect(client, &ClientT::finished, this, &ServerT::on_client_done);
     connect(client, &ClientT::message_recvd, this, &ServerT::on_client_message);

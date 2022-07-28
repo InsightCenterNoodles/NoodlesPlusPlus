@@ -12,6 +12,7 @@
 #include <QCommandLineParser>
 #include <QDebug>
 #include <QFile>
+#include <QLoggingCategory>
 
 #include <fstream>
 #include <sstream>
@@ -101,7 +102,7 @@ SignalTPtr create_signal(DocumentT* server, SignalData const& data) {
 
 // Server ======================================================================
 std::shared_ptr<ServerT> create_server(ServerOptions const& options) {
-    return std::make_shared<ServerT>(options.port);
+    return std::make_shared<ServerT>(options);
 }
 
 std::shared_ptr<ServerT> create_server(QCommandLineParser& parser) {
@@ -141,14 +142,14 @@ std::shared_ptr<ServerT> create_server(QCommandLineParser& parser) {
     }
 
     auto get_port_opt =
-        [](QCommandLineOption const& opt) -> std::optional<uint16_t> {
+        [&parser](QCommandLineOption const& opt) -> std::optional<uint16_t> {
         bool ok;
-        auto value = parser.value(port_option).toInt(&ok);
+        auto value = parser.value(opt).toInt(&ok);
         if (ok and value > 0 and value < std::numeric_limits<uint16_t>::max()) {
-            return new_port;
+            return value;
         }
         return {};
-    }
+    };
 
     ServerOptions options;
     options.port = get_port_opt(port_option).value_or(options.port);

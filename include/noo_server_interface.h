@@ -1,5 +1,4 @@
-#ifndef NOO_SERVER_INTERFACE_H
-#define NOO_SERVER_INTERFACE_H
+#pragma once
 
 #include "noo_common.h"
 #include "noo_include_glm.h"
@@ -763,54 +762,6 @@ public:
     void handle_set_selection(Selection const&) override;
 };
 
-// class AbstractTableDelegate : public ServerTableDelegate {
-//     Q_OBJECT
-
-// protected:
-//     std::vector<TableColumn> m_columns;
-//     uint64_t                 m_counter = 0;
-
-//    std::unordered_map<int64_t, uint64_t> m_key_to_row_map;
-//    std::vector<int64_t>                  m_row_to_key_map;
-
-//    // how should selections handle key deletion?
-//    QHash<QString, Selection> m_selections;
-
-// protected:
-//     virtual TableQueryPtr handle_insert(QCborArray const& cols);
-//     virtual TableQueryPtr handle_update(QCborValue const& keys,
-//                                         QCborArray const& cols);
-//     virtual TableQueryPtr handle_deletion(QCborValue const& keys);
-//     virtual bool          handle_reset();
-//     virtual bool          handle_set_selection(Selection const&);
-
-// public:
-//     TableSource(QObject* p) : QObject(p) { }
-//     virtual ~TableSource();
-
-//    QStringList   get_headers();
-//    TableQueryPtr get_all_data();
-
-//    auto const& get_columns() const { return m_columns; }
-//    auto const& get_all_selections() const { return m_selections; }
-//    auto const& get_key_to_row_map() const { return m_key_to_row_map; }
-//    auto const& get_row_to_key_map() const { return m_row_to_key_map; }
-
-
-//    bool ask_insert(QCborArray const&); // list of lists
-//    bool ask_update(QCborValue const& keys,
-//                    QCborArray const&); // list of lists
-//    bool ask_delete(QCborValue const& keys);
-//    bool ask_clear();
-//    bool ask_update_selection(Selection const&);
-
-// signals:
-//     void table_reset();
-//     void table_selection_updated(noo::Selection const&);
-//     void table_row_updated(noo::TableQueryPtr);
-//     void table_row_deleted(noo::TableQueryPtr);
-// };
-
 ///
 /// \brief The TableData struct helps define a new table
 ///
@@ -972,5 +923,3 @@ void issue_signal(C* ctx, S const& s, Args&&... args) {
 }
 
 } // namespace noo
-
-#endif // INTERFACE_H

@@ -1,5 +1,4 @@
-#ifndef MATERIALLIST_H
-#define MATERIALLIST_H
+#pragma once
 
 #include "componentlistbase.h"
 #include "include/noo_id.h"
@@ -28,5 +27,3 @@ public:
 };
 
 } // namespace noo
-
-#endif // MATERIALLIST_H

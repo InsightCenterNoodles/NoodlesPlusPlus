@@ -1,14 +1,15 @@
 #include "assetstorage.h"
 
+#include "include/noo_server_interface.h"
+
+#include <QHostAddress>
 #include <QNetworkInterface>
+#include <QObject>
 #include <QTcpServer>
 #include <QTcpSocket>
-#include <qglobal.h>
-#include <qhostaddress.h>
-#include <qobject.h>
-#include <qtcpsocket.h>
-#include <qurl.h>
-#include <quuid.h>
+#include <QUrl>
+#include <QUuid>
+#include <QtGlobal>
 
 namespace noo {
 
@@ -176,6 +177,24 @@ void AssetRequest::on_data() {
     execute_reply(HTTPResponse { .code = ResponseCode::OK, .asset = asset }, p);
 }
 
+static QString determine_default_host() {
+    QString ip_address;
+
+    auto ip_list = QNetworkInterface::allAddresses();
+
+    for (auto const& ha : ip_list) {
+        if (ha != QHostAddress::LocalHost and ha.toIPv4Address()) {
+            ip_address = ha.toString();
+            break;
+        }
+    }
+
+    if (ip_address.isEmpty()) {
+        ip_address = QHostAddress(QHostAddress::LocalHost).toString();
+    }
+    return ip_address;
+}
+
 AssetStorage::AssetStorage(ServerOptions const& options, QObject* parent)
     : QObject(parent), m_server(new QTcpServer(this)) {
 
@@ -194,24 +213,14 @@ AssetStorage::AssetStorage(ServerOptions const& options, QObject* parent)
 
     // determine an IP address for users
 
-    QString ip_address;
+    QString ip_address = options.asset_hostname.isEmpty()
+                             ? determine_default_host()
+                             : options.asset_hostname;
 
-    auto ip_list = QNetworkInterface::allAddresses();
+    m_host_info =
+        QString("http://%1:%2/").arg(ip_address).arg(options.asset_port);
 
-    for (auto const& ha : ip_list) {
-        if (ha != QHostAddress::LocalHost and ha.toIPv4Address()) {
-            ip_address = ha.toString();
-            break;
-        }
-    }
-
-    if (ip_address.isEmpty()) {
-        ip_address = QHostAddress(QHostAddress::LocalHost).toString();
-    }
-
-    m_host_info = QString("http://%1:%2/").arg(ip_address).arg(port);
-
-    qInfo() << "Asset storage on" << m_host_info;
+    qInfo() << "Asset storage at" << m_host_info;
 }
 
 bool AssetStorage::is_ready() const {
@@ -233,7 +242,7 @@ std::pair<QUuid, QUrl> AssetStorage::register_asset(QByteArray arr) {
 
     QUrl url(m_host_info + ref);
 
-    qDebug() << "New asset at" << new_id << url;
+    qDebug() << "New asset" << new_id << "at" << url << arr.size() << "bytes";
 
     return { new_id, url };
 }
@@ -251,6 +260,8 @@ void AssetStorage::handle_new_connection() {
     connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
 
     auto* handler = new AssetRequest(socket, this);
+
+    Q_UNUSED(handler);
 }
 
 } // namespace noo

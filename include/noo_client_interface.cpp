@@ -1574,7 +1574,7 @@ AttachedSignalList const& DocumentDelegate::attached_signals() const {
 
 class ClientCore : public QObject {
 
-    ClientConnection* m_owning_connection;
+    Client* m_owning_connection;
 
     ClientDelegates m_makers;
 
@@ -1584,9 +1584,7 @@ class ClientCore : public QObject {
     QWebSocket m_socket;
 
 public:
-    ClientCore(ClientConnection* conn,
-               QUrl const&       url,
-               ClientDelegates&& makers)
+    ClientCore(Client* conn, QUrl const& url, ClientDelegates&& makers)
         : m_owning_connection(conn), m_makers(std::move(makers)) {
         connect(&m_socket,
                 &QWebSocket::connected,
@@ -1598,10 +1596,16 @@ public:
                 &ClientCore::socket_closed);
         connect(&m_socket,
                 QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::error),
+                m_owning_connection,
                 [=](QAbstractSocket::SocketError) {
                     emit m_owning_connection->socket_error(
                         m_socket.errorString());
                 });
+
+        connect(&m_socket,
+                &QWebSocket::binaryMessageReceived,
+                m_owning_connection,
+                &Client::on_raw_message);
 
 
         m_socket.open(url);
@@ -1678,7 +1682,7 @@ private slots:
 
 
 std::unique_ptr<ClientCore>
-create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
+create_client(Client* conn, QUrl server, ClientDelegates&& d) {
 
 #define CREATE_DEFAULT(E, ID, DATA, DEL)                                       \
     if (!d.E) {                                                                \
@@ -1709,61 +1713,61 @@ create_client(ClientConnection* conn, QUrl server, ClientDelegates&& d) {
     return std::make_unique<ClientCore>(conn, server, std::move(d));
 }
 
-ClientConnection::ClientConnection(QObject* parent) : QObject(parent) { }
-ClientConnection::~ClientConnection() = default;
+Client::Client(QObject* parent) : QObject(parent) { }
+Client::~Client() = default;
 
-void ClientConnection::open(QUrl server, ClientDelegates&& delegates) {
-    if (m_data) {
-        if (m_data->is_connecting()) { return; }
-
-        // disconnect current connection
-        m_data.reset();
-    }
+void Client::open(QUrl server, ClientDelegates&& delegates) {
+    // disconnect current connection, if any
+    m_data.reset();
 
     m_data = create_client(this, server, std::move(delegates));
 }
 
-TextureDelegate* ClientConnection::get(noo::TextureID id) {
+void Client::disconnect() {
+    m_data.reset();
+}
+
+TextureDelegate* Client::get(noo::TextureID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-BufferDelegate* ClientConnection::get(noo::BufferID id) {
+BufferDelegate* Client::get(noo::BufferID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-TableDelegate* ClientConnection::get(noo::TableID id) {
+TableDelegate* Client::get(noo::TableID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-LightDelegate* ClientConnection::get(noo::LightID id) {
+LightDelegate* Client::get(noo::LightID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-MaterialDelegate* ClientConnection::get(noo::MaterialID id) {
+MaterialDelegate* Client::get(noo::MaterialID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-MeshDelegate* ClientConnection::get(noo::GeometryID id) {
+MeshDelegate* Client::get(noo::GeometryID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-EntityDelegate* ClientConnection::get(noo::EntityID id) {
+EntityDelegate* Client::get(noo::EntityID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-SignalDelegate* ClientConnection::get(noo::SignalID id) {
+SignalDelegate* Client::get(noo::SignalID id) {
     if (!m_data) return {};
 
     return m_data->get(id);
 }
-MethodDelegate* ClientConnection::get(noo::MethodID id) {
+MethodDelegate* Client::get(noo::MethodID id) {
     if (!m_data) return {};
 
     return m_data->get(id);

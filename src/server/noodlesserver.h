@@ -1,5 +1,4 @@
-#ifndef NOODLESSERVER_H
-#define NOODLESSERVER_H
+#pragma once
 
 #include "include/noo_id.h"
 
@@ -22,6 +21,7 @@ class SMsgWriter;
 class NoodlesState;
 class TableT;
 class DocumentT;
+class ServerOptions;
 
 class IncomingMessage;
 
@@ -69,7 +69,7 @@ class ServerT : public QObject {
 
 
 public:
-    explicit ServerT(quint16 port, QObject* parent = nullptr);
+    explicit ServerT(ServerOptions const& options, QObject* parent = nullptr);
 
     quint16 port() const;
 
@@ -92,5 +92,3 @@ signals:
 };
 
 } // namespace noo
-
-#endif // NOODLESSERVER_H

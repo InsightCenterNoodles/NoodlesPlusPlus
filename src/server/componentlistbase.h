@@ -1,5 +1,4 @@
-#ifndef COMPONENTLISTBASE_H
-#define COMPONENTLISTBASE_H
+#pragma once
 
 #include "src/common/serialize.h"
 
@@ -162,5 +161,3 @@ ServerT* server_from_component(Comp* c) {
 }
 
 } // namespace noo
-
-#endif // COMPONENTLISTBASE_H

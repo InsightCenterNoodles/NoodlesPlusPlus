@@ -1352,16 +1352,20 @@ class ClientCore;
 /// Delegates here should never be deleted manually; lifetimes are managed by
 /// this library instead!
 ///
-class ClientConnection : public QObject {
+class Client : public QObject {
     Q_OBJECT
     std::unique_ptr<ClientCore> m_data;
 
 public:
-    ClientConnection(QObject* parent = nullptr);
-    ~ClientConnection();
+    Client(QObject* parent = nullptr);
+    ~Client();
 
-    /// Open a new connection to a server, with the supplied clients.
+    /// (re)open a new connection to a server.
+    /// Existing delegates are destroyed.
     void open(QUrl server, ClientDelegates&&);
+
+    /// Disconnect from the server
+    void disconnect();
 
     // translate given IDs to the noodles object.
     TextureDelegate*  get(noo::TextureID);
@@ -1387,6 +1391,9 @@ signals:
 
     /// Issued when we (or the server) close the connection.
     void disconnected();
+
+    /// Provides access to raw messages from the server
+    void on_raw_message(QByteArray);
 };
 
 } // namespace nooc
