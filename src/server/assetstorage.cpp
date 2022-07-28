@@ -129,7 +129,9 @@ void AssetRequest::on_data() {
 
     auto info = parse_headers(m_request);
 
-    qInfo() << "New request" << info.action << info.path;
+    qInfo() << "New request:" << info.action << info.path;
+
+    qDebug() << "Headers:" << info.headers;
 
     // action had better be...
 

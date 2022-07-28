@@ -1054,7 +1054,7 @@ QVector<ServerMessage> deserialize_server(QByteArray bytes) {
         return {};
     }
 
-    qDebug() << message_list;
+    // qDebug() << message_list;
 
     QVector<ServerMessage> ret;
 
@@ -1124,7 +1124,7 @@ QVector<ClientMessage> deserialize_client(QByteArray bytes) {
         return {};
     }
 
-    qDebug() << message_list;
+    // qDebug() << message_list;
 
     QVector<ClientMessage> ret;
 

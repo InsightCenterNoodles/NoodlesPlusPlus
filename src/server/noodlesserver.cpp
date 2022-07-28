@@ -81,7 +81,7 @@ void ClientT::send(QByteArray data) {
 
     m_socket->sendBinaryMessage(data);
 
-    qDebug() << QCborValue::fromCbor(data).toDiagnosticNotation();
+    // qDebug() << QCborValue::fromCbor(data).toDiagnosticNotation();
 
     //    if (m_use_binary) {
     //        m_socket->sendBinaryMessage(data);

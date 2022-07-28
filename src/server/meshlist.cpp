@@ -7,8 +7,6 @@
 #include "src/common/serialize.h"
 #include "src/generated/interface_tools.h"
 
-#include <magic_enum.hpp>
-
 #include <QDebug>
 
 namespace noo {
