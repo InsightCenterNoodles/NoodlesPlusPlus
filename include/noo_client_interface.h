@@ -921,7 +921,7 @@ public:
 
     uint64_t count;
 
-    QPointer<Index> indicies;
+    QPointer<Index> indices;
 
     noo::PrimitiveType type;
 

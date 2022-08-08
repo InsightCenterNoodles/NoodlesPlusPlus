@@ -909,11 +909,11 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
     count = m.vertex_count;
 
     if (m.indices) {
-        indicies = new Index(m.indices.value(), state);
-        indicies->setParent(this);
-        m_unready_buffers += !indicies->view->is_data_ready();
+        indices = new Index(m.indices.value(), state);
+        indices->setParent(this);
+        m_unready_buffers += !indices->view->is_data_ready();
 
-        connect(indicies->view,
+        connect(indices->view,
                 &BufferViewDelegate::data_ready,
                 this,
                 &MeshPatch::on_buffer_ready);
