@@ -2,6 +2,8 @@
 
 #include "include/noo_server_interface.h"
 
+//#include <quazip/quazip.h>
+
 #include <QHostAddress>
 #include <QNetworkInterface>
 #include <QObject>

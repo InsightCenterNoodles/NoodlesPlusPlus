@@ -526,7 +526,7 @@ struct Index {
 struct GeometryPatch {
     QVector<Attribute>   attributes;
     uint64_t             vertex_count;
-    std::optional<Index> indicies;
+    std::optional<Index> indices;
     PrimitiveType        type;
     MaterialID           material;
 

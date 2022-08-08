@@ -38,6 +38,11 @@ private slots:
     void on_data();
 };
 
+class Asset {
+    QByteArray normal_asset;
+    QByteArray compressed;
+};
+
 class AssetStorage : public QObject {
     Q_OBJECT
 

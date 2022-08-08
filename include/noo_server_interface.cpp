@@ -221,7 +221,7 @@ pack_mesh_source(MeshSource const& refs) {
 
     qDebug() << Q_FUNC_INFO;
 
-    if (refs.indicies.empty()) return std::nullopt;
+    if (refs.indices.empty()) return std::nullopt;
     if (refs.positions.empty()) return std::nullopt;
 
     PackedMeshDataResult ret;
@@ -326,7 +326,7 @@ pack_mesh_source(MeshSource const& refs) {
     std::span<std::byte const> index_copy_from;
 
     {
-        index_copy_from = std::as_bytes(refs.indicies);
+        index_copy_from = std::as_bytes(refs.indices);
         index_ref.size  = index_copy_from.size();
 
         ret.format = refs.index_format;
@@ -352,7 +352,7 @@ pack_mesh_source(MeshSource const& refs) {
             break;
         }
 
-        ret.icount = refs.indicies.size() / base_size;
+        ret.icount = refs.indices.size() / base_size;
     }
 
     qDebug() << "Packed index" << index_copy_from.size();
@@ -388,7 +388,7 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
                 VCASE(MeshSource const& b)->uint64_t {
                     return b.positions.size_bytes() + b.normals.size_bytes() +
                            b.textures.size_bytes() + b.colors.size_bytes() +
-                           b.indicies.size_bytes();
+                           b.indices.size_bytes();
                 });
         }
 
@@ -473,7 +473,7 @@ BufferDirectory create_directory(DocumentTPtrRef doc, BufferSources sources) {
             patch.material     = minfo.material;
             patch.vertex_count = minfo.vcount;
 
-            auto& new_index = patch.indicies.emplace();
+            auto& new_index = patch.indices.emplace();
 
             // what format to use?
 

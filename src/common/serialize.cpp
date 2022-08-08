@@ -882,7 +882,7 @@ template <class Archive>
 void GeometryPatch::serialize(Archive& a) {
     NOONVP(attributes);
     NOONVP(vertex_count);
-    NOONVP(indicies);
+    NOONVP(indices);
     NOONVP(type);
     NOONVP(material);
 }

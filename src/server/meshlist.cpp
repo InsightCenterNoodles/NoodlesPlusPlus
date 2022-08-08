@@ -34,9 +34,9 @@ void MeshT::write_new_to(SMsgWriter& w) {
 
         if (patch.material) geom_patch.material = patch.material->id();
 
-        if (patch.indicies) {
-            auto const& src = *patch.indicies;
-            auto&       ind = geom_patch.indicies.emplace();
+        if (patch.indices) {
+            auto const& src = *patch.indices;
+            auto&       ind = geom_patch.indices.emplace();
             ind.view        = src.view->id();
             ind.format      = src.format;
             ind.stride      = src.stride;

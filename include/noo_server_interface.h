@@ -500,7 +500,7 @@ struct MeshPatch {
 
     uint64_t vertex_count = 0;
 
-    std::optional<Index> indicies;
+    std::optional<Index> indices;
 
     PrimitiveType type;
 
@@ -545,7 +545,7 @@ struct MeshSource {
     std::span<glm::u8vec4 const>  colors;
 
     // Index data
-    std::span<std::byte const> indicies;
+    std::span<std::byte const> indices;
 
     Format index_format = Format::U16;
 

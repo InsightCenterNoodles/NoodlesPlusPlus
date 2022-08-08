@@ -908,8 +908,8 @@ MeshPatch::MeshPatch(noo::messages::GeometryPatch const& m,
 
     count = m.vertex_count;
 
-    if (m.indicies) {
-        indicies = new Index(m.indicies.value(), state);
+    if (m.indices) {
+        indicies = new Index(m.indices.value(), state);
         indicies->setParent(this);
         m_unready_buffers += !indicies->view->is_data_ready();
 
