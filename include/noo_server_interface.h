@@ -196,8 +196,9 @@ class MethodT;
 using MethodTPtr = std::shared_ptr<MethodT>;
 
 /// Create a new method.
-MethodTPtr create_method(DocumentTPtrRef, MethodData const&);
-MethodTPtr create_method(DocumentT*, MethodData const&);
+MethodTPtr        create_method(DocumentTPtrRef, MethodData const&);
+MethodTPtr        create_method(DocumentT*, MethodData const&);
+MethodData const& method_data(MethodTPtr);
 
 
 // Signals =====================================================================
@@ -215,8 +216,9 @@ class SignalT;
 using SignalTPtr = std::shared_ptr<SignalT>;
 
 /// Create a new signal.
-SignalTPtr create_signal(DocumentTPtrRef, SignalData const&);
-SignalTPtr create_signal(DocumentT*, SignalData const&);
+SignalTPtr        create_signal(DocumentTPtrRef, SignalData const&);
+SignalTPtr        create_signal(DocumentT*, SignalData const&);
+SignalData const& signal_data(SignalTPtr);
 
 // Server ======================================================================
 
@@ -283,7 +285,9 @@ BufferTPtr create_buffer(DocumentTPtrRef, BufferData const&);
 /// Create a new buffer from a file
 BufferTPtr create_buffer_from_file(DocumentTPtrRef, QString path);
 
-// Buffer ======================================================================
+BufferData const& buffer_data(BufferTPtr);
+
+// BufferView ==================================================================
 
 enum class ViewType : uint8_t {
     UNKNOWN,
@@ -306,6 +310,7 @@ using BufferViewTPtr = std::shared_ptr<BufferViewT>;
 
 /// Create a new view
 BufferViewTPtr create_buffer_view(DocumentTPtrRef, BufferViewData const&);
+BufferViewData const& buffer_view_data(BufferViewTPtr);
 
 // Image =======================================================================
 
@@ -319,7 +324,8 @@ class ImageT;
 using ImageTPtr = std::shared_ptr<ImageT>;
 
 /// Create a new view
-ImageTPtr create_image(DocumentTPtrRef, ImageData const&);
+ImageTPtr        create_image(DocumentTPtrRef, ImageData const&);
+ImageData const& image_data(ImageTPtr);
 
 // Sampler =====================================================================
 
@@ -354,7 +360,8 @@ class SamplerT;
 using SamplerTPtr = std::shared_ptr<SamplerT>;
 
 /// Create a new view
-SamplerTPtr create_sampler(DocumentTPtrRef, SamplerData const&);
+SamplerTPtr        create_sampler(DocumentTPtrRef, SamplerData const&);
+SamplerData const& sampler_data(SamplerTPtr);
 
 // Texture =====================================================================
 
@@ -377,6 +384,7 @@ TextureTPtr create_texture(DocumentTPtrRef, TextureData const&);
 /// Create a new texture. Automatically creates buffers and views
 TextureTPtr create_texture(DocumentTPtrRef, QImage img);
 
+TextureData const& texture_data(TextureTPtr);
 
 // Material ====================================================================
 
@@ -400,7 +408,23 @@ struct PBRInfo {
 ///
 struct MaterialData {
     QString                   name;
-    PBRInfo                   pbr_info;
+    std::optional<PBRInfo>    pbr_info;
+    std::optional<TextureRef> normal_texture;
+
+    std::optional<TextureRef> occlusion_texture;
+    std::optional<float>      occlusion_texture_factor = 1.0;
+
+    std::optional<TextureRef> emissive_texture;
+    std::optional<glm::vec3>  emissive_factor;
+
+    std::optional<bool>  use_alpha    = false;
+    std::optional<float> alpha_cutoff = .5;
+
+    std::optional<bool> double_sided = false;
+};
+
+struct MaterialUpdateData {
+    std::optional<PBRInfo>    pbr_info;
     std::optional<TextureRef> normal_texture;
 
     std::optional<TextureRef> occlusion_texture;
@@ -422,7 +446,9 @@ using MaterialTPtr = std::shared_ptr<MaterialT>;
 MaterialTPtr create_material(DocumentTPtrRef, MaterialData const&);
 
 /// Update a material
-void update_material(MaterialTPtr, MaterialData const&);
+void update_material(MaterialTPtr, MaterialUpdateData const&);
+
+MaterialData const& material_data(MaterialTPtr);
 
 // Light =======================================================================
 
@@ -466,6 +492,8 @@ LightTPtr create_light(DocumentTPtrRef, LightData const&);
 
 /// Update a light
 void update_light(LightTPtr const&, LightUpdateData const&);
+
+LightData const& light_data(LightTPtr);
 
 // Mesh ========================================================================
 
@@ -522,6 +550,8 @@ using MeshTPtr = std::shared_ptr<MeshT>;
 
 /// Create a new mesh.
 MeshTPtr create_mesh(DocumentTPtrRef, MeshData const&);
+
+MeshData const& mesh_data(MeshTPtr);
 
 // Buffer Construction =========================================================
 
@@ -589,10 +619,12 @@ struct PlotUpdateData {
 };
 
 /// Create a new plot.
-MeshTPtr create_plot(DocumentTPtrRef, PlotData const&);
+PlotTPtr create_plot(DocumentTPtrRef, PlotData const&);
 
 /// Update a plot.
 void update_plot(DocumentTPtrRef, PlotUpdateData const&);
+
+PlotData const& plot_data(PlotTPtr);
 
 // Table =======================================================================
 
@@ -775,6 +807,8 @@ struct TableData {
 /// Create a new table
 TableTPtr create_table(DocumentTPtrRef, TableData const&);
 
+TableData const& table_data(TableTPtr);
+
 void issue_signal_direct(TableT*, SignalT*, QCborArray);
 
 // Object ======================================================================
@@ -907,8 +941,11 @@ struct ObjectUpdateData {
 
 ObjectTPtr create_object(DocumentTPtrRef, ObjectData const&);
 
-void             update_object(ObjectT*, ObjectUpdateData&);
-void             update_object(ObjectTPtr, ObjectUpdateData&);
+void update_object(ObjectT*, ObjectUpdateData&);
+void update_object(ObjectTPtr, ObjectUpdateData&);
+
+ObjectData const& object_data(ObjectTPtr);
+
 EntityCallbacks* get_callbacks_from(ObjectT*);
 
 void issue_signal_direct(ObjectT*, SignalT*, QCborArray);

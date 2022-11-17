@@ -30,6 +30,8 @@ class TableT : public ComponentMixin<TableT, TableList, TableID> {
 public:
     TableT(IDType, TableList*, TableData const&);
 
+    auto const& data() const { return m_data; }
+
     AttachedMethodList& att_method_list();
     AttachedSignalList& att_signal_list();
 

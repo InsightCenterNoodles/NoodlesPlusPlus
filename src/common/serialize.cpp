@@ -756,6 +756,20 @@ void MsgMaterialCreate::serialize(Archive& a) {
 template <class Archive>
 void MsgMaterialUpdate::serialize(Archive& a) {
     NOONVP(id);
+
+    NOONVP(pbr_info);
+    NOONVP(normal_texture);
+
+    NOONVP(occlusion_texture);
+    NOONVP(occlusion_texture_factor);
+
+    NOONVP(emissive_texture);
+    NOONVP(emissive_factor);
+
+    NOONVP(use_alpha);
+    NOONVP(alpha_cutoff);
+
+    NOONVP(double_sided);
 }
 
 template <class Archive>
@@ -1131,7 +1145,10 @@ QVector<ClientMessage> deserialize_client(QByteArray bytes) {
     for (int i = 0; i < message_list.size(); i += 2) {
         auto id = message_list.at(i).toInteger(-1);
 
-        if (id < 0) continue;
+        if (id < 0) {
+            qWarning() << "Unknown message id:" << id;
+            continue;
+        }
 
         auto content = message_list.at(i + 1);
 

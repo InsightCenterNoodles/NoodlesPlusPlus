@@ -714,11 +714,29 @@ PBRInfo::PBRInfo(noo::messages::PBRInfo const& m, InternalClientState& state) {
 }
 
 MaterialInit::MaterialInit(noo::messages::MsgMaterialCreate const& m,
-                           InternalClientState&                    state)
-    : pbr_info(m.pbr_info, state) {
+                           InternalClientState&                    state) {
+
+    if (m.pbr_info) { pbr_info = PBRInfo(*m.pbr_info, state); }
 
     convert(m.name, name, state);
 
+    convert(m.normal_texture, normal_texture, state);
+
+    convert(m.occlusion_texture, occlusion_texture, state);
+    if (m.occlusion_texture_factor) {
+        occlusion_texture_factor = m.occlusion_texture_factor.value();
+    }
+
+    convert(m.emissive_texture, emissive_texture, state);
+    if (m.emissive_factor) { emissive_factor = m.emissive_factor.value(); }
+
+    use_alpha    = m.use_alpha.value_or(false);
+    alpha_cutoff = m.alpha_cutoff.value_or(.5);
+    double_sided = m.double_sided.value_or(false);
+}
+
+MaterialUpdate::MaterialUpdate(noo::messages::MsgMaterialUpdate const& m,
+                               InternalClientState&                    state) {
     convert(m.normal_texture, normal_texture, state);
 
     convert(m.occlusion_texture, occlusion_texture, state);
@@ -760,8 +778,10 @@ MaterialDelegate::MaterialDelegate(noo::MaterialID i, MaterialInit const& data)
                 &MaterialDelegate::texture_ready);
     };
 
-    test_texture(m_init.pbr_info.base_color_texture);
-    test_texture(m_init.pbr_info.metal_rough_texture);
+    if (m_init.pbr_info) {
+        test_texture(m_init.pbr_info->base_color_texture);
+        test_texture(m_init.pbr_info->metal_rough_texture);
+    }
     test_texture(m_init.normal_texture);
     test_texture(m_init.occlusion_texture);
     test_texture(m_init.emissive_texture);

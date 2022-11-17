@@ -28,6 +28,8 @@ class ObjectT : public ComponentMixin<ObjectT, ObjectList, EntityID> {
 public:
     ObjectT(IDType, ObjectList*, ObjectData const&);
 
+    auto const& data() const { return m_data; }
+
     void write_new_to(SMsgWriter&);
     void update(ObjectUpdateData&, SMsgWriter&);
     void update(ObjectUpdateData&);

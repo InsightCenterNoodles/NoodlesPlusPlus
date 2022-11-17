@@ -27,7 +27,8 @@ convert(std::optional<TextureRef> const& tr) {
     return ret;
 }
 
-void convert(PBRInfo const& src, messages::PBRInfo& dest) {
+void convert(PBRInfo const& src, std::optional<messages::PBRInfo>& dest_opt) {
+    auto& dest               = dest_opt.emplace();
     dest.base_color          = src.base_color;
     dest.base_color_texture  = convert(src.base_color_texture);
     dest.metallic            = src.metallic;
@@ -35,46 +36,80 @@ void convert(PBRInfo const& src, messages::PBRInfo& dest) {
     dest.metal_rough_texture = convert(src.metal_rough_texture);
 }
 
+template <class Message, class UP>
+void update_common(MaterialT* obj, UP const& data, Message& m) {
+
+    m.id = obj->id();
+
+    if (data.pbr_info) { convert(*data.pbr_info, m.pbr_info); }
+
+    if (data.normal_texture) {
+        m.normal_texture = convert(data.normal_texture);
+    }
+
+    if (data.occlusion_texture) {
+        m.occlusion_texture = convert(data.occlusion_texture);
+    }
+
+    if (data.occlusion_texture_factor) {
+        m.occlusion_texture_factor = data.occlusion_texture_factor.value();
+    }
+
+    if (data.emissive_texture) {
+        m.emissive_texture = convert(data.emissive_texture);
+    }
+
+    if (data.emissive_factor) {
+        m.emissive_factor = data.emissive_factor.value();
+    }
+
+    if (data.use_alpha) { m.use_alpha = data.use_alpha.value(); }
+
+    if (data.alpha_cutoff) { m.alpha_cutoff = data.alpha_cutoff.value(); }
+
+    if (data.double_sided) { m.double_sided = data.double_sided.value(); }
+}
+
 void MaterialT::write_new_to(SMsgWriter& w) {
 
     messages::MsgMaterialCreate m;
 
-    m.id   = id();
     m.name = opt_string(m_data.name);
 
-    convert(m_data.pbr_info, m.pbr_info);
-
-    m.normal_texture = convert(m_data.normal_texture);
-
-    m.occlusion_texture = convert(m_data.occlusion_texture);
-
-    if (m_data.occlusion_texture_factor) {
-        m.occlusion_texture_factor = m_data.occlusion_texture_factor.value();
-    }
-
-    m.emissive_texture = convert(m_data.emissive_texture);
-
-    if (m_data.emissive_factor) {
-        m.emissive_factor = m_data.emissive_factor.value();
-    }
-
-    if (m_data.use_alpha) { m.use_alpha = m_data.use_alpha.value(); }
-
-    if (m_data.alpha_cutoff) { m.alpha_cutoff = m_data.alpha_cutoff.value(); }
-
-    if (m_data.double_sided) { m.double_sided = m_data.double_sided.value(); }
+    update_common(this, m_data, m);
 
     w.add(m);
 }
 
-void MaterialT::update(MaterialData const& d, SMsgWriter& w) {
-    m_data = d;
+#define CHECK_UPDATE(FLD)                                                      \
+    {                                                                          \
+        if (data.FLD) { m_data.FLD = std::move(*data.FLD); }                   \
+    }
+
+void MaterialT::update(MaterialUpdateData const& data, SMsgWriter& w) {
+    messages::MsgMaterialUpdate m;
+
+    update_common(this, data, m);
+
+    CHECK_UPDATE(pbr_info);
+    CHECK_UPDATE(normal_texture);
+
+    CHECK_UPDATE(occlusion_texture);
+    CHECK_UPDATE(occlusion_texture_factor);
+
+    CHECK_UPDATE(emissive_texture);
+    CHECK_UPDATE(emissive_factor);
+
+    CHECK_UPDATE(use_alpha);
+    CHECK_UPDATE(alpha_cutoff);
+
+    CHECK_UPDATE(double_sided);
 
     // same message is used
     write_new_to(w);
 }
 
-void MaterialT::update(MaterialData const& data) {
+void MaterialT::update(MaterialUpdateData const& data) {
     auto w = m_parent_list->new_bcast();
 
     update(data, *w);

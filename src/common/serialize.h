@@ -319,7 +319,7 @@ struct MsgMaterialCreate {
     MaterialID             id;
     std::optional<QString> name;
 
-    PBRInfo                   pbr_info;
+    std::optional<PBRInfo>    pbr_info;
     std::optional<TextureRef> normal_texture;
 
     std::optional<TextureRef> occlusion_texture;
@@ -340,7 +340,20 @@ struct MsgMaterialCreate {
 struct MsgMaterialUpdate {
     MSGID(15);
     MaterialID id;
-    // TBD
+
+    std::optional<PBRInfo>    pbr_info;
+    std::optional<TextureRef> normal_texture;
+
+    std::optional<TextureRef> occlusion_texture;
+    std::optional<float>      occlusion_texture_factor = 1;
+
+    std::optional<TextureRef> emissive_texture;
+    std::optional<glm::vec3>  emissive_factor = glm::vec3(1);
+
+    std::optional<bool>  use_alpha    = false;
+    std::optional<float> alpha_cutoff = .5;
+
+    std::optional<bool> double_sided = false;
 
     template <class Archive>
     void serialize(Archive& a);

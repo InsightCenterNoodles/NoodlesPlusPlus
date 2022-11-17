@@ -94,10 +94,23 @@ MethodTPtr create_method(DocumentTPtrRef server, MethodData const& data) {
     return create_method(server.get(), data);
 }
 
+MethodData const& method_data(MethodTPtr ptr) {
+    return ptr->data();
+}
+
 
 // Signals
+
+SignalTPtr create_signal(DocumentTPtrRef ref, SignalData const& data) {
+    return create_signal(ref.get(), data);
+}
+
 SignalTPtr create_signal(DocumentT* server, SignalData const& data) {
     return server->signal_list().provision_next(data);
+}
+
+SignalData const& create_signal(SignalTPtr ptr) {
+    return ptr->data();
 }
 
 // Server ======================================================================
@@ -578,11 +591,19 @@ BufferTPtr create_buffer_from_file(DocumentTPtrRef doc, QString path) {
                          });
 }
 
+BufferData const& buffer_data(BufferTPtr ptr) {
+    return ptr->data();
+}
+
 // BufferView ==================================================================
 
 BufferViewTPtr create_buffer_view(DocumentTPtrRef       doc,
                                   BufferViewData const& data) {
     return doc->buffer_view_list().provision_next(data);
+}
+
+BufferViewData const& buffer_view_data(BufferViewTPtr ptr) {
+    return ptr->data();
 }
 
 // Image =======================================================================
@@ -591,10 +612,18 @@ ImageTPtr create_image(DocumentTPtrRef doc, ImageData const& data) {
     return doc->image_list().provision_next(data);
 }
 
+ImageData const& image_data(ImageTPtr ptr) {
+    return ptr->data();
+}
+
 // Sampler =====================================================================
 
 SamplerTPtr create_sampler(DocumentTPtrRef doc, SamplerData const& data) {
     return doc->sampler_list().provision_next(data);
+}
+
+SamplerData const& sampler_data(SamplerTPtr ptr) {
+    return ptr->data();
 }
 
 // Texture =====================================================================
@@ -627,6 +656,9 @@ TextureTPtr create_texture(DocumentTPtrRef doc, QImage img) {
     return create_texture(doc, TextureData { .image = new_image });
 }
 
+TextureData const& texture_data(TextureTPtr ptr) {
+    return ptr->data();
+}
 
 // Material ====================================================================
 
@@ -634,8 +666,12 @@ MaterialTPtr create_material(DocumentTPtrRef doc, MaterialData const& data) {
     return doc->mat_list().provision_next(data);
 }
 
-void update_material(MaterialTPtr item, MaterialData const& data) {
+void update_material(MaterialTPtr item, MaterialUpdateData const& data) {
     item->update(data);
+}
+
+MaterialData const& material_data(MaterialTPtr ptr) {
+    return ptr->data();
 }
 
 // Light =======================================================================
@@ -648,40 +684,19 @@ void update_light(LightTPtr const& item, LightUpdateData const& data) {
     item->update(data);
 }
 
+LightData const& light_data(LightTPtr ptr) {
+    return ptr->data();
+}
+
 // Mesh ========================================================================
-
-// MeshData::MeshData(PackedMeshDataResult const& res, BufferTPtr ptr) {
-//     auto set_from = [&ptr](auto const& src, auto& out) {
-//         qDebug() << "HERE";
-//         if (!src) return;
-//         auto& l  = *src;
-//         auto& d  = out.emplace();
-//         d.buffer = ptr;
-//         d.start  = l.start;
-//         d.size   = l.size;
-//         d.stride = l.stride;
-
-//        qDebug() << d.start << d.stride << d.size;
-//    };
-
-//    bounding_box = res.bounding_box;
-
-//    positions.buffer = ptr;
-//    positions.start  = res.positions.start;
-//    positions.size   = res.positions.size;
-//    positions.stride = res.positions.stride;
-
-//    set_from(res.normals, normals);
-//    set_from(res.textures, textures);
-//    set_from(res.colors, colors);
-//    set_from(res.lines, lines);
-//    set_from(res.triangles, triangles);
-//}
 
 MeshTPtr create_mesh(DocumentTPtrRef doc, MeshData const& data) {
     return doc->mesh_list().provision_next(data);
 }
 
+MeshData const& mesh_data(MeshTPtr ptr) {
+    return ptr->data();
+}
 
 // Table =======================================================================
 
@@ -750,6 +765,10 @@ void ServerTableDelegate::handle_set_selection(Selection const& s) {
 
 TableTPtr create_table(DocumentTPtrRef doc, TableData const& data) {
     return doc->table_list().provision_next(data);
+}
+
+TableData const& table_data(TableTPtr ptr) {
+    return ptr->data();
 }
 
 // Table Delegate ==============================================================
@@ -1116,6 +1135,10 @@ void update_object(ObjectT* item, ObjectUpdateData& data) {
 }
 void update_object(ObjectTPtr item, ObjectUpdateData& data) {
     item->update(data);
+}
+
+ObjectData const& object_data(ObjectTPtr ptr) {
+    return ptr->data();
 }
 
 

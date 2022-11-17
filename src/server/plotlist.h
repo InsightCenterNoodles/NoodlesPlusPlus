@@ -23,6 +23,8 @@ class PlotT : public ComponentMixin<PlotT, PlotList, PlotID> {
 public:
     PlotT(IDType, PlotList*, PlotData const&);
 
+    auto const& data() const { return m_data; }
+
     AttachedMethodList& att_method_list();
     AttachedSignalList& att_signal_list();
 

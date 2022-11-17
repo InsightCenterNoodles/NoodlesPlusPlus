@@ -20,9 +20,11 @@ class MaterialT : public ComponentMixin<MaterialT, MaterialList, MaterialID> {
 public:
     MaterialT(IDType, MaterialList*, MaterialData const&);
 
+    MaterialData const& data() const { return m_data; }
+
     void write_new_to(SMsgWriter&);
-    void update(MaterialData const&, SMsgWriter&);
-    void update(MaterialData const&);
+    void update(MaterialUpdateData const&, SMsgWriter&);
+    void update(MaterialUpdateData const&);
     void write_delete_to(SMsgWriter&);
 };
 

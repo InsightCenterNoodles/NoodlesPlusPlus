@@ -747,7 +747,7 @@ struct PBRInfo {
 struct MaterialInit {
     QString name;
 
-    PBRInfo                   pbr_info;
+    std::optional<PBRInfo>    pbr_info;
     std::optional<TextureRef> normal_texture;
 
     std::optional<TextureRef> occlusion_texture;
@@ -763,7 +763,24 @@ struct MaterialInit {
     MaterialInit(noo::messages::MsgMaterialCreate const&, InternalClientState&);
 };
 
-struct MaterialUpdate { };
+struct MaterialUpdate {
+
+    std::optional<PBRInfo>    pbr_info;
+    std::optional<TextureRef> normal_texture;
+
+    std::optional<TextureRef> occlusion_texture;
+    float                     occlusion_texture_factor = 1;
+
+    std::optional<TextureRef> emissive_texture;
+    glm::vec3                 emissive_factor = glm::vec3(1);
+
+    bool  use_alpha    = false;
+    float alpha_cutoff = .5;
+    bool  double_sided = false;
+
+    MaterialUpdate(noo::messages::MsgMaterialUpdate const&,
+                   InternalClientState&);
+};
 
 /// The base delegate class for materials. Users can inherit from this to add
 /// their own functionality. Delegates are instantiated on new materials from

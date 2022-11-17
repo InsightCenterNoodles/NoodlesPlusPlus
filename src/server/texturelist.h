@@ -19,6 +19,8 @@ class TextureT : public ComponentMixin<TextureT, TextureList, TextureID> {
 public:
     TextureT(IDType, TextureList*, TextureData const&);
 
+    auto const& data() const { return m_data; }
+
 
     void write_new_to(SMsgWriter&);
     void write_delete_to(SMsgWriter&);
@@ -38,6 +40,7 @@ class ImageT : public ComponentMixin<ImageT, ImageList, ImageID> {
 public:
     ImageT(IDType, ImageList*, ImageData const&);
 
+    auto const& data() const { return m_data; }
 
     void write_new_to(SMsgWriter&);
     void write_delete_to(SMsgWriter&);
@@ -57,6 +60,7 @@ class SamplerT : public ComponentMixin<SamplerT, SamplerList, SamplerID> {
 public:
     SamplerT(IDType, SamplerList*, SamplerData const&);
 
+    auto const& data() const { return m_data; }
 
     void write_new_to(SMsgWriter&);
     void write_delete_to(SMsgWriter&);

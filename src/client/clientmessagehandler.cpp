@@ -150,7 +150,7 @@ static void process(noo::messages::MsgMaterialUpdate const& value,
                     MessageState&                           ms) {
     auto id = value.id;
 
-    MaterialUpdate md;
+    MaterialUpdate md(value, ms.state);
 
     ms.state.material_list().handle_update(id, std::move(md));
 }

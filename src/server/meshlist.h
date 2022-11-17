@@ -20,6 +20,8 @@ class MeshT : public ComponentMixin<MeshT, MeshList, GeometryID> {
 public:
     MeshT(IDType, MeshList*, MeshData const&);
 
+    auto const& data() const { return m_data; }
+
     void write_new_to(SMsgWriter&);
     void write_delete_to(SMsgWriter&);
 };

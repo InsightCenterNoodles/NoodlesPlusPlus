@@ -51,6 +51,8 @@ class BufferViewT
 public:
     BufferViewT(IDType, BufferViewList*, BufferViewData const&);
 
+    auto const& data() const { return m_data; }
+
     void write_new_to(SMsgWriter&);
 
     void write_delete_to(SMsgWriter&);
@@ -70,6 +72,8 @@ class LightT : public ComponentMixin<LightT, LightList, LightID> {
 
 public:
     LightT(IDType, LightList*, LightData const&);
+
+    auto const& data() const { return m_data; }
 
     void write_new_to(SMsgWriter&);
     void update(LightUpdateData const&, SMsgWriter&);

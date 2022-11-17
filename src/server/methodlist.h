@@ -22,6 +22,8 @@ class MethodT : public ComponentMixin<MethodT, MethodList, MethodID> {
 public:
     MethodT(IDType, MethodList*, MethodData const&);
 
+    auto const& data() const { return m_data; }
+
     void write_new_to(SMsgWriter&);
     void write_delete_to(SMsgWriter&);
 
@@ -47,6 +49,7 @@ public:
     SignalT(IDType, SignalList*, SignalData const&);
 
     QString const& name() const { return m_data.signal_name; }
+    auto const&    data() const { return m_data; }
 
     void write_new_to(SMsgWriter&);
     void write_delete_to(SMsgWriter&);
