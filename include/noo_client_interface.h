@@ -709,7 +709,7 @@ public:
     QString        name() const { return m_init.name; }
     auto const&    info() const { return m_init; }
 
-    bool is_data_ready() const { return !m_init.image->is_data_ready(); }
+    bool is_data_ready() const { return m_init.image->is_data_ready(); }
 
     virtual void on_complete();
 
