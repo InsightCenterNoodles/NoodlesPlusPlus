@@ -22,10 +22,11 @@ TextureT::TextureT(IDType id, TextureList* host, TextureData const& d)
 void TextureT::write_new_to(SMsgWriter& w) {
 
     messages::MsgTextureCreate m {
-        .id = id(),
+        .id   = id(),
+        .name = m_data.name,
     };
-
     if (m_data.sampler) { m.sampler = m_data.sampler->id(); }
+    if (m_data.image) { m.image = m_data.image->id(); }
 
     w.add(m);
 }

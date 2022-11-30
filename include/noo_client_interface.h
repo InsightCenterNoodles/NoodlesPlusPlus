@@ -694,9 +694,6 @@ struct TextureInit {
 };
 
 
-/// The base delegate class for textures. Users can inherit from this to add
-/// their own functionality. Delegates are instantiated on new textures from the
-/// server. Texture delegates can also be updated.
 class TextureDelegate : public QObject {
     Q_OBJECT
     noo::TextureID m_id;
