@@ -636,6 +636,17 @@ SamplerInit::SamplerInit(noo::messages::MsgSamplerCreate const& m,
         { "MIRRORED_REPEAT", SamplerMode::MIRRORED_REPEAT },
         { "REPEAT", SamplerMode::REPEAT },
     };
+
+    mag_filter =
+        mag_hash.value(m.mag_filter.value_or(QString()), MagFilter::LINEAR);
+
+    min_filter =
+        min_hash.value(m.min_filter.value_or(QString()), MinFilter::LINEAR);
+
+    wrap_s = samp_hash.value(m.wrap_s.value_or(QString()),
+                             SamplerMode::CLAMP_TO_EDGE);
+    wrap_t = samp_hash.value(m.wrap_t.value_or(QString()),
+                             SamplerMode::CLAMP_TO_EDGE);
 }
 
 SamplerDelegate::SamplerDelegate(noo::SamplerID i, SamplerInit const& data)
