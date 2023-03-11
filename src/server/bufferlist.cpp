@@ -62,7 +62,7 @@ void BufferT::write_new_to(SMsgWriter& w) {
         m_data.source,
         VCASE(BufferInlineSource const& source) {
             if (m_asset_url.isValid()) {
-                create.uri_bytes = m_asset_url;
+                create.uri_bytes = m_asset_url.toString();
                 create.size      = source.data.size();
             } else {
                 create.inline_bytes = source.data;
@@ -70,7 +70,7 @@ void BufferT::write_new_to(SMsgWriter& w) {
             }
         },
         VCASE(BufferURLSource const& source) {
-            create.uri_bytes = source.url_source;
+            create.uri_bytes = source.url_source.toString();
             create.size      = source.source_byte_size;
         });
 

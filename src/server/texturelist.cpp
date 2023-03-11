@@ -54,7 +54,7 @@ void ImageT::write_new_to(SMsgWriter& w) {
 
     VMATCH(
         m_data.source,
-        VCASE(QUrl const& url) { m.uri_source = url; },
+        VCASE(QUrl const& url) { m.uri_source = url.toString(); },
         VCASE(BufferViewTPtr const& ptr) { m.buffer_source = ptr->id(); })
 
     w.add(m);

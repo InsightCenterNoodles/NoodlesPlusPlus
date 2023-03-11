@@ -35,7 +35,7 @@ void write_common(PlotT* plt, UP const& data, Message& m) {
         VMATCH(
             *data.definition,
             VCASE(QString const& s) { m.simple_plot = s; },
-            VCASE(QUrl const& s) { m.url_plot = s; });
+            VCASE(QUrl const& s) { m.url_plot = s.toString(); });
     }
 }
 

@@ -105,9 +105,9 @@ struct TextRepresentation {
 };
 
 struct WebRepresentation {
-    QUrl  source;
-    float height = .5;
-    float width  = .5;
+    QString source;
+    float   height = .5;
+    float   width  = .5;
 
     template <class Archive>
     void serialize(Archive& a);
@@ -207,7 +207,7 @@ struct MsgPlotCreate {
 
     // ONE OF
     std::optional<QString> simple_plot;
-    std::optional<QUrl>    url_plot;
+    std::optional<QString> url_plot;
     // END ONE OF
 
     std::optional<QVector<MethodID>> methods_list;
@@ -224,7 +224,7 @@ struct MsgPlotUpdate {
 
     // ONE OF
     std::optional<QString> simple_plot;
-    std::optional<QUrl>    url_plot;
+    std::optional<QString> url_plot;
     // END ONE OF
 
     std::optional<QVector<MethodID>> methods_list;
@@ -252,7 +252,7 @@ struct MsgBufferCreate {
 
     // ONE OF
     std::optional<QByteArray> inline_bytes;
-    std::optional<QUrl>       uri_bytes;
+    std::optional<QString>    uri_bytes;
     // END ONE OF
 
     template <class Archive>
@@ -376,7 +376,7 @@ struct MsgImageCreate {
 
     // ONE OF
     std::optional<BufferViewID> buffer_source;
-    std::optional<QUrl>         uri_source;
+    std::optional<QString>      uri_source;
     // END ONE OF
 
     template <class Archive>

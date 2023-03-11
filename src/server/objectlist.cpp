@@ -101,7 +101,7 @@ void update_common(ObjectT* obj, UP const& data, Message& m) {
             },
             VCASE(ObjectWebpageDefinition const& t) {
                 m.web_rep = messages::WebRepresentation {
-                    .source = t.url,
+                    .source = t.url.toString(),
                     .height = t.height,
                     .width  = t.width,
                 };

@@ -1,4 +1,4 @@
-#pragma once
+ #pragma once
 
 #include "noo_common.h"
 #include "noo_include_glm.h"
