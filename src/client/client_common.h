@@ -3,6 +3,8 @@
 
 #include "include/noo_client_interface.h"
 
+#include <QNetworkAccessManager>
+
 namespace nooc {
 
 class SubscribeInitReply : public PendingMethodReply {
@@ -14,10 +16,30 @@ public:
     void interpret() override;
 
 signals:
-    void recv(noo::AnyVarListRef const&,
-              noo::AnyVarRef,
-              noo::AnyVarListRef const&,
-              noo::AnyVarListRef const&);
+    void recv(nooc::TableDataInit);
+};
+
+// =============================================================================
+
+///
+/// \brief The URLFetch class fetches a URL and deletes itself when done
+///
+class URLFetch : public QObject {
+    Q_OBJECT
+public:
+    URLFetch(QNetworkAccessManager*, QUrl const& source);
+
+private slots:
+    void on_finished();
+
+#ifndef Q_NO_SSL
+    void on_ssl_error(QList<QSslError> const&);
+#endif
+
+signals:
+    void completed(QByteArray);
+    void error(QString);
+    void progress(qint64 received, qint64 total);
 };
 
 } // namespace nooc

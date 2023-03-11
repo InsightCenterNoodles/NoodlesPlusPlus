@@ -30,23 +30,27 @@ class TableT : public ComponentMixin<TableT, TableList, TableID> {
 public:
     TableT(IDType, TableList*, TableData const&);
 
+    auto const& data() const { return m_data; }
+
     AttachedMethodList& att_method_list();
     AttachedSignalList& att_signal_list();
 
-    void write_new_to(Writer&);
-    void write_delete_to(Writer&);
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
 
-    TableSource* get_source() const;
+    ServerTableDelegate* get_source() const;
 
 signals:
     void send_data(QByteArray);
 
 private slots:
     void on_table_reset();
-    void on_table_selection_updated(std::string, SelectionRef const&);
-    void on_table_row_updated(TableQueryPtr);
-    void on_table_row_deleted(TableQueryPtr);
+    void on_table_selection_updated(Selection const&);
+    void on_table_row_updated(QCborArray keys, QCborArray rows);
+    void on_table_row_deleted(QCborArray keys);
 };
+
+QCborMap make_table_init_data(ServerTableDelegate& source);
 
 } // namespace noo
 

@@ -1,7 +1,6 @@
-#ifndef COMPONENTLISTBASE_H
-#define COMPONENTLISTBASE_H
+#pragma once
 
-#include "serialize.h"
+#include "src/common/serialize.h"
 
 #include <QDebug>
 #include <QObject>
@@ -10,7 +9,7 @@
 
 namespace noo {
 
-class Writer;
+class SMsgWriter;
 
 class ServerT;
 
@@ -40,10 +39,10 @@ public:
         m_parent_list->mark_free(m_id);
     }
 
-    ComponentMixin(ComponentMixin const&) = delete;
+    ComponentMixin(ComponentMixin const&)            = delete;
     ComponentMixin& operator=(ComponentMixin const&) = delete;
 
-    ComponentMixin(ComponentMixin&&) = delete;
+    ComponentMixin(ComponentMixin&&)            = delete;
     ComponentMixin& operator=(ComponentMixin&&) = delete;
 
     auto  id() const { return m_id; }
@@ -53,7 +52,7 @@ public:
 struct ComponentListRock {
     ServerT* m_server;
 
-    std::unique_ptr<Writer> new_bcast();
+    std::unique_ptr<SMsgWriter> new_bcast();
 
     ComponentListRock(ServerT*);
 
@@ -162,5 +161,3 @@ ServerT* server_from_component(Comp* c) {
 }
 
 } // namespace noo
-
-#endif // COMPONENTLISTBASE_H

@@ -1,9 +1,10 @@
-#ifndef BUFFERLIST_H
-#define BUFFERLIST_H
+#pragma once
 
 #include "componentlistbase.h"
 #include "include/noo_id.h"
 #include "include/noo_server_interface.h"
+#include <qurl.h>
+#include <quuid.h>
 
 namespace noo {
 
@@ -16,20 +17,48 @@ public:
 
 
 class BufferT : public ComponentMixin<BufferT, BufferList, BufferID> {
-    QByteArray m_bytes;
+    BufferData m_data;
 
-    std::optional<BufferURLSource> m_url_source;
+    QUuid m_asset_id;
+    QUrl  m_asset_url;
 
 public:
     BufferT(IDType, BufferList*, BufferData const&);
+    ~BufferT() override;
 
-    void write_new_to(Writer&);
+    void write_new_to(SMsgWriter&);
 
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
 
-    void write_refresh_to(Writer&);
+    BufferData const& data() const { return m_data; }
 };
 
+
+// =============================================================================
+
+class BufferViewList
+    : public ComponentListBase<BufferViewList, BufferViewID, BufferViewT> {
+public:
+    BufferViewList(ServerT*);
+    ~BufferViewList();
+};
+
+
+class BufferViewT
+    : public ComponentMixin<BufferViewT, BufferViewList, BufferViewID> {
+    BufferViewData m_data;
+
+public:
+    BufferViewT(IDType, BufferViewList*, BufferViewData const&);
+
+    auto const& data() const { return m_data; }
+
+    void write_new_to(SMsgWriter&);
+
+    void write_delete_to(SMsgWriter&);
+};
+
+// =============================================================================
 
 class LightList : public ComponentListBase<LightList, LightID, LightT> {
 public:
@@ -44,12 +73,12 @@ class LightT : public ComponentMixin<LightT, LightList, LightID> {
 public:
     LightT(IDType, LightList*, LightData const&);
 
-    void write_new_to(Writer&);
-    void update(LightUpdateData const&, Writer&);
+    auto const& data() const { return m_data; }
+
+    void write_new_to(SMsgWriter&);
+    void update(LightUpdateData const&, SMsgWriter&);
     void update(LightUpdateData const&);
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
 };
 
 } // namespace noo
-
-#endif // BUFFERLIST_H

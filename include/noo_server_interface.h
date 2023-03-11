@@ -1,11 +1,14 @@
-#ifndef NOO_SERVER_INTERFACE_H
-#define NOO_SERVER_INTERFACE_H
+ #pragma once
 
 #include "noo_common.h"
 #include "noo_include_glm.h"
 #include "noo_interface_types.h"
 
+#include <QAbstractTableModel>
+#include <QColor>
+#include <QImage>
 #include <QObject>
+#include <QPointer>
 #include <QUrl>
 
 #include <filesystem>
@@ -19,8 +22,7 @@
 #include <variant>
 #include <vector>
 
-// We mirror a lot of the noodles objects in order to hide deps.
-// We can revisit this later.
+class QCommandLineParser;
 
 namespace noo {
 
@@ -54,38 +56,18 @@ using PlotTPtr = std::shared_ptr<PlotT>;
 struct MethodContext;
 
 template <class T>
-T _any_call_getter(AnyVarListRef const& source, size_t& loc) {
+T _any_call_getter(QCborArray const& source, size_t& loc) {
     auto at_i = source[loc];
     loc++;
 
-    if constexpr (std::is_same_v<T, int64_t>) {
-        return at_i.to_int();
-    } else if constexpr (std::is_same_v<T, double>) {
-        return at_i.to_real();
-    } else if constexpr (std::is_same_v<T, std::string_view>) {
-        return at_i.to_string();
-    } else if constexpr (std::is_same_v<T, AnyVarListRef>) {
-        return at_i.to_vector();
-    } else if constexpr (std::is_same_v<T, std::span<std::byte const>>) {
-        return at_i.to_data();
-    } else if constexpr (std::is_same_v<T, AnyVarMapRef>) {
-        return at_i.to_map();
-    } else if constexpr (std::is_same_v<T, std::span<double const>>) {
-        return at_i.to_real_list();
-    } else if constexpr (std::is_same_v<T, std::span<int64_t const>>) {
-        return at_i.to_int_list();
-    } else if constexpr (std::is_same_v<T, AnyID>) {
-        return at_i.to_id();
-    } else if constexpr (std::is_same_v<T, AnyVarRef>) {
-        return at_i;
-    } else {
-        return T(at_i);
-    }
+    T ret;
+    from_cbor(at_i, ret);
+    return ret;
 }
 
 
 template <class Func, class... Args>
-auto _call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+auto _call(Func&& f, MethodContext const& c, QCborArray const& source) {
     size_t i = 0;
     return f(c, std::move(_any_call_getter<Args>(source, i))...);
 }
@@ -97,7 +79,7 @@ template <class R, class... Args>
 struct AnyCallHelper<R(MethodContext const&, Args...)> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -106,7 +88,7 @@ template <class R, class... Args>
 struct AnyCallHelper<R (*)(MethodContext const&, Args...)> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -115,7 +97,7 @@ template <class R, class C, class... Args>
 struct AnyCallHelper<R (C::*)(MethodContext const&, Args...)> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -124,7 +106,7 @@ template <class R, class C, class... Args>
 struct AnyCallHelper<R (C::*)(MethodContext const&, Args...) const> {
     template <class Func>
     static auto
-    call(Func&& f, MethodContext const& c, AnyVarListRef const& source) {
+    call(Func&& f, MethodContext const& c, QCborArray const& source) {
         return _call<Func, Args...>(f, c, source);
     }
 };
@@ -136,7 +118,7 @@ struct AnyCallHelper<R (C::*)(MethodContext const&, Args...) const> {
 template <class Func>
 auto any_call_helper(Func&&               f,
                      MethodContext const& c,
-                     AnyVarListRef const& source) {
+                     QCborArray const&    source) {
     using FType = std::remove_cvref_t<Func>;
     return AnyCallHelper<FType>::call(f, c, source);
 }
@@ -146,20 +128,20 @@ auto any_call_helper(Func&&               f,
 /// This should only be thrown inside code that handles method requests, and is
 /// used to communicate disappointment to calling clients.
 struct MethodException : public std::exception {
-    int         m_code;
-    std::string m_reason;
-    AnyVar      m_data;
+    int        m_code;
+    QString    m_reason;
+    QCborValue m_data;
 
 public:
-    MethodException(int code, std::string_view message, AnyVar data = {});
+    MethodException(int code, QString message, QCborValue data = {});
 
-    int              code() const { return m_code; }
-    std::string_view reason() const { return m_reason; }
-    AnyVar const&    data() const { return m_data; }
+    int               code() const { return m_code; }
+    auto              reason() const { return m_reason; }
+    QCborValue const& data() const { return m_data; }
 
     char const* what() const noexcept override;
 
-    std::string to_string() const;
+    QString to_string() const;
 };
 
 // Methods =====================================================================
@@ -181,21 +163,21 @@ struct MethodContext
 };
 
 struct Arg {
-    std::string name;
-    std::string documentation;
-    std::string hint;
+    QString name;
+    QString documentation;
+    QString editor_hint;
 };
 
 ///
 /// \brief The MethodData struct defines a noodles method.
 ///
 struct MethodData {
-    std::string      method_name;
-    std::string      documentation;
-    std::string      return_documentation;
+    QString          method_name;
+    QString          documentation;
+    QString          return_documentation;
     std::vector<Arg> argument_documentation;
 
-    std::function<AnyVar(MethodContext const&, AnyVarListRef const&)> code;
+    std::function<QCborValue(MethodContext const&, QCborArray const&)> code;
 
     /// Set the code to be called when the method is invoked. The function f can
     /// be any function and the parameters will be decoded. See noo::RealListArg
@@ -204,7 +186,7 @@ struct MethodData {
     template <class Function>
     void set_code(Function&& f) {
         code = [lf = std::move(f)](MethodContext const& c,
-                                   AnyVarListRef const& v) {
+                                   QCborArray const&    v) {
             return any_call_helper(lf, c, v);
         };
     }
@@ -214,8 +196,9 @@ class MethodT;
 using MethodTPtr = std::shared_ptr<MethodT>;
 
 /// Create a new method.
-MethodTPtr create_method(DocumentTPtrRef, MethodData const&);
-MethodTPtr create_method(DocumentT*, MethodData const&);
+MethodTPtr        create_method(DocumentTPtrRef, MethodData const&);
+MethodTPtr        create_method(DocumentT*, MethodData const&);
+MethodData const& method_data(MethodTPtr);
 
 
 // Signals =====================================================================
@@ -224,8 +207,8 @@ MethodTPtr create_method(DocumentT*, MethodData const&);
 /// \brief The SignalData struct describes a new signal
 ///
 struct SignalData {
-    std::string      signal_name;
-    std::string      documentation;
+    QString          signal_name;
+    QString          documentation;
     std::vector<Arg> argument_documentation;
 };
 
@@ -233,17 +216,26 @@ class SignalT;
 using SignalTPtr = std::shared_ptr<SignalT>;
 
 /// Create a new signal.
-SignalTPtr create_signal(DocumentTPtrRef, SignalData const&);
-SignalTPtr create_signal(DocumentT*, SignalData const&);
+SignalTPtr        create_signal(DocumentTPtrRef, SignalData const&);
+SignalTPtr        create_signal(DocumentT*, SignalData const&);
+SignalData const& signal_data(SignalTPtr);
 
 // Server ======================================================================
 
 struct ServerOptions {
-    uint16_t port = 50000;
+    uint16_t port       = 50000;
+    uint16_t asset_port = 50001;
+    QString  asset_hostname; //< If blank, automatic
 };
 
 /// Create a new server, which uses a WebSocket to listen on the given port.
 std::shared_ptr<ServerT> create_server(ServerOptions const&);
+
+/// Create a server from common command line options
+/// Set up the parser with application information first.
+/// This function will process arguments, and can then be checked afterwards for
+/// custom arguments.
+std::shared_ptr<ServerT> create_server(QCommandLineParser&);
 
 // Document ====================================================================
 
@@ -254,75 +246,22 @@ std::shared_ptr<DocumentT> get_document(ServerT*);
 /// \brief The DocumentData struct is used to update the noodles document
 ///
 struct DocumentData {
-    std::vector<MethodTPtr> method_list;
-    std::vector<SignalTPtr> signal_list;
+    std::optional<QVector<MethodTPtr>> method_list;
+    std::optional<QVector<SignalTPtr>> signal_list;
 };
 
 /// Update the document with new methods and signals
 void update_document(DocumentTPtrRef, DocumentData const&);
 
-void issue_signal_direct(DocumentT*, SignalT*, AnyVarList);
-void issue_signal_direct(DocumentT*, std::string const&, AnyVarList);
+/// Issue a signal (by name or by object), on this document.
+void issue_signal_direct(DocumentT*, SignalT*, QCborArray);
+void issue_signal_direct(DocumentT*, std::string const&, QCborArray);
 
 // Buffer ======================================================================
 
-///
-/// \brief The BufferMeshDataRef struct is a helper type to define mesh
-/// information.
-///
-/// Vertex arrays should either be size zero or exactly equal to the size of
-/// positions; these are per-vertex arrays.
-///
-/// Index arrays: only lines OR triangles should be used. These are indexes of
-/// vertex information.
-///
-struct BufferMeshDataRef {
-    // Vertex data
-    std::span<glm::vec3 const>    positions;
-    std::span<glm::vec3 const>    normals;
-    std::span<glm::u16vec2 const> textures;
-    std::span<glm::u8vec4 const>  colors;
-
-    // Index data
-    std::span<glm::u16vec2 const> lines;
-    std::span<glm::u16vec3 const> triangles;
-};
-
-///
-/// \brief The PackedMeshDataResult struct provides the result of a pack
-/// operation of mesh data. It can be used to help create a new mesh in a
-/// buffer.
-///
-struct PackedMeshDataResult {
-    BoundingBox bounding_box;
-
-    struct Ref {
-        size_t start  = 0;
-        size_t size   = 0;
-        size_t stride = 0;
-    };
-
-    Ref                positions;
-    std::optional<Ref> normals;
-    std::optional<Ref> textures;
-    std::optional<Ref> colors;
-    std::optional<Ref> lines;
-    std::optional<Ref> triangles;
-};
-
-/// Take your mesh data and pack it into a byte buffer.
-PackedMeshDataResult pack_mesh_to_vector(BufferMeshDataRef const&,
-                                         std::vector<std::byte>&);
-
-
-/// Take an image from disk and pack it into a byte buffer.
-PackedMeshDataResult::Ref
-pack_image_to_vector(std::filesystem::path const& path,
-                     std::vector<std::byte>&);
-
-/// Instruct the buffer system to copy the given bytes
-struct BufferCopySource {
-    std::span<std::byte const> to_copy;
+/// Instruct the buffer system to own the given bytes
+struct BufferInlineSource {
+    QByteArray data;
 };
 
 /// Instruct the buffer system to reference the URL for a buffer
@@ -331,15 +270,98 @@ struct BufferURLSource {
     size_t source_byte_size;
 };
 
-struct BufferData : std::variant<BufferCopySource, BufferURLSource> {
-    using variant::variant;
+struct BufferData {
+    QString name;
+
+    std::variant<BufferInlineSource, BufferURLSource> source;
 };
 
 class BufferT;
 using BufferTPtr = std::shared_ptr<BufferT>;
 
 /// Create a new buffer
-BufferTPtr create_buffer(DocumentTPtrRef, BufferData);
+BufferTPtr create_buffer(DocumentTPtrRef, BufferData const&);
+
+/// Create a new buffer from a file
+BufferTPtr create_buffer_from_file(DocumentTPtrRef, QString path);
+
+BufferData const& buffer_data(BufferTPtr);
+
+// BufferView ==================================================================
+
+enum class ViewType : uint8_t {
+    UNKNOWN,
+    GEOMETRY_INFO,
+    IMAGE_INFO,
+};
+
+struct BufferViewData {
+    QString name;
+
+    BufferTPtr source_buffer;
+
+    ViewType type   = ViewType::UNKNOWN;
+    uint64_t offset = 0;
+    uint64_t length = 0;
+};
+
+class BufferViewT;
+using BufferViewTPtr = std::shared_ptr<BufferViewT>;
+
+/// Create a new view
+BufferViewTPtr create_buffer_view(DocumentTPtrRef, BufferViewData const&);
+BufferViewData const& buffer_view_data(BufferViewTPtr);
+
+// Image =======================================================================
+
+struct ImageData {
+    QString name;
+
+    std::variant<QUrl, BufferViewTPtr> source;
+};
+
+class ImageT;
+using ImageTPtr = std::shared_ptr<ImageT>;
+
+/// Create a new view
+ImageTPtr        create_image(DocumentTPtrRef, ImageData const&);
+ImageData const& image_data(ImageTPtr);
+
+// Sampler =====================================================================
+
+enum class MagFilter : uint8_t {
+    NEAREST,
+    LINEAR,
+};
+
+enum class MinFilter : uint8_t {
+    NEAREST,
+    LINEAR,
+    LINEAR_MIPMAP_LINEAR,
+};
+
+enum class SamplerMode : uint8_t {
+    CLAMP_TO_EDGE,
+    MIRRORED_REPEAT,
+    REPEAT,
+};
+
+struct SamplerData {
+    QString name;
+
+    MagFilter mag_filter = MagFilter::LINEAR;
+    MinFilter min_filter = MinFilter::LINEAR_MIPMAP_LINEAR;
+
+    SamplerMode wrap_s = SamplerMode::REPEAT;
+    SamplerMode wrap_t = SamplerMode::REPEAT;
+};
+
+class SamplerT;
+using SamplerTPtr = std::shared_ptr<SamplerT>;
+
+/// Create a new view
+SamplerTPtr        create_sampler(DocumentTPtrRef, SamplerData const&);
+SamplerData const& sampler_data(SamplerTPtr);
 
 // Texture =====================================================================
 
@@ -348,9 +370,9 @@ BufferTPtr create_buffer(DocumentTPtrRef, BufferData);
 /// given buffer.
 ///
 struct TextureData {
-    BufferTPtr buffer;
-    size_t     start;
-    size_t     size;
+    QString     name;
+    ImageTPtr   image;   // may not be blank.
+    SamplerTPtr sampler; // may be blank.
 };
 
 class TextureT;
@@ -359,25 +381,62 @@ using TextureTPtr = std::shared_ptr<TextureT>;
 /// Create a new texture.
 TextureTPtr create_texture(DocumentTPtrRef, TextureData const&);
 
-/// Create a new texture from a span of bytes. Bytes should be the disk
-/// representation of an image, A new buffer will be automatically created.
-TextureTPtr create_texture_from_file(DocumentTPtrRef, std::span<std::byte>);
+/// Create a new texture. Automatically creates buffers and views
+TextureTPtr create_texture(DocumentTPtrRef, QImage img);
 
-/// Update a texture with a new byte range.
-void update_texture(TextureTPtr, TextureData const&);
-
+TextureData const& texture_data(TextureTPtr);
 
 // Material ====================================================================
+
+struct TextureRef {
+    TextureTPtr source;
+    glm::mat3   transform          = glm::mat3(1);
+    uint8_t     texture_coord_slot = 0;
+};
+
+struct PBRInfo {
+    QColor                    base_color;
+    std::optional<TextureRef> base_color_texture;
+
+    float                     metallic  = 1.0;
+    float                     roughness = 1.0;
+    std::optional<TextureRef> metal_rough_texture;
+};
 
 ///
 /// \brief The MaterialData struct defines a new material.
 ///
 struct MaterialData {
-    glm::vec4   color        = { 1, 1, 1, 1 };
-    float       metallic     = 0;
-    float       roughness    = 1;
-    bool        use_blending = false;
-    TextureTPtr texture;
+    QString                   name;
+    std::optional<PBRInfo>    pbr_info;
+    std::optional<TextureRef> normal_texture;
+
+    std::optional<TextureRef> occlusion_texture;
+    std::optional<float>      occlusion_texture_factor = 1.0;
+
+    std::optional<TextureRef> emissive_texture;
+    std::optional<glm::vec3>  emissive_factor;
+
+    std::optional<bool>  use_alpha    = false;
+    std::optional<float> alpha_cutoff = .5;
+
+    std::optional<bool> double_sided = false;
+};
+
+struct MaterialUpdateData {
+    std::optional<PBRInfo>    pbr_info;
+    std::optional<TextureRef> normal_texture;
+
+    std::optional<TextureRef> occlusion_texture;
+    std::optional<float>      occlusion_texture_factor = 1.0;
+
+    std::optional<TextureRef> emissive_texture;
+    std::optional<glm::vec3>  emissive_factor;
+
+    std::optional<bool>  use_alpha    = false;
+    std::optional<float> alpha_cutoff = .5;
+
+    std::optional<bool> double_sided = false;
 };
 
 class MaterialT;
@@ -387,29 +446,42 @@ using MaterialTPtr = std::shared_ptr<MaterialT>;
 MaterialTPtr create_material(DocumentTPtrRef, MaterialData const&);
 
 /// Update a material
-void update_material(MaterialTPtr, MaterialData const&);
+void update_material(MaterialTPtr, MaterialUpdateData const&);
+
+MaterialData const& material_data(MaterialTPtr);
 
 // Light =======================================================================
 
-enum class LightType : uint8_t {
-    POINT,
-    SUN,
+struct PointLight {
+    float range = -1;
 };
+
+struct SpotLight {
+    float range                = -1;
+    float inner_cone_angle_rad = 0;
+    float outer_cone_angle_rad = M_PI / 4.0;
+};
+
+struct DirectionLight {
+    float range = -1;
+};
+
 
 ///
 /// \brief The LightData struct defines a new light
 ///
 struct LightData {
-    glm::u8vec3 color     = { 1, 1, 1 };
-    float       intensity = 0;
-    glm::vec4   spatial;
-    LightType   type = LightType::POINT;
+    QString name;
+    QColor  color     = Qt::white;
+    float   intensity = 1;
+
+    std::variant<PointLight, SpotLight, DirectionLight> type;
 };
 
 struct LightUpdateData {
-    std::optional<glm::u8vec3> color;
-    std::optional<float>       intensity;
-    std::optional<glm::vec4>   spatial;
+    // todo, add more
+    std::optional<QColor> color;
+    std::optional<float>  intensity;
 };
 
 class LightT;
@@ -421,17 +493,46 @@ LightTPtr create_light(DocumentTPtrRef, LightData const&);
 /// Update a light
 void update_light(LightTPtr const&, LightUpdateData const&);
 
+LightData const& light_data(LightTPtr);
+
 // Mesh ========================================================================
 
-///
-/// \brief The ComponentRef struct models a vertex component as a range of
-/// bytes, as well as a stride between those components.
-///
-struct ComponentRef {
-    BufferTPtr buffer;
-    size_t     start  = 0;
-    size_t     size   = 0;
-    size_t     stride = 0;
+
+struct Attribute {
+    BufferViewTPtr    view;
+    AttributeSemantic semantic;
+    uint8_t           channel = 0;
+
+    uint64_t offset = 0;
+    uint64_t stride = 0;
+    Format   format;
+
+    QVector<float> minimum_value;
+    QVector<float> maximum_value;
+
+    bool normalized = false;
+};
+
+struct Index {
+    BufferViewTPtr view;
+
+    uint64_t count = 0;
+
+    uint64_t offset = 0;
+    uint64_t stride = 0;
+    Format   format;
+};
+
+struct MeshPatch {
+    std::vector<Attribute> attributes;
+
+    uint64_t vertex_count = 0;
+
+    std::optional<Index> indices;
+
+    PrimitiveType type;
+
+    MaterialTPtr material;
 };
 
 ///
@@ -439,21 +540,9 @@ struct ComponentRef {
 /// components
 ///
 struct MeshData {
-    BoundingBox bounding_box;
+    QString name;
 
-    ComponentRef                positions;
-    std::optional<ComponentRef> normals;
-    std::optional<ComponentRef> textures;
-    std::optional<ComponentRef> colors;
-
-    std::optional<ComponentRef> lines;
-    std::optional<ComponentRef> triangles;
-
-    MeshData() = default;
-
-    /// Construct new data using a packed mesh result and assuming that all the
-    /// data resides in the given buffer.
-    MeshData(PackedMeshDataResult const&, BufferTPtr);
+    std::vector<MeshPatch> patches;
 };
 
 class MeshT;
@@ -462,162 +551,269 @@ using MeshTPtr = std::shared_ptr<MeshT>;
 /// Create a new mesh.
 MeshTPtr create_mesh(DocumentTPtrRef, MeshData const&);
 
-/// Create a new mesh from a user-supplied list of raw components. A new buffer
-/// is created under the hood.
-MeshTPtr create_mesh(DocumentTPtrRef, BufferMeshDataRef const&);
+MeshData const& mesh_data(MeshTPtr);
 
-/// Update a mesh
-void update_mesh(MeshT*, MeshData const&);
+// Buffer Construction =========================================================
+
+///
+/// \brief The BufferMeshDataRef struct is a helper type to define mesh
+/// information.
+///
+/// Vertex arrays should either be size zero or exactly equal to the size of
+/// positions; these are per-vertex arrays.
+///
+/// Index arrays: only lines OR triangles should be used. These are indexes of
+/// vertex information.
+///
+struct MeshSource {
+    MaterialTPtr material;
+
+    // Vertex data
+    std::span<glm::vec3 const>    positions;
+    std::span<glm::vec3 const>    normals;
+    std::span<glm::u16vec2 const> textures;
+    std::span<glm::u8vec4 const>  colors;
+
+    // Index data
+    std::span<std::byte const> indices;
+
+    Format index_format = Format::U16;
+
+    enum Type {
+        LINE,
+        TRIANGLE,
+    } type = Type::TRIANGLE;
+};
+
+struct BuilderBytes {
+    QByteArray bytes;
+    ViewType   type;
+};
+
+using BufferSources =
+    QHash<QString, std::variant<BuilderBytes, QImage, MeshSource>>;
+
+using BufferDirectory = QHash<QString, std::variant<BufferViewTPtr, MeshTPtr>>;
+
+BufferDirectory create_directory(DocumentTPtrRef, BufferSources);
+
+noo::MeshTPtr create_mesh(DocumentTPtrRef, noo::MeshSource const& src);
 
 // Plot ========================================================================
 
-struct SimplePlotDef {
-    QString definition;
-};
-
-struct URLPlotDef {
-    QUrl url;
-};
-
-using PlotDef = std::variant<SimplePlotDef, URLPlotDef>;
+using PlotDef = std::variant<QString, QUrl>;
 
 struct PlotData {
-    PlotDef                 definition;
-    TableTPtr               table_link;
-    std::vector<MethodTPtr> method_list;
-    std::vector<SignalTPtr> signal_list;
+    QString                            name;
+    std::optional<PlotDef>             definition;
+    std::optional<TableTPtr>           table_link;
+    std::optional<QVector<MethodTPtr>> method_list;
+    std::optional<QVector<SignalTPtr>> signal_list;
 };
 
 struct PlotUpdateData {
-    std::optional<PlotDef>                 definition;
-    std::optional<TableTPtr>               table_link;
-    std::optional<std::vector<MethodTPtr>> method_list;
-    std::optional<std::vector<SignalTPtr>> signal_list;
+    std::optional<PlotDef>             definition;
+    std::optional<TableTPtr>           table_link;
+    std::optional<QVector<MethodTPtr>> method_list;
+    std::optional<QVector<SignalTPtr>> signal_list;
 };
 
 /// Create a new plot.
-MeshTPtr create_plot(DocumentTPtrRef, PlotData const&);
+PlotTPtr create_plot(DocumentTPtrRef, PlotData const&);
 
 /// Update a plot.
 void update_plot(DocumentTPtrRef, PlotUpdateData const&);
 
+PlotData const& plot_data(PlotTPtr);
+
 // Table =======================================================================
 
-// The table system here is just preliminary
-
-// sketch for better query...
-struct TableQuery {
-    size_t num_cols = 0;
-    size_t num_rows = 0;
-
-    virtual bool is_column_string(size_t col) const; // either real or string
-
-    virtual bool get_reals_to(size_t col, std::span<double>) const;
-    virtual bool get_cell_to(size_t col, size_t row, std::string_view&) const;
-
-    virtual bool get_keys_to(std::span<int64_t>) const;
-};
-
-using TableQueryPtr = std::shared_ptr<TableQuery const>;
-
-
-class TableColumn
-    : public std::variant<std::vector<double>, std::vector<std::string>> {
-public:
-    std::string name;
-
-    using variant::variant;
-
-    size_t size() const;
-    bool   is_string() const;
-
-    std::span<double const>      as_doubles() const;
-    std::span<std::string const> as_string() const;
-
-    void append(std::span<double const>);
-    void append(AnyVarListRef const&);
-    void append(double);
-    void append(std::string_view);
-
-    void set(size_t row, double);
-    void set(size_t row, AnyVarRef);
-    void set(size_t row, std::string_view);
-
-    void erase(size_t row);
-
-    void clear();
-};
-
 ///
-/// \brief The TableSource class is the base type for tables. Users should
-/// inherit from this and override the functionality they desire.
+/// \brief The ServerTableDelegate class is the base type for tables. Users
+/// should inherit from this and override the functionality they desire.
 ///
-class TableSource : public QObject {
+class ServerTableDelegate : public QObject {
     Q_OBJECT
 
-protected:
-    std::vector<TableColumn> m_columns;
-    uint64_t                 m_counter = 0;
-
-    std::unordered_map<int64_t, uint64_t> m_key_to_row_map;
-    std::vector<int64_t>                  m_row_to_key_map;
-
-    // how should selections handle key deletion?
-    std::unordered_map<std::string, Selection> m_selections;
-
-protected:
-    virtual TableQueryPtr handle_insert(AnyVarListRef const& cols);
-    virtual TableQueryPtr handle_update(AnyVarRef const&     keys,
-                                        AnyVarListRef const& cols);
-    virtual TableQueryPtr handle_deletion(AnyVarRef const& keys);
-    virtual bool          handle_reset();
-    virtual bool handle_set_selection(std::string_view, SelectionRef const&);
-
 public:
-    TableSource(QObject* p) : QObject(p) { }
-    virtual ~TableSource();
+    ServerTableDelegate(QObject* p);
+    virtual ~ServerTableDelegate();
 
-    std::vector<std::string> get_headers();
-    TableQueryPtr            get_all_data();
+    virtual QStringList                       get_headers();
+    virtual std::pair<QCborArray, QCborArray> get_all_data(); // keys, rows
+    virtual QList<Selection>                  get_all_selections();
 
-    auto const& get_columns() const { return m_columns; }
-    auto const& get_all_selections() const { return m_selections; }
-    auto const& get_key_to_row_map() const { return m_key_to_row_map; }
-    auto const& get_row_to_key_map() const { return m_row_to_key_map; }
+    // list of rows, return new keys.
+    virtual void handle_insert(QCborArray const& new_rows);
 
+    // list of keys, list of columns
+    virtual void handle_update(QCborArray const& keys, QCborArray const& rows);
 
-    bool ask_insert(AnyVarListRef const&); // list of lists
-    bool ask_update(AnyVarRef const& keys,
-                    AnyVarListRef const&); // list of lists
-    bool ask_delete(AnyVarRef const& keys);
-    bool ask_clear();
-    bool ask_update_selection(std::string_view, SelectionRef const&);
+    // list of keys
+    virtual void handle_deletion(QCborArray const& keys);
+
+    // ask to clear
+    virtual void handle_reset();
+    virtual void handle_set_selection(Selection const&);
 
 signals:
     void table_reset();
-    void table_selection_updated(std::string, SelectionRef const&);
-    void table_row_updated(TableQueryPtr);
-    void table_row_deleted(TableQueryPtr);
+    void table_selection_updated(noo::Selection const&);
+    void table_row_updated(QCborArray keys, QCborArray rows);
+    void table_row_deleted(QCborArray keys);
+};
+
+// Useful Table Delegates ====
+
+// Abstract Table Delegate; this is an interface to an abstract table model,
+// with optional modification provided through another inherited class.
+// This can be used to interface with SQL tables, etc.
+
+struct AbstractTableInsertable {
+    virtual void handle_insert(QCborArray const& new_rows) = 0;
+    virtual void handle_update(QCborArray const& keys,
+                               QCborArray const& rows)     = 0;
+    virtual void handle_deletion(QCborArray const& keys)   = 0;
+    virtual void handle_reset()                            = 0;
+};
+
+class AbstractTableDelegate : public ServerTableDelegate {
+    Q_OBJECT
+
+    QVector<QMetaObject::Connection> m_connections;
+
+    QPointer<QAbstractTableModel> m_table_model;
+    AbstractTableInsertable*      m_insertable;
+
+    uint64_t m_counter = 0;
+
+    uint64_t next_counter();
+
+    QHash<uint64_t, QPersistentModelIndex> m_key_to_model_map;
+    QHash<QPersistentModelIndex, uint64_t> m_model_to_key_map;
+
+    QHash<QString, Selection> m_selections;
+
+    void reconnect_standard(QAbstractTableModel*);
+
+protected:
+    void handle_insert(QCborArray const& new_rows) override;
+    void handle_update(QCborArray const& keys, QCborArray const& rows) override;
+    void handle_deletion(QCborArray const& keys) override;
+    void handle_reset() override;
+    void handle_set_selection(Selection const&) override;
+
+public:
+    template <class Model>
+    AbstractTableDelegate(Model* model, QObject* parent)
+        : ServerTableDelegate(parent) {
+        set_model(model);
+    }
+    ~AbstractTableDelegate() override;
+
+    QStringList                       get_headers() override;
+    std::pair<QCborArray, QCborArray> get_all_data() override;
+    QList<Selection>                  get_all_selections() override;
+
+    template <class Model>
+    void set_model(Model* model = nullptr) {
+        static_assert(std::is_base_of<QAbstractTableModel, Model>::value);
+
+        if (m_table_model == model) return;
+
+        for (auto const& c : m_connections) {
+            disconnect(c);
+        }
+
+        m_key_to_model_map.clear();
+        m_model_to_key_map.clear();
+        m_selections.clear();
+
+        m_table_model = model;
+
+        if (!m_table_model) return;
+
+        reconnect_standard(model);
+
+        if constexpr (std::is_base_of<AbstractTableInsertable, Model>::value) {
+            m_insertable = model;
+        }
+
+        if (model->columnCount() != 0) {
+            for (auto i = 0; i < model->rowCount(); i++) {
+                auto key = next_counter();
+                auto mi  = QPersistentModelIndex(model->index(i, 0));
+                m_key_to_model_map[key] = mi;
+                m_model_to_key_map[mi]  = key;
+            }
+        }
+
+        emit table_reset();
+    }
+
+private slots:
+    void act_model_destroy();
+    void act_model_reset();
+    void act_model_rows_inserted(QModelIndex, int, int);
+    void act_model_rows_removed(QModelIndex, int, int);
+    void act_model_data_changed(QModelIndex, QModelIndex, QVector<int>);
+};
+
+// This class is a delegate around simple variants. It's not very efficient, but
+// does the job.
+class VariantTableDelegate : public ServerTableDelegate {
+    Q_OBJECT
+
+    QStringList                 m_headers;
+    QHash<uint64_t, QCborArray> m_rows;
+    uint64_t                    m_counter = 0;
+
+    uint64_t next_counter();
+
+    void normalize_row(QCborArray&);
+    // new keys, new rows
+    std::pair<QCborArray, QCborArray> common_insert(QCborArray const& new_rows);
+
+
+    QHash<QString, Selection> m_selections;
+
+public:
+    VariantTableDelegate(QStringList column_names,
+                         QCborArray  initial_rows,
+                         QObject*    p);
+    virtual ~VariantTableDelegate();
+
+    QStringList                       get_headers() override;
+    std::pair<QCborArray, QCborArray> get_all_data() override;
+    QList<Selection>                  get_all_selections() override;
+
+    void handle_insert(QCborArray const& new_rows) override;
+    void handle_update(QCborArray const& keys, QCborArray const& rows) override;
+    void handle_deletion(QCborArray const& keys) override;
+    void handle_reset() override;
+    void handle_set_selection(Selection const&) override;
 };
 
 ///
 /// \brief The TableData struct helps define a new table
 ///
 struct TableData {
-    std::string name;
-    std::string meta;
+    QString name;
+    QString meta;
 
-    std::shared_ptr<TableSource> source;
+    std::shared_ptr<ServerTableDelegate> source;
 };
 
 /// Create a new table
 TableTPtr create_table(DocumentTPtrRef, TableData const&);
 
-void issue_signal_direct(TableT*, SignalT*, AnyVarList);
+TableData const& table_data(TableTPtr);
+
+void issue_signal_direct(TableT*, SignalT*, QCborArray);
 
 // Object ======================================================================
 
-class ObjectCallbacks : public QObject {
+class EntityCallbacks : public QObject {
     Q_OBJECT
 
 protected:
@@ -641,17 +837,19 @@ public:
         bool attention_signals  = false;
     };
 
-    ObjectCallbacks(ObjectT*, EnableCallback);
+    EntityCallbacks(ObjectT*, EnableCallback);
 
     EnableCallback const& callbacks_enabled() const;
 
-    virtual void                     on_activate_str(std::string_view);
-    virtual void                     on_activate_int(int);
-    virtual std::vector<std::string> get_activation_choices();
+    virtual void        on_activate_str(QString);
+    virtual void        on_activate_int(int);
+    virtual QStringList get_activation_choices();
 
-    virtual std::vector<std::string> get_option_choices();
-    virtual std::string              get_current_option();
-    virtual void                     set_current_option(std::string_view);
+
+    virtual QStringList get_var_keys();
+    virtual QCborArray  get_var_options(QString key = QString());
+    virtual QCborValue  get_var_value(QString key = QString());
+    virtual bool set_var_value(QCborValue value, QString key = QString());
 
     virtual void set_position(glm::vec3);
     virtual void set_rotation(glm::quat);
@@ -666,13 +864,13 @@ public:
                              std::span<int64_t const>   index_list,
                              SelAction                  select);
 
-    virtual std::pair<std::string, glm::vec3> probe_at(glm::vec3);
+    virtual std::pair<QString, glm::vec3> probe_at(glm::vec3);
 
 signals:
     // Issue these signals to emit attention getting
     void signal_attention_plain();
     void signal_attention_at(glm::vec3);
-    void signal_attention_anno(glm::vec3, std::string);
+    void signal_attention_anno(glm::vec3, QString);
 
 private:
     ObjectT*       m_host;
@@ -680,10 +878,10 @@ private:
 };
 
 struct ObjectTextDefinition {
-    std::string text;
-    std::string font;
-    float       height;
-    float       width = -1;
+    QString text;
+    QString font;
+    float   height;
+    float   width = -1;
 };
 
 struct ObjectWebpageDefinition {
@@ -692,11 +890,16 @@ struct ObjectWebpageDefinition {
     float width;
 };
 
-struct ObjectRenderableDefinition {
-    MaterialTPtr               material;
-    MeshTPtr                   mesh;
-    std::vector<glm::mat4>     instances;
+struct InstanceInfo {
+    BufferViewTPtr             view;
+    uint64_t                   stride = 0;
     std::optional<BoundingBox> instance_bb;
+};
+
+struct ObjectRenderableDefinition {
+    MeshTPtr mesh;
+
+    std::optional<InstanceInfo> instances;
 };
 
 using ObjectDefinition = std::variant<std::monostate,
@@ -706,54 +909,54 @@ using ObjectDefinition = std::variant<std::monostate,
 
 
 struct ObjectData {
-    ObjectTPtr                 parent;
-    std::string                name;
-    glm::mat4                  transform = glm::mat4(1);
-    ObjectDefinition           definition;
-    std::vector<LightTPtr>     lights;
-    std::vector<TableTPtr>     tables;
-    std::vector<PlotTPtr>      plots;
-    std::vector<std::string>   tags;
-    std::vector<MethodTPtr>    method_list;
-    std::vector<SignalTPtr>    signal_list;
-    std::optional<BoundingBox> influence;
-    bool                       visibility = true;
+    QString                                   name;
+    std::optional<ObjectTPtr>                 parent;
+    std::optional<glm::mat4>                  transform;
+    std::optional<ObjectDefinition>           definition;
+    std::optional<QVector<LightTPtr>>         lights;
+    std::optional<QVector<TableTPtr>>         tables;
+    std::optional<QVector<PlotTPtr>>          plots;
+    std::optional<QStringList>                tags;
+    std::optional<QVector<MethodTPtr>>        method_list;
+    std::optional<QVector<SignalTPtr>>        signal_list;
+    std::optional<std::optional<BoundingBox>> influence;
+    std::optional<bool>                       visible;
 
-    std::function<std::unique_ptr<ObjectCallbacks>(ObjectT*)> create_callbacks;
+    std::function<std::unique_ptr<EntityCallbacks>(ObjectT*)> create_callbacks;
 };
 
 struct ObjectUpdateData {
     std::optional<ObjectTPtr>                 parent;
-    std::optional<std::string>                name;
     std::optional<glm::mat4>                  transform;
     std::optional<ObjectDefinition>           definition;
-    std::optional<std::vector<LightTPtr>>     lights;
-    std::optional<std::vector<TableTPtr>>     tables;
-    std::optional<std::vector<PlotTPtr>>      plots;
-    std::optional<std::vector<std::string>>   tags;
-    std::optional<std::vector<MethodTPtr>>    method_list;
-    std::optional<std::vector<SignalTPtr>>    signal_list;
+    std::optional<QVector<LightTPtr>>         lights;
+    std::optional<QVector<TableTPtr>>         tables;
+    std::optional<QVector<PlotTPtr>>          plots;
+    std::optional<QStringList>                tags;
+    std::optional<QVector<MethodTPtr>>        method_list;
+    std::optional<QVector<SignalTPtr>>        signal_list;
     std::optional<std::optional<BoundingBox>> influence;
-    std::optional<bool>                       visibility;
+    std::optional<bool>                       visible;
 };
 
 ObjectTPtr create_object(DocumentTPtrRef, ObjectData const&);
 
-void             update_object(ObjectT*, ObjectUpdateData&);
-void             update_object(ObjectTPtr, ObjectUpdateData&);
-ObjectCallbacks* get_callbacks_from(ObjectT*);
+void update_object(ObjectT*, ObjectUpdateData&);
+void update_object(ObjectTPtr, ObjectUpdateData&);
 
-void issue_signal_direct(ObjectT*, SignalT*, AnyVarList);
-void issue_signal_direct(ObjectT*, std::string const&, AnyVarList);
+ObjectData const& object_data(ObjectTPtr);
+
+EntityCallbacks* get_callbacks_from(ObjectT*);
+
+void issue_signal_direct(ObjectT*, SignalT*, QCborArray);
+void issue_signal_direct(ObjectT*, QString const&, QCborArray);
 
 // Other =======================================================================
 
 template <class C, class S, class... Args>
 void issue_signal(C* ctx, S const& s, Args&&... args) {
     return issue_signal_direct(
-        ctx, s, marshall_to_any(std::forward<Args>(args)...));
+        ctx, s, convert_to_cbor_array(std::forward<Args>(args)...));
 }
 
 } // namespace noo
-
-#endif // INTERFACE_H

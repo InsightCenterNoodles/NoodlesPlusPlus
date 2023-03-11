@@ -1,12 +1,14 @@
 #include "meshlist.h"
 
 #include "bufferlist.h"
+#include "materiallist.h"
+#include "noo_common.h"
 #include "noodlesserver.h"
-#include "serialize.h"
+#include "src/common/serialize.h"
 #include "src/generated/interface_tools.h"
-#include "src/generated/noodles_generated.h"
 
 #include <QDebug>
+
 namespace noo {
 
 MeshList::MeshList(ServerT* s) : ComponentListBase(s) { }
@@ -17,61 +19,64 @@ MeshList::~MeshList() = default;
 MeshT::MeshT(IDType id, MeshList* host, MeshData const& d)
     : ComponentMixin(id, host), m_data(d) { }
 
-static flatbuffers::Offset<noodles::ComponentRef>
-setup_comp_ref(ComponentRef const& r, Writer& w) {
-    auto bid = convert_id(r.buffer, w);
+void MeshT::write_new_to(SMsgWriter& w) {
 
-    // qDebug() << Q_FUNC_INFO << bid.id_slot() << r.start << r.size <<
-    // r.stride;
+    messages::MsgGeometryCreate m;
+    m.id   = id();
+    m.name = m_data.name;
 
-    return noodles::CreateComponentRef(w, bid, r.start, r.size, r.stride);
+    for (auto const& patch : m_data.patches) {
+
+        messages::GeometryPatch geom_patch;
+
+        geom_patch.vertex_count = patch.vertex_count;
+        geom_patch.type         = patch.type;
+
+        if (patch.material) geom_patch.material = patch.material->id();
+
+        if (patch.indices) {
+            auto const& src = *patch.indices;
+            auto&       ind = geom_patch.indices.emplace();
+            ind.view        = src.view->id();
+            ind.format      = src.format;
+            ind.stride      = src.stride;
+            ind.offset      = src.offset;
+            ind.count       = src.count;
+        }
+
+        for (auto const& attrib : patch.attributes) {
+
+            messages::Attribute new_attrib;
+
+            new_attrib.view     = attrib.view->id();
+            new_attrib.semantic = attrib.semantic;
+
+            if (attrib.channel) new_attrib.channel = attrib.channel;
+            if (attrib.offset) new_attrib.offset = attrib.offset;
+            if (attrib.stride) new_attrib.stride = attrib.stride;
+
+            new_attrib.format = attrib.format;
+
+            if (attrib.maximum_value.size()) {
+                new_attrib.maximum_value = attrib.maximum_value;
+            }
+            if (attrib.minimum_value.size()) {
+                new_attrib.minimum_value = attrib.minimum_value;
+            }
+
+            new_attrib.normalized = attrib.normalized;
+
+            geom_patch.attributes << new_attrib;
+        }
+
+        m.patches << geom_patch;
+    }
+
+    w.add(m);
 }
 
-static flatbuffers::Offset<noodles::ComponentRef>
-conditional_comp_ref(std::optional<ComponentRef> const& r, Writer& w) {
-    if (r) return setup_comp_ref(*r, w);
-    return 0;
-}
-
-void MeshT::write_new_to(Writer& w) {
-
-    auto lid = convert_id(id(), w);
-
-    auto bb = convert(m_data.bounding_box);
-
-    auto x = noodles::CreateGeometryCreate(
-        w,
-        lid,
-        &bb,
-        conditional_comp_ref(m_data.positions, w),
-        conditional_comp_ref(m_data.normals, w),
-        conditional_comp_ref(m_data.textures, w),
-        conditional_comp_ref(m_data.colors, w),
-        conditional_comp_ref(m_data.lines, w),
-        conditional_comp_ref(m_data.triangles, w));
-
-
-    w.complete_message(x);
-}
-
-void MeshT::update(MeshData const& data, Writer& w) {
-    m_data = data;
-
-    write_new_to(w);
-}
-
-void MeshT::update(MeshData const& data) {
-    auto w = m_parent_list->new_bcast();
-
-    update(data, *w);
-}
-
-void MeshT::write_delete_to(Writer& w) {
-    auto lid = convert_id(id(), w);
-
-    auto x = noodles::CreateGeometryDelete(w, lid);
-
-    w.complete_message(x);
+void MeshT::write_delete_to(SMsgWriter& w) {
+    w.add(messages::MsgGeometryCreate { .id = id() });
 }
 
 } // namespace noo

@@ -1,5 +1,4 @@
-#ifndef MATERIALLIST_H
-#define MATERIALLIST_H
+#pragma once
 
 #include "componentlistbase.h"
 #include "include/noo_id.h"
@@ -21,12 +20,12 @@ class MaterialT : public ComponentMixin<MaterialT, MaterialList, MaterialID> {
 public:
     MaterialT(IDType, MaterialList*, MaterialData const&);
 
-    void write_new_to(Writer&);
-    void update(MaterialData const&, Writer&);
-    void update(MaterialData const&);
-    void write_delete_to(Writer&);
+    MaterialData const& data() const { return m_data; }
+
+    void write_new_to(SMsgWriter&);
+    void update(MaterialUpdateData const&, SMsgWriter&);
+    void update(MaterialUpdateData const&);
+    void write_delete_to(SMsgWriter&);
 };
 
 } // namespace noo
-
-#endif // MATERIALLIST_H

@@ -19,11 +19,51 @@ class TextureT : public ComponentMixin<TextureT, TextureList, TextureID> {
 public:
     TextureT(IDType, TextureList*, TextureData const&);
 
+    auto const& data() const { return m_data; }
 
-    void write_new_to(Writer&);
-    void update(TextureData const&, Writer&);
-    void update(TextureData const&);
-    void write_delete_to(Writer&);
+
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
+};
+
+// =============================================================================
+
+class ImageList : public ComponentListBase<ImageList, ImageID, ImageT> {
+public:
+    ImageList(ServerT*);
+    ~ImageList();
+};
+
+class ImageT : public ComponentMixin<ImageT, ImageList, ImageID> {
+    ImageData m_data;
+
+public:
+    ImageT(IDType, ImageList*, ImageData const&);
+
+    auto const& data() const { return m_data; }
+
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
+};
+
+// =============================================================================
+
+class SamplerList : public ComponentListBase<SamplerList, SamplerID, SamplerT> {
+public:
+    SamplerList(ServerT*);
+    ~SamplerList();
+};
+
+class SamplerT : public ComponentMixin<SamplerT, SamplerList, SamplerID> {
+    SamplerData m_data;
+
+public:
+    SamplerT(IDType, SamplerList*, SamplerData const&);
+
+    auto const& data() const { return m_data; }
+
+    void write_new_to(SMsgWriter&);
+    void write_delete_to(SMsgWriter&);
 };
 
 } // namespace noo

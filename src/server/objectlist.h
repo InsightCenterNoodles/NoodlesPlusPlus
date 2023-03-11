@@ -11,43 +11,41 @@
 
 namespace noo {
 
-class ObjectList : public ComponentListBase<ObjectList, ObjectID, ObjectT> {
+class ObjectList : public ComponentListBase<ObjectList, EntityID, ObjectT> {
 public:
     ObjectList(ServerT*);
     ~ObjectList();
 };
 
-class ObjectTUpdateHelper;
-
-class ObjectT : public ComponentMixin<ObjectT, ObjectList, ObjectID> {
+class ObjectT : public ComponentMixin<ObjectT, ObjectList, EntityID> {
     ObjectData m_data;
 
     AttachedMethodList m_method_search;
     AttachedSignalList m_signal_search;
 
-    std::unique_ptr<ObjectCallbacks> m_callback;
-
-    void update_common(ObjectTUpdateHelper const&, Writer&);
+    std::unique_ptr<EntityCallbacks> m_callback;
 
 public:
     ObjectT(IDType, ObjectList*, ObjectData const&);
 
-    void write_new_to(Writer&);
-    void update(ObjectUpdateData&, Writer&);
+    auto const& data() const { return m_data; }
+
+    void write_new_to(SMsgWriter&);
+    void update(ObjectUpdateData&, SMsgWriter&);
     void update(ObjectUpdateData&);
-    void write_delete_to(Writer&);
+    void write_delete_to(SMsgWriter&);
 
 
     AttachedMethodList& att_method_list();
     AttachedSignalList& att_signal_list();
 
-    ObjectCallbacks* callbacks() const;
+    EntityCallbacks* callbacks() const;
 
 
 private slots:
     void on_signal_attention_plain();
     void on_signal_attention_at(glm::vec3);
-    void on_signal_attention_anno(glm::vec3, std::string);
+    void on_signal_attention_anno(glm::vec3, QString);
 
 signals:
 };

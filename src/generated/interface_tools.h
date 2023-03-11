@@ -1,7 +1,6 @@
 #ifndef NOO_INTERFACE_TOOLS_H
 #define NOO_INTERFACE_TOOLS_H
 
-#include "flatbuffers/flatbuffers.h"
 #include "include/noo_id.h"
 #include "include/noo_include_glm.h"
 
@@ -9,6 +8,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#if 0
 
 // Forward declare generated noodles types
 namespace noodles {
@@ -25,12 +26,15 @@ struct BoundingBox;
 
 struct TextureID;
 struct BufferID;
+struct BufferViewID;
 struct TableID;
 struct LightID;
 struct MaterialID;
 struct GeometryID;
-struct ObjectID;
+struct EntityID;
 struct SignalID;
+struct ImageID;
+struct SamplerID;
 struct MethodID;
 struct PlotID;
 
@@ -44,8 +48,8 @@ template <class T>
 struct IDConvType;
 
 template <>
-struct IDConvType<noodles::ObjectID> {
-    using type = ObjectID;
+struct IDConvType<noodles::EntityID> {
+    using type = EntityID;
 };
 
 template <>
@@ -70,7 +74,7 @@ struct IDConvType<noodles::MaterialID> {
 
 template <>
 struct IDConvType<noodles::GeometryID> {
-    using type = MeshID;
+    using type = GeometryID;
 };
 
 template <>
@@ -79,13 +83,28 @@ struct IDConvType<noodles::LightID> {
 };
 
 template <>
+struct IDConvType<noodles::ImageID> {
+    using type = TextureID;
+};
+
+template <>
 struct IDConvType<noodles::TextureID> {
     using type = TextureID;
 };
 
 template <>
+struct IDConvType<noodles::SamplerID> {
+    using type = SamplerID;
+};
+
+template <>
 struct IDConvType<noodles::BufferID> {
     using type = BufferID;
+};
+
+template <>
+struct IDConvType<noodles::BufferViewID> {
+    using type = BufferViewID;
 };
 
 template <>
@@ -100,7 +119,7 @@ flatbuffers::Offset<::noodles::Any> write_to(AnyVar const&,
                                              flatbuffers::FlatBufferBuilder&);
 
 flatbuffers::Offset<::noodles::AnyList>
-write_to(noo::AnyVarList const&, flatbuffers::FlatBufferBuilder&);
+write_to(QCborValueList const&, flatbuffers::FlatBufferBuilder&);
 
 flatbuffers::Offset<::noodles::AnyID> write_to(AnyID const&,
                                                flatbuffers::FlatBufferBuilder&);
@@ -125,13 +144,13 @@ write_to(glm::u8vec3 const&, flatbuffers::FlatBufferBuilder&);
 ::noodles::Vec3 convert(glm::vec3 const&);
 ::noodles::Vec4 convert(glm::vec4 const&);
 ::noodles::Mat4 convert(glm::mat4 const&);
-::noodles::RGB  convert(glm::u8vec3 const&);
+::noodles::RGB  convert(QColor const&);
 
-glm::vec2   convert(::noodles::Vec2 const&);
-glm::vec3   convert(::noodles::Vec3 const&);
-glm::vec4   convert(::noodles::Vec4 const&);
-glm::mat4   convert(::noodles::Mat4 const&);
-glm::u8vec3 convert(::noodles::RGB const&);
+glm::vec2 convert(::noodles::Vec2 const&);
+glm::vec3 convert(::noodles::Vec3 const&);
+glm::vec4 convert(::noodles::Vec4 const&);
+glm::mat4 convert(::noodles::Mat4 const&);
+QColor    convert(::noodles::RGB const&);
 
 struct BoundingBox;
 ::noo::BoundingBox     convert(::noodles::BoundingBox const&);
@@ -151,6 +170,9 @@ convert_id(TextureID, flatbuffers::FlatBufferBuilder&);
 flatbuffers::Offset<::noodles::BufferID>
 convert_id(BufferID, flatbuffers::FlatBufferBuilder&);
 
+flatbuffers::Offset<::noodles::BufferViewID>
+convert_id(BufferViewID, flatbuffers::FlatBufferBuilder&);
+
 flatbuffers::Offset<::noodles::TableID>
 convert_id(TableID, flatbuffers::FlatBufferBuilder&);
 
@@ -161,10 +183,10 @@ flatbuffers::Offset<::noodles::MaterialID>
 convert_id(MaterialID, flatbuffers::FlatBufferBuilder&);
 
 flatbuffers::Offset<::noodles::GeometryID>
-convert_id(MeshID, flatbuffers::FlatBufferBuilder&);
+convert_id(GeometryID, flatbuffers::FlatBufferBuilder&);
 
-flatbuffers::Offset<::noodles::ObjectID>
-convert_id(ObjectID, flatbuffers::FlatBufferBuilder&);
+flatbuffers::Offset<::noodles::EntityID>
+convert_id(EntityID, flatbuffers::FlatBufferBuilder&);
 
 flatbuffers::Offset<::noodles::SignalID>
 convert_id(SignalID, flatbuffers::FlatBufferBuilder&);
@@ -183,28 +205,33 @@ auto convert_id(std::shared_ptr<T> const&       ptr,
     return convert_id(IDType(), b);
 }
 
+ImageID      convert_id(::noodles::ImageID const&);
+TextureID    convert_id(::noodles::TextureID const&);
+SamplerID    convert_id(::noodles::SamplerID const&);
+BufferID     convert_id(::noodles::BufferID const&);
+BufferViewID convert_id(::noodles::BufferViewID const&);
+TableID      convert_id(::noodles::TableID const&);
+LightID      convert_id(::noodles::LightID const&);
+MaterialID   convert_id(::noodles::MaterialID const&);
+GeometryID   convert_id(::noodles::GeometryID const&);
+EntityID     convert_id(::noodles::EntityID const&);
+SignalID     convert_id(::noodles::SignalID const&);
+MethodID     convert_id(::noodles::MethodID const&);
+PlotID       convert_id(::noodles::PlotID const&);
 
-TextureID  convert_id(::noodles::TextureID const&);
-BufferID   convert_id(::noodles::BufferID const&);
-TableID    convert_id(::noodles::TableID const&);
-LightID    convert_id(::noodles::LightID const&);
-MaterialID convert_id(::noodles::MaterialID const&);
-MeshID     convert_id(::noodles::GeometryID const&);
-ObjectID   convert_id(::noodles::ObjectID const&);
-SignalID   convert_id(::noodles::SignalID const&);
-MethodID   convert_id(::noodles::MethodID const&);
-PlotID     convert_id(::noodles::PlotID const&);
-
-TextureID  convert_id(::noodles::TextureID const*);
-BufferID   convert_id(::noodles::BufferID const*);
-TableID    convert_id(::noodles::TableID const*);
-LightID    convert_id(::noodles::LightID const*);
-MaterialID convert_id(::noodles::MaterialID const*);
-MeshID     convert_id(::noodles::GeometryID const*);
-ObjectID   convert_id(::noodles::ObjectID const*);
-SignalID   convert_id(::noodles::SignalID const*);
-MethodID   convert_id(::noodles::MethodID const*);
-PlotID     convert_id(::noodles::PlotID const*);
+ImageID      convert_id(::noodles::ImageID const*);
+TextureID    convert_id(::noodles::TextureID const*);
+SamplerID    convert_id(::noodles::SamplerID const*);
+BufferID     convert_id(::noodles::BufferID const*);
+BufferViewID convert_id(::noodles::BufferViewID const*);
+TableID      convert_id(::noodles::TableID const*);
+LightID      convert_id(::noodles::LightID const*);
+MaterialID   convert_id(::noodles::MaterialID const*);
+GeometryID   convert_id(::noodles::GeometryID const*);
+EntityID     convert_id(::noodles::EntityID const*);
+SignalID     convert_id(::noodles::SignalID const*);
+MethodID     convert_id(::noodles::MethodID const*);
+PlotID       convert_id(::noodles::PlotID const*);
 
 /// Write an arbitrary iterable container to a flatbuffer.
 template <class Container>
@@ -251,5 +278,6 @@ auto make_id_list(Iter b, Iter e, flatbuffers::FlatBufferBuilder& blder) {
 
 } // namespace noo
 
+#endif
 
 #endif // INTERFACE_TOOLS_H

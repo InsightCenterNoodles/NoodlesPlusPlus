@@ -2,7 +2,7 @@
 
 #include "noodlesserver.h"
 #include "noodlesstate.h"
-#include "serialize.h"
+#include "src/common/serialize.h"
 #include "src/generated/interface_tools.h"
 
 namespace noo {
@@ -37,22 +37,22 @@ TableT::TableT(IDType id, TableList* host, TableData const& d)
     }
 
     connect(m_data.source.get(),
-            &TableSource::table_selection_updated,
+            &ServerTableDelegate::table_selection_updated,
             this,
             &TableT::on_table_selection_updated);
 
     connect(m_data.source.get(),
-            &TableSource::table_row_deleted,
+            &ServerTableDelegate::table_row_deleted,
             this,
             &TableT::on_table_row_deleted);
 
     connect(m_data.source.get(),
-            &TableSource::table_row_updated,
+            &ServerTableDelegate::table_row_updated,
             this,
             &TableT::on_table_row_updated);
 
     connect(m_data.source.get(),
-            &TableSource::table_reset,
+            &ServerTableDelegate::table_reset,
             this,
             &TableT::on_table_reset);
 }
@@ -64,35 +64,27 @@ AttachedSignalList& TableT::att_signal_list() {
     return m_signal_list;
 }
 
-void TableT::write_new_to(Writer& w) {
-    auto lid = convert_id(id(), w);
+void TableT::write_new_to(SMsgWriter& w) {
 
-    auto update_methods_list =
-        make_id_list(m_method_list.begin(), m_method_list.end(), w);
+    messages::MsgTableCreate m;
+    m.id   = id();
+    m.name = opt_string(m_data.name);
+    m.meta = opt_string(m_data.meta);
 
-    auto update_signals_list =
-        make_id_list(m_signal_list.begin(), m_signal_list.end(), w);
+    m.methods_list =
+        delegates_to_ids(m_method_list.begin(), m_method_list.end());
 
+    m.signals_list =
+        delegates_to_ids(m_signal_list.begin(), m_signal_list.end());
 
-    auto x = noodles::CreateTableCreateUpdateDirect(w,
-                                                    lid,
-                                                    m_data.name.c_str(),
-                                                    m_data.meta.c_str(),
-                                                    &update_methods_list,
-                                                    &update_signals_list);
-
-    w.complete_message(x);
+    w.add(m);
 }
 
-void TableT::write_delete_to(Writer& w) {
-    auto lid = convert_id(id(), w);
-
-    auto x = noodles::CreateTableDelete(w, lid);
-
-    w.complete_message(x);
+void TableT::write_delete_to(SMsgWriter& w) {
+    w.add(messages::MsgTableDelete { .id = id() });
 }
 
-TableSource* TableT::get_source() const {
+ServerTableDelegate* TableT::get_source() const {
     return m_data.source.get();
 }
 
@@ -106,93 +98,78 @@ static void send_table_signal(TableT& n, BuiltinSignals bs, Args&&... args) {
 
     if (!sig) return;
 
-    auto to_send = marshall_to_any(std::forward<Args>(args)...);
+    auto to_send = convert_to_cbor_array(std::forward<Args>(args)...);
 
     sig->fire(n.id(), std::move(to_send));
 }
 
 
-void TableT::on_table_selection_updated(std::string         name,
-                                        SelectionRef const& ref) {
+void TableT::on_table_selection_updated(Selection const& ref) {
     //    qDebug() << "Table emit" << Q_FUNC_INFO
     //             << QString::fromStdString(ref.to_any().dump_string());
 
     send_table_signal(
-        *this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, name, ref.to_any());
+        *this, BuiltinSignals::TABLE_SIG_SELECTION_CHANGED, ref.to_cbor());
 }
 
-void TableT::on_table_row_deleted(TableQueryPtr q) {
-    // TODO clean up
-    std::vector<int64_t> keys;
-    keys.resize(q->num_rows);
-
-    q->get_keys_to(keys);
-
-    AnyVar v = std::move(keys);
-
-    //    qDebug() << "Table emit" << Q_FUNC_INFO
-    //             << QString::fromStdString(v.dump_string());
-
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_ROWS_DELETED, v);
+void TableT::on_table_row_deleted(QCborArray keys) {
+    send_table_signal(*this, BuiltinSignals::TABLE_SIG_ROWS_DELETED, keys);
 }
 
-void TableT::on_table_row_updated(TableQueryPtr q) {
-    AnyVar kv;
-    AnyVar cols;
-
-    {
-        std::vector<int64_t> keys;
-        keys.resize(q->num_rows);
-
-        q->get_keys_to(keys);
-
-        kv = std::move(keys);
-    }
-
-    {
-        AnyVarList l;
-        l.reserve(q->num_cols);
-
-        for (size_t i = 0; i < q->num_cols; i++) {
-            AnyVar this_c;
-
-            if (q->is_column_string(i)) {
-                AnyVarList avl(q->num_rows);
-
-                for (size_t row_i = 0; row_i < avl.size(); row_i++) {
-                    std::string_view value_view;
-
-                    q->get_cell_to(i, row_i, value_view);
-
-                    avl[i] = std::string(value_view);
-                }
-
-                this_c = std::move(avl);
-
-            } else {
-                std::vector<double> d(q->num_rows);
-
-                q->get_reals_to(i, d);
-
-                this_c = std::move(d);
-            }
-
-            l.emplace_back(std::move(this_c));
-        }
-
-        cols = std::move(l);
-    }
-
-    //    qDebug() << "Table emit" << Q_FUNC_INFO
-    //             << QString::fromStdString(kv.dump_string())
-    //             << QString::fromStdString(cols.dump_string());
-
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_DATA_UPDATED, kv, cols);
+void TableT::on_table_row_updated(QCborArray keys, QCborArray rows) {
+    send_table_signal(
+        *this, BuiltinSignals::TABLE_SIG_DATA_UPDATED, keys, rows);
 }
 
 void TableT::on_table_reset() {
     // qDebug() << "Table emit" << Q_FUNC_INFO;
-    send_table_signal(*this, BuiltinSignals::TABLE_SIG_RESET);
+
+    auto map = make_table_init_data(*this->get_source());
+
+    send_table_signal(*this, BuiltinSignals::TABLE_SIG_RESET, map);
+}
+
+
+QCborMap make_table_init_data(ServerTableDelegate& source) {
+    QCborMap return_obj;
+
+    auto all_data = source.get_all_data();
+
+    {
+        QCborArray column_info;
+
+        auto all_names = source.get_headers();
+
+        // "TEXT" / "REAL" / "INTEGER" / "ANY"
+
+        for (auto const& name : source.get_headers()) {
+
+            QCborMap map;
+            map[QStringLiteral("name")] = name;
+            map[QStringLiteral("type")] = "ANY";
+
+            column_info << map;
+        }
+
+        return_obj[QStringLiteral("columns")] = column_info;
+    }
+
+    return_obj[QStringLiteral("keys")] = all_data.first;
+    return_obj[QStringLiteral("data")] = all_data.second;
+
+    {
+        auto const& selections = source.get_all_selections();
+
+        QCborArray lv;
+
+        for (auto const& sel : selections) {
+            lv << to_cbor(sel);
+        }
+
+        return_obj[QStringLiteral("selections")] = std::move(lv);
+    }
+
+    return return_obj;
 }
 
 } // namespace noo

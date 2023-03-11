@@ -10,6 +10,15 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# hack for clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE INTERNAL "")
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+  set(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES
+      ${CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES})
+endif()
+# end hack for clangd
+
+
 # CMake Modules ================================================================
 
 include(cmake/CPM.cmake)
@@ -22,30 +31,22 @@ CPMAddPackage(
 
 CPMAddPackage("gh:TheLartians/PackageProject.cmake@1.6.0")
 
-CPMAddPackage(
-  NAME flatbuffers
-  URL https://github.com/google/flatbuffers/archive/v2.0.0.zip
-  VERSION 2.0.0
-  OPTIONS
-    "FLATBUFFERS_CODE_COVERAGE OFF"
-    "FLATBUFFERS_BUILD_TESTS OFF"
-    "FLATBUFFERS_BUILD_FLATLIB ON"
-    "FLATBUFFERS_BUILD_FLATC OFF"
-    "FLATBUFFERS_BUILD_FLATHASH OFF"
-    "FLATBUFFERS_LIBCXX_WITH_CLANG ON"
-)
+option(NOO_LOCAL_GLM "Use a local version of GLM instead of using CPM" OFF)
 
-CPMAddPackage(
-    NAME glm
-    URL  https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.7z
-    VERSION 0.9.9.8
-)
-
-find_package(Qt6 COMPONENTS Gui Widgets Core Websockets)
-
-if (NOT Qt6_FOUND)
-    find_package(Qt5 COMPONENTS Gui Widgets Core Websockets)
+if (NOT NOO_LOCAL_GLM)
+    CPMAddPackage(
+        NAME glm
+        URL  https://github.com/g-truc/glm/releases/download/0.9.9.8/glm-0.9.9.8.7z
+        VERSION 0.9.9.8
+    )
 endif()
+
+CPMAddPackage(
+    NAME magic_enum
+    GITHUB_REPOSITORY Neargye/magic_enum
+    GIT_TAG v0.8.0
+)
+
 
 # Options ======================================================================
 
@@ -71,21 +72,20 @@ target_include_directories(noodles PUBLIC
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>
 )
 
-message(${flatbuffers_SOURCE_DIR}/src/idl_parser.cpp)
-
-#we also have to add specific files from flatbuffers, because they want to make things hard
-target_sources(noodles PRIVATE
-    ${flatbuffers_SOURCE_DIR}/src/util.cpp
-    ${flatbuffers_SOURCE_DIR}/src/idl_parser.cpp
-    ${flatbuffers_SOURCE_DIR}/src/idl_gen_text.cpp
-    )
-
 # Because packagers like having fun
-target_link_libraries(noodles PRIVATE glm)
-target_include_directories(noodles PRIVATE ${flatbuffers_SOURCE_DIR}/include)
-target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets)
+target_link_libraries(noodles PRIVATE magic_enum)
+if (NOT NOO_LOCAL_GLM)
+    target_link_libraries(noodles PRIVATE glm)
+ENDIF()
 
-target_compile_definitions(noodles PRIVATE -DFLATBUFFERS_DEBUG_VERIFICATION_FAILURE)
+
+find_package(Qt6 COMPONENTS Gui Widgets Core WebSockets)
+
+if (NOT Qt6_FOUND)
+    find_package(Qt5 5.15 COMPONENTS Gui Widgets Core WebSockets REQUIRED)
+endif()
+
+target_link_libraries(noodles PUBLIC Qt::Core Qt::WebSockets Qt::Gui)
 
 add_subdirectory(src)
 
@@ -95,10 +95,6 @@ target_sources(noodles
 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_interface_types.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_interface_types.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_any.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_any.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_anyref.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_anyref.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_client_interface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_client_interface.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/noo_common.cpp

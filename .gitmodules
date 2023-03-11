@@ -1,3 +1,0 @@
-[submodule "src/message_spec"]
-	path = src/message_spec
-	url = git@github.com:InsightCenterNoodles/message_spec.git
