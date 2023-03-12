@@ -983,8 +983,8 @@ void MeshPatch::on_material_ready() {
 }
 
 void MeshPatch::invalidate_material() {
-    emit invalidated();
     m_is_material_ready = material->is_data_ready();
+    emit invalidated();
 }
 
 MeshInit::MeshInit(noo::messages::MsgGeometryCreate const& m,
